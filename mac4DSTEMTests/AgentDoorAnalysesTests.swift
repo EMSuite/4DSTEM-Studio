@@ -92,6 +92,15 @@ final class AgentDoorAnalysesTests: XCTestCase {
         return state
     }
 
+    /// Waits, as an agent does after a busy refusal, until the window has no run in flight (#369). Fails after 60 s.
+    private func waitUntilIdle(_ state: AppState) async throws {
+        let deadline = Date().addingTimeInterval(60)
+        while state.isBusy || state.resultPresentation.vdInFlight {
+            guard Date() < deadline else { return XCTFail("the window stayed busy for 60 s") }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
     private func object(_ text: String) throws -> [String: Any] {
         try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any], text)
     }
@@ -172,6 +181,10 @@ final class AgentDoorAnalysesTests: XCTestCase {
         let detector = try XCTUnwrap(try object(set.text)["detector"] as? [String: Any])
         XCTAssertEqual(detector["shape"] as? String, "annulus")
 
+        // Each typed field commits a full virtual-detector run (`ApertureEntry.apply` -> `commitApertureChange`), and a busy window
+        // refuses the next tool. An agent waits for the window, so the test does too: on a loaded 3-core CI runner the runs were
+        // still going when set_imaging arrived, and it was refused (#369).
+        try await waitUntilIdle(state)
         let view = try await call("set_imaging", ["direction": "region", "region_shape": "circle", "region_radius": 3])
         XCTAssertFalse(view.refused, view.text)
         XCTAssertEqual(state.activePane, .realSpace)

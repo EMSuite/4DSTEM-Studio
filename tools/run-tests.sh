@@ -98,13 +98,33 @@ unit_tests() (
     local -a classes; classes=("${(@s:,:)MAC4DSTEM_UNIT_ONLY}")
     local c; for c in "${classes[@]}"; do only+=(-only-testing:mac4DSTEMTests/$c); done
   fi
+  # A result bundle, so a failure says WHY (#370): with -quiet and parallel workers the log names a failing test and nothing
+  # else, and an intermittent CI failure could not be diagnosed from it (#368, #369).
+  local rc=0
   LLVM_PROFILE_FILE="$work/default-%p.profraw" \
     xcodebuild test -project "$ROOT/mac4DSTEM.xcodeproj" -scheme mac4DSTEM \
       -configuration Debug -destination 'platform=macOS' \
-      -derivedDataPath "$dd" "${par[@]}" \
+      -derivedDataPath "$dd" "${par[@]}" -resultBundlePath "$work/unit.xcresult" \
       "${only[@]}" -testLanguage en -testRegion US \
-      SWIFT_OPTIMIZATION_LEVEL=-O CODE_SIGNING_ALLOWED=NO "${loud[@]}"
+      SWIFT_OPTIMIZATION_LEVEL=-O CODE_SIGNING_ALLOWED=NO "${loud[@]}" || rc=$?
+  (( rc == 0 )) || print_test_failures "$work/unit.xcresult"
+  return $rc
 )
+
+# print_test_failures <xcresult>: each failure's test and message, from the result bundle (#370).
+print_test_failures() {
+  [[ -d "$1" ]] || { echo "run-tests.sh: no result bundle at $1, so no failure messages"; return 0; }
+  xcrun xcresulttool get test-results summary --path "$1" --format json 2>/dev/null | /usr/bin/python3 -I -c '
+import json, sys
+try:
+    failures = json.load(sys.stdin).get("testFailures", [])
+except ValueError:
+    failures = []
+print("Failure messages (%d):" % len(failures))
+for f in failures:
+    print("  %s: %s" % (f.get("testIdentifierString") or f.get("testName", "?"), (f.get("failureText") or "").strip()))
+'
+}
 
 # run_harnesses <root> <name>...: keeps going past a red harness and fails at the end, naming every red one.
 . "$(dirname "$0")/lib/run-harnesses.sh"

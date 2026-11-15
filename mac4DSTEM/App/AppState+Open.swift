@@ -315,7 +315,6 @@ extension AppState {
             return
         }
         errorMessage = Self.errorDetail(error)
-        lastComputeFailure = Self.errorDetail(error)
         statusText = "Error: \(Self.errorDetail(error))"
     }
 
@@ -332,6 +331,7 @@ extension AppState {
             present(error)
             return
         }
+        lastComputeFailure = Self.errorDetail(error)   // get_window's operation.error (#323)
         statusText = "Error: \(Self.errorDetail(error))"
     }
 

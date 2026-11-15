@@ -1568,15 +1568,14 @@ extension AppState {
             ]
             return (result.samplingAngstrom, result.samplingAngstrom, "A", provenance)
         case .depth:
-            guard let result = phaseContrast.parallaxDepth,
-                  result.depthsAngstrom.indices.contains(phaseContrast.parallaxDepthSelectedIndex) else {
+            guard let result = phaseContrast.parallaxDepth, let depth = phaseContrast.selectedParallaxDepthAngstrom else {
                 return (nil, nil, nil, [:])
             }
             let informationLimit = result.informationLimitInvAngstrom
                 .map { String($0) } ?? "off"
             let provenance: [String: String] = [
                 "source_product": "parallax_depth",
-                "depth_angstrom": String(result.depthsAngstrom[phaseContrast.parallaxDepthSelectedIndex]),
+                "depth_angstrom": String(depth),
                 "full_fit": String(result.usedFullFit),
                 "information_limit_inv_a": informationLimit,
                 "information_power": String(result.informationPower),

@@ -700,7 +700,8 @@ final class AppState {
         return acomSession.estimatedDuration(
             forPositions: ACOMScanSelection.full.positionCount(
                 width: descriptor.rx, height: descriptor.ry
-            )
+            ),
+            symmetry: resolvedACOMModel?.symmetry ?? .cubic   // the Work row's library (#411)
         )
     }
 

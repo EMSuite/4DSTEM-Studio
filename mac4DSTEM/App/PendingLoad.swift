@@ -402,11 +402,20 @@ final class PendingLoad: Identifiable {
     var loadedAsComputedFloat32: Bool { (view?.specification.detectorBin ?? 1) > 1 }
     var fullExtentByteCount: Int { configuration.fullExtentByteCount }
 
-    /// "42% of the full cube", or nil at full extent where there is nothing to
+    /// The whole cube as it would be held in memory: at the stored bit depth when the reader hands it out (#260), so it
+    /// sits beside `loadedByteCount` in the same unit.
+    var fullExtentHeldByteCount: Int { reader.residentByteCount(for: LoadView(fullExtentOf: source)) }
+
+    /// `fullExtentHeldByteCount`'s element type name ("uint16", "float32").
+    var fullExtentHeldTypeName: String { reader.residentElementType(for: LoadView(fullExtentOf: source)).rawValue }
+
+    /// "42% of the full cube's pixels", or nil at full extent where there is nothing to
     /// compare against.
     var reductionSummary: String? {
         guard let fraction = configuration.fractionOfFullExtent, fraction < 1 else { return nil }
-        return String(format: "%.0f%% of the full cube", fraction * 100)
+        // Of the pixels, not of the bytes: a binned selection is held as float32 while the whole cube is held at its stored
+        // bit depth, so the two byte counts beside it do not divide to this (#260).
+        return String(format: "%.0f%% of the full cube's pixels", fraction * 100)
     }
 
     /// The loaded shape, as the reader would see it.

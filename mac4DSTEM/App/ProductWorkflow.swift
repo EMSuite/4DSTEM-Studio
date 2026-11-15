@@ -340,6 +340,9 @@ extension AnalysisMode {
 /// Pure, testable guidance used by the sidebar and empty/result states.
 struct ProductWorkflowReadiness: Equatable, Sendable {
     var hasOriginProbe = false
+    /// An origin is set (any source, a sane fit) whether or not a probe radius is: DPC subtracts the origin and never reads the
+    /// probe, so its guidance asks for the origin only when this is false (#365).
+    var hasOrigin = false
     var hasRotation = false
     var hasQScale = false
     var hasRScale = false
@@ -770,7 +773,7 @@ enum ProductWorkflow {
                 : []
         case .dpc:
             var missing: [String] = []
-            if !readiness.hasOriginProbe { missing.append("origin") }
+            if !(readiness.hasOrigin || readiness.hasOriginProbe) { missing.append("origin") }
             if !readiness.hasRotation { missing.append("R–Q rotation") }
             if !readiness.hasQScale { missing.append("Q scale") }
             if !readiness.hasRScale { missing.append("R scale") }

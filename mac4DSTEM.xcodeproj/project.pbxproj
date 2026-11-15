@@ -1644,8 +1644,12 @@
 			};
 		};
 		30000000000000000000000C /* XCRemoteSwiftPackageReference "DiffractoKit" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "/var/folders/n_/jp6htt7s4vlcks13k9wqxvf00000gn/T/dk121/DiffractoKit";
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mac4DSTEM/DiffractoKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.18.0;
+			};
 		};
 		30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */ = {
 			isa = XCRemoteSwiftPackageReference;

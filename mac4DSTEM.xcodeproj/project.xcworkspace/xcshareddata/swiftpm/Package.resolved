@@ -1,5 +1,5 @@
 {
-  "originHash" : "3c5eb3c1a664d673d7d26c3c6bf11f3ef02ddce7bcd0e54abbb26d9d2d702610",
+  "originHash" : "88644f1bd62ffde6bd60f27e3e40b4839ae11bb01ffe191ef7812c18ca709847",
   "pins" : [
     {
       "identity" : "cubokit",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "fe380f5bfd7a9e943f853f6aee1598fef1820a8b",
         "version" : "0.11.1"
+      }
+    },
+    {
+      "identity" : "diffractokit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mac4DSTEM/DiffractoKit",
+      "state" : {
+        "revision" : "d991501a6e68f8b8ed199d5270161948145c8a20",
+        "version" : "0.18.0"
       }
     },
     {

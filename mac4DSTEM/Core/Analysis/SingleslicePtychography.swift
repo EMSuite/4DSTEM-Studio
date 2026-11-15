@@ -52,6 +52,11 @@ package nonisolated struct SingleslicePtychographyInput: Sendable {
     /// input assembled by hand.
     package let probeAberrations: PtychographyProbeAberrations
 
+    /// Bytes this product keeps while published: the complex object and probe (#413).
+    package var heldByteCount: Int {
+        (object.real.count + object.imaginary.count + probe.real.count + probe.imaginary.count) * MemoryLayout<Float>.stride
+    }
+
     // Explicit so the memberwise initializer is `package` (synthesized ones are internal). // v2.5 step 2b
     package nonisolated init(scanHeight: Int, scanWidth: Int, detectorHeight: Int, detectorWidth: Int, amplitudes: [Float], positions: [PtychographyScanPosition], objectSamplingRowAngstrom: Double, objectSamplingColumnAngstrom: Double, initialObject: PtychographyComplexArray, initialProbe: PtychographyComplexArray, probeAberrations: PtychographyProbeAberrations = PtychographyProbeAberrations()) {
         self.scanHeight = scanHeight

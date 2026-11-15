@@ -221,6 +221,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+      - name: A fresh checkout creates its dmgbuild venv (release tools, #373)
+        run: tools/release/tests/test-ensure-dmgbuild.sh
       - name: Fail on Accelerate / Metal / vDSP outside the allowlist
         # Decision D15. Plain grep, no build; also part of `inventory`, kept as its own job so the red is named.
         run: tools/check-kit-boundary.sh

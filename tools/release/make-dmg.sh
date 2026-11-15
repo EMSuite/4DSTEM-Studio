@@ -39,16 +39,8 @@ OUT="${2:-$ROOT/build/release/mac4DSTEM-$VERSION.dmg}"
 BACKGROUND="$ROOT/tools/release/dmg-background.png"
 [ -f "$BACKGROUND" ] || { echo "Missing background: $BACKGROUND" >&2; exit 1; }
 
-# Build-time only, kept out of the scientific Python environment on purpose.
-# Lives under build/ (gitignored); recreate with:
-#   python3 -m venv build/dmg-venv && build/dmg-venv/bin/pip install dmgbuild==1.6.1
-DMGBUILD="$ROOT/build/dmg-venv/bin/dmgbuild"
-if [ ! -x "$DMGBUILD" ]; then
-  echo "dmgbuild not found at $DMGBUILD" >&2
-  echo "Create it with:" >&2
-  echo "  python3 -m venv build/dmg-venv && build/dmg-venv/bin/pip install dmgbuild==1.6.1" >&2
-  exit 1
-fi
+# Build-time only, kept out of the scientific Python environment on purpose; created on first use (#373).
+DMGBUILD="$("$ROOT/tools/release/ensure-dmgbuild.sh" "$ROOT")"
 
 # Refuse to ship an unstapled app. Without this the DMG builds happily and the
 # failure only surfaces on a stranger's Mac, which is the worst place to find it.

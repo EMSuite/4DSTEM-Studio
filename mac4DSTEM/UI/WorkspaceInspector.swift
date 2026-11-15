@@ -409,7 +409,7 @@ private struct DatasetActionSections: View {
 
     var body: some View {
         if !appState.loadedView.isFullExtent || appState.residency.isResident
-            || sessionViewDiffers {
+            || appState.residency.reason != nil || sessionViewDiffers {
             InspectorSection("Dataset") {
                 if !appState.loadedView.isFullExtent {
                     InspectorActionRow {
@@ -449,6 +449,11 @@ private struct DatasetActionSections: View {
                         .disabled(appState.isBusy)
                         .accessibilityIdentifier("inspector.reopenWithoutSession")
                     }
+                }
+                // Held or streamed, and why (#314): the open's decision in one sentence.
+                if let reason = appState.residency.reason {
+                    InspectorNote(reason)
+                        .accessibilityIdentifier("inspector.residencyReason")
                 }
                 if appState.residency.isResident {
                     InspectorActionRow {

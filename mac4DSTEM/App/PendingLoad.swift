@@ -23,6 +23,7 @@
 //
 
 import ShellLayout
+import FormatoCore
 import Foundation
 import Metal
 import ShellMetal
@@ -385,7 +386,20 @@ final class PendingLoad: Identifiable {
     /// would refuse.
     var view: LoadView? { configuration.view }
 
-    var loadedByteCount: Int? { configuration.byteCount }
+    /// Bytes the selection holds in memory with Keep in memory on: the stored
+    /// size when the reader hands out the view at its stored bit depth, else
+    /// Float32 (a binned view, an 8-byte type; #260).
+    var loadedByteCount: Int? { view.map { reader.residentByteCount(for: $0) } }
+
+    /// The element type Keep in memory holds the selection at, or nil when it is not loadable.
+    var loadedElementType: FormatoDataType? { view.map { reader.residentElementType(for: $0) } }
+
+    /// `loadedElementType`'s name ("uint16", "float32"), for the size row.
+    var loadedElementTypeName: String { loadedElementType?.rawValue ?? FormatoDataType.float32.rawValue }
+
+    /// Whether the selection is binned, so held as Float32 whatever the file
+    /// stores (a computed view; #260).
+    var loadedAsComputedFloat32: Bool { (view?.specification.detectorBin ?? 1) > 1 }
     var fullExtentByteCount: Int { configuration.fullExtentByteCount }
 
     /// "42% of the full cube", or nil at full extent where there is nothing to

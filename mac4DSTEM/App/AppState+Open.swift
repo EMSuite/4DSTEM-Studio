@@ -946,6 +946,8 @@ extension AppState {
         guard let fourD = datasetSession.fourD, let d = descriptor else { return }
         let totalPatterns = d.ry * d.rx
         guard totalPatterns > 0 else { return }
+        // What one position takes in memory: the stored bit depth (#260), not Float32.
+        let heldBytesPerPattern = fourD.residentByteCountIfHeld / totalPatterns
         // The per-open "Keep in memory" switch is the only caller that asks
         // for `.resident`; `preload` stamps the seam's mode, so it is set first.
         if keepInMemory { await residency.request(.resident, on: fourD) }
@@ -958,7 +960,7 @@ extension AppState {
                 fraction,
                 SystemMonitor.scanProgressStatus(
                     "Loading into memory", processed: processed,
-                    total: totalPatterns, descriptor: d
+                    total: totalPatterns, descriptor: d, bytesPerPattern: heldBytesPerPattern
                 )
             )
         }

@@ -93,6 +93,9 @@ package actor DM4Reader: FourDDataSource {
     private let isScanFastest: Bool
     /// How the file is held, chosen once at open; a reopen holds it the same way.
     private let options: Data.ReadingOptions
+    /// The element type the kit's gather hands out (the file's, kept by `keepStoredType`, #260); nil for the rank-3
+    /// scan-shaped path, which reads only Float32. A reopen refuses a file of another type, so this holds for the reader's life.
+    private nonisolated let storedType: FormatoDataType?
 
     /// Non-nil only when the file is MAPPED: a file read into memory (a network volume) is valid after its disk is gone and
     /// needs no guard. Owner: this reader; one descriptor per open reader (a reopen replaces it with the new mapping's).
@@ -147,6 +150,7 @@ package actor DM4Reader: FourDDataSource {
         let opened = try Self.openCube(path: path, options: options)
         let chosen = opened.chosen, tree = opened.tree
         cube = chosen.cube
+        if case .kit(let kit) = chosen.cube { storedType = kit.layout.outputType } else { storedType = nil }
         isScanFastest = chosen.scanFastest
         calibrationNote = chosen.note
         let object = chosen.object
@@ -202,8 +206,10 @@ package actor DM4Reader: FourDDataSource {
             if dims.count == 4 {
                 let kit: DM4Datacube
                 do {
+                    // The stored type, converted by the app (`float32Values`, the kit's own conversion), so a tile can be
+                    // held at its stored bit depth (#260).
                     kit = try DM4Datacube(path: path, objectIndex: object.index, convention: .appCalibratedAxes,
-                                          storage: isMapped ? .mapped : .readIntoMemory)
+                                          storage: isMapped ? .mapped : .readIntoMemory, keepStoredType: true)
                 } catch DM4Error.cannotOpen(let detail) {
                     throw DM4Error.cannotOpen(detail)
                 } catch {
@@ -311,18 +317,46 @@ package actor DM4Reader: FourDDataSource {
 
     /// `rows` x `columns` source scan positions over the view's READ crop (or the whole detector), as Float, BEFORE binning.
     private func gather(_ view: LoadView, rows: Range<Int>, columns: Range<Int>) throws -> [Float] {
-        let source = descriptor
-        let start = [rows.lowerBound, columns.lowerBound, view.readDetectorCrop?.yOffset ?? 0, view.readDetectorCrop?.xOffset ?? 0]
-        let count = [rows.count, columns.count, view.readDetectorCrop?.height ?? source.qy, view.readDetectorCrop?.width ?? source.qx]
         switch cube {
-        case .kit(let kit):
-            guard let values = try kit.signal.array.read(start: start, count: count).float32Values() else {
+        case .kit:
+            guard let values = try storedGather(view, rows: rows, columns: columns).float32Values() else {
                 throw DM4Error.truncated
             }
             return values
         case .scanShaped(let flat):
+            let (start, count) = gatherBox(view, rows: rows, columns: columns)
             return try flat.read(start: start, count: count)
         }
+    }
+
+    private func gatherBox(_ view: LoadView, rows: Range<Int>, columns: Range<Int>) -> (start: [Int], count: [Int]) {
+        let source = descriptor
+        return ([rows.lowerBound, columns.lowerBound, view.readDetectorCrop?.yOffset ?? 0, view.readDetectorCrop?.xOffset ?? 0],
+                [rows.count, columns.count, view.readDetectorCrop?.height ?? source.qy, view.readDetectorCrop?.width ?? source.qx])
+    }
+
+    /// The kit's gather at the stored type, over the same box as `gather`.
+    private func storedGather(_ view: LoadView, rows: Range<Int>, columns: Range<Int>) throws -> FormatoArray {
+        guard case .kit(let kit) = cube else { throw FourDDataSourceError.noStoredRead }
+        let (start, count) = gatherBox(view, rows: rows, columns: columns)
+        return try kit.signal.array.read(start: start, count: count)
+    }
+
+    /// The kit's stored type for an unbinned view; nil for a binned view (computed in Float32) and the scan-shaped path.
+    package nonisolated func storedElementType(for view: LoadView) -> FormatoDataType? {
+        guard view.specification.detectorBin == 1, let storedType, storedType.convertsToFloat32 else { return nil }
+        return storedType
+    }
+
+    package func readStoredScanTile(_ view: LoadView, yRange: Range<Int>) throws -> FourDStoredTile {
+        guard let type = storedElementType(for: view) else { throw FourDDataSourceError.noStoredRead }
+        try requireDiskAlive()
+        try view.requireSource(shape: descriptor.shape)
+        guard yRange.lowerBound >= 0, yRange.upperBound <= view.descriptor.ry, !yRange.isEmpty else { throw DM4Error.truncated }
+        let y = view.sourceScanY(yRange.lowerBound), x = view.sourceScanX(0)
+        let array = try storedGather(view, rows: y..<(y + yRange.count), columns: x..<(x + view.descriptor.rx))
+        guard array.dataType == type else { throw DM4Error.truncated }
+        return FourDStoredTile(yRange: yRange, dataType: type, bytes: array.bytes)
     }
 
     package func readPattern(_ view: LoadView, ry scanY: Int, rx scanX: Int) throws -> [Float] {

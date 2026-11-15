@@ -4,10 +4,13 @@
 //        work identically against HDF5 (H5Reader) or Gatan DM4 (DM4Reader).
 //
 //  All conformers are actors (file access is serialized off the main thread).
-//  Reads return Float32 regardless of the on-disk dtype.
+//  Reads return Float32 regardless of the on-disk dtype; a reader that can also
+//  hand out a view's tiles at the stored bit depth (for the resident cube, #260)
+//  says so with `storedElementType(for:)`.
 //
 
 import Foundation
+import FormatoCore
 
 /// How a data file is named in a message the user reads.
 ///
@@ -36,6 +39,20 @@ package nonisolated struct FourDScanTile: Sendable {
         self.detectorHeight = detectorHeight
         self.detectorWidth = detectorWidth
         self.pixels = pixels
+    }
+}
+
+/// Contiguous view scan rows at the stored bit depth, in app order
+/// `[tileRy,Rx,Qy,Qx]`, little-endian: what the resident cube holds (#260).
+package nonisolated struct FourDStoredTile: Sendable {
+    package let yRange: Range<Int>
+    package let dataType: FormatoDataType
+    package let bytes: Data
+
+    package nonisolated init(yRange: Range<Int>, dataType: FormatoDataType, bytes: Data) {
+        self.yRange = yRange
+        self.dataType = dataType
+        self.bytes = bytes
     }
 }
 
@@ -316,6 +333,17 @@ package protocol FourDDataSource: Actor {
     func readStringAttribute(_ name: String, onObjectPath path: String) -> String?
     /// Pixel sizes/units from file metadata, or nil if the format has none.
     func pixelCalibration() -> PixelCalibration?
+
+    /// The element type `readStoredScanTile` hands out for `view`, or nil when
+    /// this reader cannot read the view at its stored bit depth (a binned view,
+    /// which is computed in Float32, or a format path without a stored read).
+    /// Decides what the resident cube holds and how many bytes it is admitted
+    /// at, so it must answer exactly what `readStoredScanTile` returns.
+    nonisolated func storedElementType(for view: LoadView) -> FormatoDataType?
+    /// Contiguous view scan rows at the stored bit depth; only called when
+    /// `storedElementType(for:)` is non-nil. Converting it with
+    /// `FormatoDataType.convertToFloat32` gives `readScanTile`'s pixels bit for bit.
+    func readStoredScanTile(_ view: LoadView, yRange: Range<Int>) throws -> FourDStoredTile
 }
 
 package extension FourDDataSource {
@@ -324,13 +352,36 @@ package extension FourDDataSource {
     func readProbe(_ candidate: ProbeCandidate) throws -> [Float] {
         throw FourDDataSourceError.noProbe(candidate.path)
     }
+    nonisolated func storedElementType(for view: LoadView) -> FormatoDataType? { nil }
+    func readStoredScanTile(_ view: LoadView, yRange: Range<Int>) throws -> FourDStoredTile {
+        throw FourDDataSourceError.noStoredRead
+    }
+}
+
+extension FourDDataSource {
+    /// The element type a resident cube of `view` holds: the stored type when the
+    /// reader hands it out and it is at most four bytes, else Float32 (binned or
+    /// processed views, 8-byte types, readers without a stored read).
+    package nonisolated func residentElementType(for view: LoadView) -> FormatoDataType {
+        guard let stored = storedElementType(for: view), stored.isHeldAsStored else { return .float32 }
+        return stored
+    }
+
+    /// Bytes a resident cube of `view` holds (#260): the view's element count at
+    /// `residentElementType(for:)`. What the Keep-in-memory switch and the
+    /// admission rule weigh.
+    package nonisolated func residentByteCount(for view: LoadView) -> Int {
+        view.descriptor.shape.reduce(1, *) * residentElementType(for: view).byteSize
+    }
 }
 
 package nonisolated enum FourDDataSourceError: Error, LocalizedError {
     case noProbe(String)
+    case noStoredRead
     package var errorDescription: String? {
         switch self {
         case .noProbe(let path): "This reader cannot read a probe image at \(path)."
+        case .noStoredRead: "This reader cannot read the data at its stored bit depth."
         }
     }
 }

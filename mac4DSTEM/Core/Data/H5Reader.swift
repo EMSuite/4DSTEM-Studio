@@ -450,9 +450,10 @@ package actor H5Reader: FourDDataSource {
         return (start, count)
     }
 
-    private func read(
+    /// The view's region of the dataset as stored: the hyperslab `HDF5SlabReader` reads, over the read crop, before binning.
+    private func slab(
         _ view: LoadView, scanY: Range<Int>, scanX: Range<Int>, label: String
-    ) throws -> [Float] {
+    ) throws -> FormatoArray {
         let path = view.source.datasetPath
         let slabReader: HDF5SlabReader
         if let cached = slabReaders[path] {
@@ -463,19 +464,41 @@ package actor H5Reader: FourDDataSource {
             slabReader = opened
         }
         let slab = try hyperslab(view, dims: slabReader.shape, scanY: scanY, scanX: scanX)
-        let buffer: [Float]
         do {
-            guard let floats = try slabReader.read(start: slab.start, count: slab.count).float32Values() else {
-                throw H5Error.readFailed(label)
-            }
-            buffer = floats
+            return try slabReader.read(start: slab.start, count: slab.count)
         } catch {
+            throw H5Error.readFailed(label)
+        }
+    }
+
+    private func read(
+        _ view: LoadView, scanY: Range<Int>, scanX: Range<Int>, label: String
+    ) throws -> [Float] {
+        guard let buffer = try slab(view, scanY: scanY, scanX: scanX, label: label).float32Values() else {
             throw H5Error.readFailed(label)
         }
         let patternCount = buffer.count
             / max(1, (view.readDetectorCrop?.height ?? view.source.qy)
                      * (view.readDetectorCrop?.width ?? view.source.qx))
         return view.binned(buffer, patternCount: patternCount)
+    }
+
+    /// The stored type for an unbinned view: the hyperslab is the view's tile as the file stores it (`describe` names a
+    /// numeric dataset by its `FormatoDataType`), so no conversion is needed to hold it. A binned view is computed in Float32.
+    package nonisolated func storedElementType(for view: LoadView) -> FormatoDataType? {
+        guard view.specification.detectorBin == 1, let type = FormatoDataType(rawValue: view.source.dtypeDescription),
+              type.convertsToFloat32 else { return nil }
+        return type
+    }
+
+    package func readStoredScanTile(_ view: LoadView, yRange: Range<Int>) throws -> FourDStoredTile {
+        guard let type = storedElementType(for: view) else { throw FourDDataSourceError.noStoredRead }
+        guard yRange.lowerBound >= 0, yRange.upperBound <= view.descriptor.ry, !yRange.isEmpty else {
+            throw H5Error.readFailed("invalid scan tile \(yRange)")
+        }
+        let array = try slab(view, scanY: yRange, scanX: 0..<view.descriptor.rx, label: "scan tile \(yRange)")
+        guard array.dataType == type else { throw H5Error.readFailed("scan tile \(yRange) is \(array.dataType.rawValue), not \(type.rawValue)") }
+        return FourDStoredTile(yRange: yRange, dataType: type, bytes: array.bytes)
     }
 
     package func readPattern(_ view: LoadView, ry: Int, rx: Int) throws -> [Float] {

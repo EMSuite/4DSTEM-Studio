@@ -208,6 +208,8 @@ package final class DatasetResidency {
         let entry = generation
         await data.releaseResident()
         await sync(with: data, ifGeneration: entry)
+        // The open's reason no longer holds once the person released the cube (#314).
+        if generation == entry, !isResident { reason = "Streaming: the cube was released." }
     }
 
     /// Publish what the array actually holds — never what was requested — unless the dataset was replaced (`reset`) since

@@ -310,6 +310,16 @@ final class DatasetResidencyTests: XCTestCase {
         XCTAssertTrue(state.residency.isResident)
         XCTAssertTrue(state.residency.reason?.hasPrefix("Kept in memory: ") == true)
     }
+
+    /// The inspector's reason follows a Release cube (#314): it no longer says the cube is kept.
+    func testReleasingTheCubeChangesTheReason() async {
+        let state = AppState()
+        await state.openDemoFixture()
+        XCTAssertTrue(state.residency.isResident)
+        await state.releaseResidentCube()
+        XCTAssertFalse(state.residency.isResident)
+        XCTAssertEqual(state.residency.reason, "Streaming: the cube was released.")
+    }
 }
 
 /// The progress callback is `@MainActor`, so a plain reference box is enough.

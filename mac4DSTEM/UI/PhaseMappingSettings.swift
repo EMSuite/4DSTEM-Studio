@@ -411,6 +411,34 @@ struct PhaseMappingSections: View {
                 }
                 .disabled(appState.isBusy)
                 .accessibilityIdentifier("phaseMapping.showDistance")
+                if run.orientationSource == .structures {
+                    // The orientation each position's phase was found at (#293): the second button of the pair,
+                    // reading "Show Phase Map" while its picture is on screen.
+                    let orientation = PhaseResultPicture.control(
+                        owning: .orientation, displayedKind: appState.displayedProduct?.kind)
+                    let blocker = appState.phaseOrientationBlocker
+                    InspectorAdaptiveButton(orientation.title, systemImage: orientation.systemImage,
+                                            help: blocker ?? "Each position of the phase chosen below coloured by its orientation "
+                                                + "(the beam direction in the crystal, IPF-Z); the other phases grey") {
+                        appState.showPhaseResult(orientation.target)
+                    }
+                    .disabled(appState.isBusy || blocker != nil)
+                    .accessibilityIdentifier("phaseMapping.showOrientation")
+                }
+            }
+            if run.orientationSource == .structures, let map = appState.phaseMapping.map, map.phaseNames.count > 1,
+               let shown = appState.resolvedOrientationPhase {
+                InspectorRow("Orientation of") {
+                    Picker("Orientation of", selection: Binding(get: { shown },
+                                                               set: { appState.selectOrientationPhase($0) })) {
+                        ForEach(Array(map.phaseNames.enumerated()), id: \.offset) { index, name in
+                            Text(name).tag(index)
+                        }
+                    }
+                    .labelsHidden()
+                    .accessibilityIdentifier("phaseMapping.orientationPhase")
+                }
+                .help("The phase whose orientations Show Orientation draws.")
             }
 
             if run.orientationSource == .typedZones {

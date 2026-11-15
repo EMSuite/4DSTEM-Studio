@@ -19,6 +19,7 @@ import DSTEMCore
 import DSTEMSession
 #endif
 
+@MainActor
 enum Mac4DSTEMAgentDoor {
     /// mac4DSTEM's own port on 127.0.0.1 (macTEM's is 47812), so the copied connection command stays good; another when taken.
     static let port: UInt16 = 47811
@@ -42,12 +43,17 @@ enum Mac4DSTEMAgentDoor {
     }
 
     /// The Agent folder (Settings > Agents) and whether agents may save there (`AgentDoorFolder.swift`); at launch and on change.
-    static func setFolder(bookmark: Data?, savesAllowed allowed: Bool) {
+    /// Answers a fresh bookmark when the kept one is stale (the folder moved), for the caller to keep instead (#310).
+    @discardableResult
+    static func setFolder(bookmark: Data?, savesAllowed allowed: Bool) -> Data? {
+        var refreshed: Data?
         if folderBookmark != bookmark || (bookmark != nil && folder.url == nil) {
             folderBookmark = bookmark
-            folder.use(bookmark: bookmark)
+            refreshed = folder.use(bookmark: bookmark)
+            if let refreshed { folderBookmark = refreshed }
         }
         savesAllowed = allowed
+        return refreshed
     }
 
     /// The bookmark `folder` was last opened from, so a window that appears does not open it again.

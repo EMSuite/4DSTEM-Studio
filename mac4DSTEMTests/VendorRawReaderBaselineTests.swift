@@ -259,13 +259,24 @@ final class VendorRawReaderBaselineTests: XCTestCase {
     func testTheKitTakesAnyHeaderSizeAndHeaderlessMIB() async throws {
         try writeMIB("h512.mib", frames: 2, size: 512)
         try writeMIB("nodetector_512.mib", frames: 2, size: 512, withDetector: false)
+        // The kit is the only reader since mac4DSTEM#300: opening at all means the kit took the file.
         let kit = try MIBReader(path: directory.appendingPathComponent("h512.mib").path)
-        let kitRefusal = await kit.kitRefusal
-        XCTAssertNil(kitRefusal, "a 512-byte header with a width and height is the kit's")
         let headerless = try MIBReader(path: directory.appendingPathComponent("nodetector_512.mib").path)
-        let headerlessRefusal = await headerless.kitRefusal
-        XCTAssertNil(headerlessRefusal, "a header without width and height is the kit's since FormatoKit 0.12.0")
         let d = try await kit.discoverPrimaryDataset()
         XCTAssertTrue(d.dtypeDescription.hasPrefix("U16"))
+        let headerlessShape = try await headerless.discoverPrimaryDataset().shape
+        XCTAssertEqual(headerlessShape, [1, 2, 256, 256])
+    }
+
+    /// A crafted header whose data offset is near `Int.max` is refused, not a trap (mac4DSTEM#300: the app's own frame reads added
+    /// it to the frame size unchecked and seeked to `UInt64(offset)`). The kit refuses the header; nothing else reads it.
+    func testAMIBWithACraftedHeaderOffsetIsRefused() throws {
+        var data = mibHeader(size: 384, offset: Int.max - 10, withDetector: false)
+        data.append(Data(count: 256 * 256 * 2))
+        try data.write(to: directory.appendingPathComponent("crafted.mib"))
+        try write("crafted.hdr", "ScanX:\t1\nScanY:\t1\n")
+        XCTAssertThrowsError(try MIBReader(path: directory.appendingPathComponent("crafted.mib").path)) { error in
+            XCTAssertTrue(error is VendorRawError, "refused as \(error)")
+        }
     }
 }

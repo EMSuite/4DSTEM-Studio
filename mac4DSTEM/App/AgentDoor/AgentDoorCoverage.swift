@@ -122,6 +122,7 @@ enum AgentDoorCoverage {
         "inspector.promoteRunHalt": .seen,
         "inspector.promoteRunHeadline": .seen,
         "inspector.promoteToFullExtent": .tool("reopen_full_extent"),
+        "inspector.residencyReason": .seen,
         "inspector.reopenWithoutSession": .tool("reopen_without_session"),
         "inspector.sessionProvenanceMismatch": .seen,
         "inspector.sessionSidecarDoesNotFit": .seen,

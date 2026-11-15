@@ -298,16 +298,17 @@ final class DatasetResidencyTests: XCTestCase {
 
     // MARK: Opening a dataset leaves residency in a stated condition
 
-    func testOpeningTheDemoLeavesResidencyStreamingAndNotPreloading() async {
+    func testOpeningTheDemoHoldsItByDefaultAndClearsThePreload() async {
         let state = AppState()
         await state.openDemoFixture()
 
-        // Not an assertion that residency is useless — an assertion that the
-        // shipped default is streaming and that the open cleared its preload
-        // state either way.
+        // #314: the shipped default keeps a cube that fits a quarter of the RAM
+        // (the tiny demo always does), and the open clears its preload state
+        // either way.
         XCTAssertNil(state.residency.preloadFraction)
         XCTAssertFalse(state.residency.isPreloading)
-        XCTAssertFalse(state.residency.isResident)
+        XCTAssertTrue(state.residency.isResident)
+        XCTAssertTrue(state.residency.reason?.hasPrefix("Kept in memory: ") == true)
     }
 }
 

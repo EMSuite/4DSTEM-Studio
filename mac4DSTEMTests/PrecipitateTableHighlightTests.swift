@@ -19,11 +19,11 @@ final class PrecipitateTableHighlightTests: XCTestCase {
     ///   0 0 0 2 2
     ///   0 0 0 2 2
     ///   1 0 0 0 0
-    private func classMap() -> PrecipitateSegmentation.ClassMapObjects {
+    private func classMap() throws -> PrecipitateSegmentation.ClassMapObjects {
         var labels = [Int32](repeating: 0, count: 15)
         labels[2 * 5 + 0] = 1
         for (x, y) in [(3, 0), (4, 0), (3, 1), (4, 1)] { labels[y * 5 + x] = 2 }
-        return PrecipitateSegmentation.classObjects(
+        return try PrecipitateSegmentation.classObjects(
             labels: labels, width: 5, height: 3,
             roles: .init(precipitateClasses: [1, 2], matrix: [0], notIndexed: []),
             pixelSize: nil, pixelUnit: nil)
@@ -44,8 +44,8 @@ final class PrecipitateTableHighlightTests: XCTestCase {
     /// (a) The pixel set and the outline of the selected object are exactly
     /// that object's. Break-first: `ids.contains(object.id)` → `true` in
     /// `pixels` adds the other object and goes red.
-    func testHighlightCoversExactlyTheSelectedObject() {
-        let objects = classMap()
+    func testHighlightCoversExactlyTheSelectedObject() throws {
+        let objects = try classMap()
         let block = objectID(label: 2, in: objects), single = objectID(label: 1, in: objects)
         XCTAssertNotEqual(block, single, "test precondition: ids are distinct across classes")
 
@@ -75,12 +75,12 @@ final class PrecipitateTableHighlightTests: XCTestCase {
     /// the match ignoring `sourceID` (B goes red); the outline built from every
     /// object instead of the selection; the kind gate dropped; `publish`
     /// keeping its old `sourceID` (the re-run assertion goes red).
-    func testTheRelayHighlightsOnlyTheRunItCameFromAndNeverRepublishes() {
+    func testTheRelayHighlightsOnlyTheRunItCameFromAndNeverRepublishes() throws {
         let a = AppState(), b = AppState(), other = AppState()
-        let resultA = classMap()
+        let resultA = try classMap()
         a.precipitateClassification.publish(resultA)
-        b.precipitateClassification.publish(classMap())
-        other.precipitateClassification.publish(classMap())
+        b.precipitateClassification.publish(try classMap())
+        other.precipitateClassification.publish(try classMap())
         publishObjectsPicture(a); publishObjectsPicture(b)     // `other` shows no objects picture
         let id = objectID(label: 2, in: resultA)
         let sourceA = try! XCTUnwrap(a.precipitateClassification.sourceID)
@@ -111,7 +111,7 @@ final class PrecipitateTableHighlightTests: XCTestCase {
         XCTAssertFalse(a.precipitateHighlightOutline(for: relay).isEmpty)
 
         // A re-run mints a new sourceID: the open table's selection is stale.
-        a.precipitateClassification.publish(classMap())
+        a.precipitateClassification.publish(try classMap())
         XCTAssertNotEqual(a.precipitateClassification.sourceID, sourceA)
         XCTAssertTrue(a.precipitateHighlightOutline(for: relay).isEmpty)
 
@@ -138,8 +138,8 @@ final class PrecipitateTableHighlightTests: XCTestCase {
     /// and a snapshot written before the field existed still decodes (no source).
     func testReportSourceIDSurvivesCodableAndOldSnapshotsDecode() throws {
         let source = UUID()
-        let report = PrecipitateObjectReport.make(
-            objects: classMap(), phaseNames: ["Al", "A", "B"], matrixPhaseIndex: 0,
+        let report = try PrecipitateObjectReport.make(
+            objects: try classMap(), phaseNames: ["Al", "A", "B"], matrixPhaseIndex: 0,
             pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1, sourceID: source)
         let data = try JSONEncoder().encode(report)
         XCTAssertEqual(try JSONDecoder().decode(PrecipitateObjectReport.self, from: data).sourceID, source)

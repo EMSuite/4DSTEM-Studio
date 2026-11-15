@@ -19,7 +19,7 @@ extension Mac4DSTEMAgentDoor {
                       + "on this dataset (set_detector, run_task). get_result_image shows the map.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             if case .failed(let reason) = state.runDiskDisagreement() { return .refusal(status: 409, message: reason) }
             // The summary line the window shows (unmatched peaks per detector) is the answer an agent reads.
             let summary = state.statusText
@@ -31,7 +31,7 @@ extension Mac4DSTEMAgentDoor {
                       + "Answers the settings.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             state.resetDiskDetectionParams()
             state.statusText = "An agent reset disk detection to the recommended settings."
             return .json(diskSettings(of: state))
@@ -43,7 +43,7 @@ extension Mac4DSTEMAgentDoor {
                       + "matrix row.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             if let refusal = state.matrixZoneAxisRefusal { return .refusal(status: 409, message: refusal) }
             state.statusText = "An agent pressed Find Matrix Zone Axis."
             Task { _ = await state.findMatrixZoneAxis() }

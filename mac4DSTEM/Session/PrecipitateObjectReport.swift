@@ -253,7 +253,7 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
         endOnDirection: Int? = nil,
         variantDirections: [Int]? = nil,
         variantDefaultToleranceDegrees: Double? = nil
-    ) -> PrecipitateObjectReport {
+    ) throws -> PrecipitateObjectReport {
         let minimum = max(1, minimumAreaPx)
         let scale: Double? = {
             guard let pixelSize, pixelSize.isFinite, pixelSize > 0, pixelUnit != nil else { return nil }
@@ -268,7 +268,7 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
         for classObjects in objects.classes {
             let phaseName = name(classObjects.label)
             let accepted = Set(classObjects.objects.filter { $0.area >= minimum }.map(\.id))
-            let density = PrecipitateSegmentation.density(
+            let density = try PrecipitateSegmentation.density(
                 objects: classObjects.objects, accepted: accepted,
                 analysedPixels: objects.analysedPixels,
                 width: objects.width, height: objects.height,
@@ -336,7 +336,7 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
                 report.variantUnavailable = why
             } else {
                 let preset = variantSettings?.orientationRelationship ?? .betaDoublePrimeInAl
-                report.variantGroups = Self.variantGroups(objects: objects, rows: rows, minimum: minimum, scale: scale, pixelUnit: pixelUnit,
+                report.variantGroups = try Self.variantGroups(objects: objects, rows: rows, minimum: minimum, scale: scale, pixelUnit: pixelUnit,
                                                           familyNames: preset.familyNames, variantCount: variantDirections?.count ?? 12)
                 report.variantHabit = preset.habit
                 report.variantSummary = variantSettings.map { Self.variantSummary($0, structuresToleranceDegrees: variantDefaultToleranceDegrees) }
@@ -360,21 +360,21 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
 
     /// The three needle directions, the twelve variants and the unassigned, over the objects the variant run covered.
     private nonisolated static func variantGroups(objects: PrecipitateSegmentation.ClassMapObjects, rows: [Row], minimum: Int, scale: Double?, pixelUnit: String?,
-                                                    familyNames: [String], variantCount: Int) -> [VariantGroup] {
+                                                    familyNames: [String], variantCount: Int) throws -> [VariantGroup] {
         let covered = rows.filter { $0.variant != nil }
         let allObjects = objects.classes.flatMap(\.objects)
-        func group(_ kind: VariantGroup.Kind, _ index: Int, _ members: [Row], detail: String? = nil, name: String? = nil) -> VariantGroup {
+        func group(_ kind: VariantGroup.Kind, _ index: Int, _ members: [Row], detail: String? = nil, name: String? = nil) throws -> VariantGroup {
             let ids = Set(members.map(\.id))
             let subset = allObjects.filter { ids.contains($0.id) }
             let accepted = Set(members.filter(\.isCounted).map(\.id))
-            let density = PrecipitateSegmentation.density(
+            let density = try PrecipitateSegmentation.density(
                 objects: subset, accepted: accepted, analysedPixels: objects.analysedPixels, width: objects.width, height: objects.height,
                 pixelSize: scale, pixelUnit: scale == nil ? nil : pixelUnit)
             return VariantGroup(kind: kind, index: index, totalObjects: members.count, countedObjects: accepted.count,
                                 arealDensity: members.isEmpty ? nil : density.arealDensity, detail: detail, name: name)
         }
         var out: [VariantGroup] = []
-        for d in familyNames.indices { out.append(group(.direction, d, covered.filter { $0.variant?.direction == d }, name: familyNames[d])) }
+        for d in familyNames.indices { out.append(try group(.direction, d, covered.filter { $0.variant?.direction == d }, name: familyNames[d])) }
         // A variant that is the other half of a group shown on another row has no row of its own: "Variant 3: 0 objects" under
         // "Variant 2 or 3" would read as looked for and not found.
         let absorbed = Set(covered.flatMap { $0.variant?.alternatives ?? [] })
@@ -384,12 +384,12 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
             // A group the pattern cannot tell apart is named as one: "Variant 6 or 7" (every member of a row carries the same text
             // when the scan is one grain; with several, the texts met are listed).
             let texts = Set(members.compactMap { $0.variant?.alternatives == nil ? nil : $0.variantText }).sorted()
-            out.append(group(.variant, v, members, name: texts.isEmpty ? nil : "Variant " + texts.joined(separator: ", ")))
+            out.append(try group(.variant, v, members, name: texts.isEmpty ? nil : "Variant " + texts.joined(separator: ", ")))
         }
         let unassigned = covered.filter { !($0.variant?.isAssigned ?? false) }
         let ambiguous = unassigned.filter { if case .ambiguous? = $0.variant?.status { true } else { false } }.count
         let none = unassigned.count - ambiguous
-        out.append(group(.unassigned, 0, unassigned, detail: unassigned.isEmpty ? nil : "ambiguous \(ambiguous), no orientation \(none)"))
+        out.append(try group(.unassigned, 0, unassigned, detail: unassigned.isEmpty ? nil : "ambiguous \(ambiguous), no orientation \(none)"))
         return out
     }
 

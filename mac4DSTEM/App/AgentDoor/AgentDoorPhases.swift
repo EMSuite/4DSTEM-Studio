@@ -31,7 +31,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let file: URL
             switch folder.resolve(call.arguments["path"] ?? "") {
             case .success(let url): file = url
@@ -52,7 +52,7 @@ extension Mac4DSTEMAgentDoor {
             let product = state.phaseMapping
             if call.arguments["is_matrix"] == "true" { markMatrix(product.phases.count - 1, in: product) }
             let role = product.phases.last?.isMatrix == true ? " as the matrix" : ""
-            state.statusText = "An agent added the phase \(model.displayName)\(role) from \(file.lastPathComponent)."
+            state.statusText = "An agent added the phase \(quotedAgentText(model.displayName))\(role) from \(quotedAgentText(file.lastPathComponent))."
             return .json(phaseMappingSettings(of: state))
         },
         AgentTool(name: "set_phase", title: "Change a phase",
@@ -75,7 +75,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let product = state.phaseMapping
             guard let index = call.arguments["index"].flatMap(Int.init), product.phases.indices.contains(index) else {
                 return .refusal(status: 404, message: noPhase(call.arguments["index"], product))
@@ -120,14 +120,14 @@ extension Mac4DSTEMAgentDoor {
                                                   + "phase_mapping.phases (from 0).", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let product = state.phaseMapping
             guard let index = call.arguments["index"].flatMap(Int.init), product.phases.indices.contains(index) else {
                 return .refusal(status: 404, message: noPhase(call.arguments["index"], product))
             }
             let slot = product.phases[index]
             state.removePhaseMappingSlot(slotID: slot.slotID)
-            state.statusText = "An agent removed the phase \(slot.model.displayName)."
+            state.statusText = "An agent removed the phase \(quotedAgentText(slot.model.displayName))."
             return .json(phaseMappingSettings(of: state))
         },
     ]

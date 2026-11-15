@@ -25,16 +25,16 @@ final class ObjectJoinsTests: XCTestCase {
 
     private func pixels(_ rows: [Int], _ cols: [Int]) -> [Int] { rows.flatMap { r in cols.map { r * Self.side + $0 } } }
 
-    private func objects() -> PrecipitateSegmentation.ClassMapObjects {
+    private func objects() throws -> PrecipitateSegmentation.ClassMapObjects {
         var labels = [Int32](repeating: 0, count: Self.side * Self.side)
         for p in pixels(rowsA, colsA) + pixels(rowsB, colsB) + pixels(rowsC, colsC) { labels[p] = 1 }
-        return PrecipitateSegmentation.classObjects(
+        return try PrecipitateSegmentation.classObjects(
             labels: labels, width: Self.side, height: Self.side, roles: .init(precipitateClasses: [1], matrix: [0], notIndexed: [9]),
             pixelSize: nil, pixelUnit: nil)
     }
 
-    private func ids() -> (a: Int, b: Int, c: Int) {
-        let all = objects().classes.flatMap(\.objects)
+    private func ids() throws -> (a: Int, b: Int, c: Int) {
+        let all = try objects().classes.flatMap(\.objects)
         func id(_ p: Int) -> Int { all.first { $0.pixelIndices.contains(p) }!.id }
         return (id(pixels(rowsA, colsA)[0]), id(pixels(rowsB, colsB)[0]), id(pixels(rowsC, colsC)[0]))
     }
@@ -115,8 +115,8 @@ final class ObjectJoinsTests: XCTestCase {
     /// its own sigma (three sigma allowed), carries a sigma, and keeps the objects apart. Mutations: summing the whole map instead of the
     /// object (A and B read the same), the matrix pixels leaking into an object (Mg falls far outside the sigma), dropping the sigma.
     func testEachObjectIsOnePooledFitThatRecoversItsPlantedCompositionWithinItsSigma() throws {
-        let id = ids()
-        let result = ObjectCompositionJoin.run(objects: objects(), quantified: quantified(), registration: identity)
+        let id = try ids()
+        let result = ObjectCompositionJoin.run(objects: try objects(), quantified: quantified(), registration: identity)
         XCTAssertNil(result.unavailable)
         let a = try XCTUnwrap(result.perObject[id.a], result.reasons[id.a] ?? "no A"), b = try XCTUnwrap(result.perObject[id.b], result.reasons[id.b] ?? "no B")
         XCTAssertEqual(a.pixels, 48); XCTAssertEqual(b.pixels, 25)
@@ -137,10 +137,10 @@ final class ObjectJoinsTests: XCTestCase {
     }
 
     func testNothingQuantifiedNoRegistrationAndWrongGridsSayWhy() throws {
-        XCTAssertEqual(ObjectCompositionJoin.run(objects: objects(), quantified: nil, registration: identity).unavailable,
+        XCTAssertEqual(ObjectCompositionJoin.run(objects: try objects(), quantified: nil, registration: identity).unavailable,
                        ObjectCompositionJoin.notQuantifiedSentence)
-        XCTAssertNotNil(ObjectCompositionJoin.run(objects: objects(), quantified: quantified(), registration: nil).unavailable)
-        XCTAssertNotNil(ObjectCompositionJoin.run(objects: objects(), quantified: quantified(),
+        XCTAssertNotNil(ObjectCompositionJoin.run(objects: try objects(), quantified: quantified(), registration: nil).unavailable)
+        XCTAssertNotNil(ObjectCompositionJoin.run(objects: try objects(), quantified: quantified(),
                                                   registration: PoolCatalogue.identityRegistration(width: 4, height: 4)).unavailable)
     }
 
@@ -149,17 +149,17 @@ final class ObjectJoinsTests: XCTestCase {
     func testAFitTheKitRefusesIsTheObjectsReason() throws {
         var incomplete = method
         incomplete.typedK = [.init(element: "Al", k: 1, relativeSigma: 0)]
-        let result = ObjectCompositionJoin.run(objects: objects(), quantified: .init(source: source(), method: incomplete, tables: QuantificationTables.bundled()),
+        let result = ObjectCompositionJoin.run(objects: try objects(), quantified: .init(source: source(), method: incomplete, tables: QuantificationTables.bundled()),
                                                registration: identity)
-        let id = ids()
+        let id = try ids()
         XCTAssertNil(result.perObject[id.a])
         XCTAssertFalse(try XCTUnwrap(result.reasons[id.a]).isEmpty)
         XCTAssertEqual(result.reasons[id.c], "under 4 EDS px", "the pixel rule is said before any fit")
     }
 
     /// A stopped run says so and lands nothing half-made.
-    func testACancelledRunSaysSo() {
-        let result = ObjectCompositionJoin.run(objects: objects(), quantified: quantified(), registration: identity, cancelled: { true })
+    func testACancelledRunSaysSo() throws {
+        let result = ObjectCompositionJoin.run(objects: try objects(), quantified: quantified(), registration: identity, cancelled: { true })
         XCTAssertNotNil(result.unavailable); XCTAssertTrue(result.perObject.isEmpty)
     }
 
@@ -186,9 +186,9 @@ final class ObjectJoinsTests: XCTestCase {
     }
 
     func testStrainIsPerObjectExcludesUnfittedPixelsAndUsesRowsAndColumns() throws {
-        let id = ids()
+        let id = try ids()
         // Drop the pixel holding 0.04 (index 1), so B's fitted pixels hold 0.02, 0.02, 0.04: mean 0.08/3.
-        let result = ObjectStrainJoin.run(objects: objects(), strain: strainMap(dropB: 1).presented(in: .detector))
+        let result = ObjectStrainJoin.run(objects: try objects(), strain: strainMap(dropB: 1).presented(in: .detector))
         XCTAssertNil(result.unavailable)
         let a = try XCTUnwrap(result.perObject[id.a]), b = try XCTUnwrap(result.perObject[id.b])
         XCTAssertEqual(a.cc, 0.01, accuracy: 1e-6); XCTAssertEqual(a.rr, -0.005, accuracy: 1e-6)
@@ -201,21 +201,21 @@ final class ObjectJoinsTests: XCTestCase {
     }
 
     func testNoStrainAndWrongScanSayWhy() {
-        XCTAssertEqual(ObjectStrainJoin.run(objects: objects(), strain: nil).unavailable, ObjectStrainJoin.noStrainSentence)
+        XCTAssertEqual(ObjectStrainJoin.run(objects: try objects(), strain: nil).unavailable, ObjectStrainJoin.noStrainSentence)
         var other = strainMap(dropB: 0)
         other = StrainMap(width: 8, height: 32, exx: other.exx, eyy: other.eyy,
                           exy: other.exy, theta: other.theta, mask: other.mask,
                           localG1x: other.localG1x, localG1y: other.localG1y, localG2x: other.localG2x, localG2y: other.localG2y,
                           localResidualPixels: other.localResidualPixels, refG1: other.refG1, refG2: other.refG2,
                           referencePositionCount: 0, indexedFraction: 1, diagnostics: other.diagnostics)
-        XCTAssertNotNil(ObjectStrainJoin.run(objects: objects(), strain: other.presented(in: .detector)).unavailable)
+        XCTAssertNotNil(ObjectStrainJoin.run(objects: try objects(), strain: other.presented(in: .detector)).unavailable)
     }
 
     func testTheReportCarriesTheJoinsIntoRowsAndCSV() throws {
-        let id = ids()
-        let comp = ObjectCompositionJoin.run(objects: objects(), quantified: quantified(), registration: identity)
-        let strain = ObjectStrainJoin.run(objects: objects(), strain: strainMap(dropB: 1).presented(in: .detector))
-        let report = PrecipitateObjectReport.make(
+        let id = try ids()
+        let comp = ObjectCompositionJoin.run(objects: try objects(), quantified: quantified(), registration: identity)
+        let strain = ObjectStrainJoin.run(objects: try objects(), strain: strainMap(dropB: 1).presented(in: .detector))
+        let report = try PrecipitateObjectReport.make(
             objects: objects(), phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1,
             compositionJoin: comp, strainJoin: strain)
         let rowA = try XCTUnwrap(report.rows.first { $0.id == id.a })
@@ -227,19 +227,19 @@ final class ObjectJoinsTests: XCTestCase {
         XCTAssertTrue(csv.contains("# composition: one pooled fit per object"), "the header says what the number is")
         XCTAssertTrue(csv.contains("strain_rr"))
         XCTAssertFalse(csv.contains("per-pixel"), "no sentence of the old mean is left")
-        let plain = PrecipitateObjectReport.make(
+        let plain = try PrecipitateObjectReport.make(
             objects: objects(), phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1)
         XCTAssertFalse(plain.csv().contains("strain_rr") || plain.csv().contains("_at_pct"), "no joins, no columns")
     }
 
     /// #108: the composition says which elements it covers, so an element the EDS room did not quantify is visibly absent.
     func testTheReportSaysWhichElementsTheCompositionCovers() throws {
-        let comp = ObjectCompositionJoin.run(objects: objects(), quantified: quantified(), registration: identity)
-        let report = PrecipitateObjectReport.make(
+        let comp = ObjectCompositionJoin.run(objects: try objects(), quantified: quantified(), registration: identity)
+        let report = try PrecipitateObjectReport.make(
             objects: objects(), phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1,
             compositionJoin: comp)
         XCTAssertEqual(report.compositionCoverage, "Composition over Mg, Al (quantified elements)")
-        let plain = PrecipitateObjectReport.make(
+        let plain = try PrecipitateObjectReport.make(
             objects: objects(), phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1)
         XCTAssertNil(plain.compositionCoverage, "no composition, no coverage line")
     }
@@ -247,10 +247,10 @@ final class ObjectJoinsTests: XCTestCase {
 
 extension ObjectJoinsTests {
     func testTheTableCellsSayTheValueOrTheReason() throws {
-        let id = ids()
-        let comp = ObjectCompositionJoin.run(objects: objects(), quantified: quantified(), registration: identity)
-        let strain = ObjectStrainJoin.run(objects: objects(), strain: strainMap(dropB: 1).presented(in: .detector))
-        let report = PrecipitateObjectReport.make(
+        let id = try ids()
+        let comp = ObjectCompositionJoin.run(objects: try objects(), quantified: quantified(), registration: identity)
+        let strain = ObjectStrainJoin.run(objects: try objects(), strain: strainMap(dropB: 1).presented(in: .detector))
+        let report = try PrecipitateObjectReport.make(
             objects: objects(), phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1,
             compositionJoin: comp, strainJoin: strain)
         let a = try XCTUnwrap(report.rows.first { $0.id == id.a }), c = try XCTUnwrap(report.rows.first { $0.id == id.c })
@@ -261,7 +261,7 @@ extension ObjectJoinsTests {
         XCTAssertEqual(a.strainSummary, "rr -0.50 · cc 1.00 · rc 0.20 %, 1.00°")
         XCTAssertEqual(c.compositionSummary, "under 4 EDS px")
         XCTAssertEqual(c.strainSummary, "no strain fit under the object")
-        let none = PrecipitateObjectReport.make(
+        let none = try PrecipitateObjectReport.make(
             objects: objects(), phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1,
             compositionJoin: ObjectCompositionJoin.run(objects: objects(), quantified: nil, registration: nil),
             strainJoin: ObjectStrainJoin.run(objects: objects(), strain: nil))
@@ -273,9 +273,9 @@ extension ObjectJoinsTests {
     /// #173: the composition cell in the user's number format. The report's own summary keeps the point (copies, CSV); the table
     /// passes the locale's format, so a German Mac reads a decimal comma in the value and in the sigma.
     func testTheCompositionCellTakesTheCallersNumberFormat() throws {
-        let id = ids()
-        let comp = ObjectCompositionJoin.run(objects: objects(), quantified: quantified(), registration: identity)
-        let report = PrecipitateObjectReport.make(
+        let id = try ids()
+        let comp = ObjectCompositionJoin.run(objects: try objects(), quantified: quantified(), registration: identity)
+        let report = try PrecipitateObjectReport.make(
             objects: objects(), phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1,
             compositionJoin: comp)
         let a = try XCTUnwrap(report.rows.first { $0.id == id.a }), c = try XCTUnwrap(report.rows.first { $0.id == id.c })
@@ -292,22 +292,22 @@ extension ObjectJoinsTests {
 /// newest report of the run it was opened for and never another run's.
 @MainActor
 final class PrecipitateReportUpdatesTests: XCTestCase {
-    private func report(labels: [Int32], run: UUID, composition: ObjectJoinResult<ObjectCompositionValue>? = nil) -> PrecipitateObjectReport {
-        let objects = PrecipitateSegmentation.classObjects(labels: labels, width: 4, height: 4,
+    private func report(labels: [Int32], run: UUID, composition: ObjectJoinResult<ObjectCompositionValue>? = nil) throws -> PrecipitateObjectReport {
+        let objects = try PrecipitateSegmentation.classObjects(labels: labels, width: 4, height: 4,
                                                            roles: .init(precipitateClasses: [1], matrix: [0], notIndexed: [9]), pixelSize: nil, pixelUnit: nil)
-        return PrecipitateObjectReport.make(objects: objects, phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil,
+        return try PrecipitateObjectReport.make(objects: objects, phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil,
                                             minimumAreaPx: 1, sourceID: run, compositionJoin: composition)
     }
 
-    func testATableShowsTheNewestReportOfItsOwnRunOnly() {
+    func testATableShowsTheNewestReportOfItsOwnRunOnly() throws {
         var labels = [Int32](repeating: 0, count: 16); labels[5] = 1
         let run = UUID()
-        let opened = report(labels: labels, run: run)
+        let opened = try report(labels: labels, run: run)
         let updates = PrecipitateReportUpdates()
         XCTAssertEqual(updates.report(for: opened), opened, "nothing published: the table shows what it was opened with")
 
         // The same run after its composition join landed (here: with the join's sentence).
-        let landed = report(labels: labels, run: run, composition: .init(unavailable: "landed"))
+        let landed = try report(labels: labels, run: run, composition: .init(unavailable: "landed"))
         XCTAssertNotEqual(landed, opened)
         updates.publish(landed)
         XCTAssertEqual(updates.report(for: opened), landed, "the open table follows its run")
@@ -315,11 +315,11 @@ final class PrecipitateReportUpdatesTests: XCTestCase {
 
         // Another run does not reach this table.
         var others = [Int32](repeating: 0, count: 16); others[10] = 1
-        updates.publish(report(labels: others, run: UUID()))
+        updates.publish(try report(labels: others, run: UUID()))
         XCTAssertEqual(updates.report(for: opened), landed)
         // A report without a run id is not kept, and a forgotten run leaves the table with what it was opened with.
-        let anonymous = PrecipitateObjectReport.make(
-            objects: PrecipitateSegmentation.classObjects(labels: others, width: 4, height: 4,
+        let anonymous = try PrecipitateObjectReport.make(
+            objects: try PrecipitateSegmentation.classObjects(labels: others, width: 4, height: 4,
                                                           roles: .init(precipitateClasses: [1], matrix: [0], notIndexed: [9]), pixelSize: nil, pixelUnit: nil),
             phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1)
         updates.publish(anonymous)

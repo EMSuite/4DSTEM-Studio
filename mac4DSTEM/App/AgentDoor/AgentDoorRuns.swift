@@ -12,6 +12,7 @@
 
 import Foundation
 import ShellAgentDoor
+import ShellEDXModel
 #if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
 import DSTEMCore
 import DSTEMSession
@@ -30,7 +31,7 @@ extension Mac4DSTEMAgentDoor {
                                AgentParameter("y", .integer(0...100_000), summary: "Scan row, from 0.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let descriptor = state.descriptor, descriptor.is4D else {
                 return .refusal(status: 404, message: "This window has no 4D-STEM scan.")
             }
@@ -50,7 +51,7 @@ extension Mac4DSTEMAgentDoor {
                   parameters: DiskSetting.all.map(\.parameter) + [subpixelParameter],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             var params = state.diskDetection.diskParams
             if let mode = call.arguments["subpixel"].flatMap(subpixelMode(named:)) { params.subpixel = mode }
             for setting in DiskSetting.all {
@@ -71,7 +72,18 @@ extension Mac4DSTEMAgentDoor {
                       + "and get_log says how it ended.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
+            // The Spectroscopy room's Quantify runs on a spectrum image alone (#254), as the toolbar's does.
+            if state.navigation.workspaceArea == .spectroscopy {
+                guard state.hasSpectrumImage else {
+                    return .refusal(status: 404, message: "No spectrum image is open in the EDS room; open one first.")
+                }
+                guard !state.edx.isBusy else { return busyRefusal }
+                if let blocker = state.edx.quantifyBlocker { return .refusal(status: 409, message: blocker) }
+                state.statusText = "An agent started Run (Quantify)."
+                Task { await state.runPrimaryWorkspaceTask() }
+                return .json(["started": "Quantify"])
+            }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             guard state.hasPrimaryWorkspaceTask else {
                 return .refusal(status: 409, message: "The current task has nothing to run (\(state.navigation.analysisMode.rawValue)).")

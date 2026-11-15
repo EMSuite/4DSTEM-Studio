@@ -7,6 +7,8 @@ import Foundation
 import FormatoCore
 
 extension FormatoArray {
+    /// In bounds by construction (mac4DSTEM#300 asked): `FormatoArray.init` refuses bytes that are not exactly `count × byteSize`.
+    /// delete at FormatoKit 0.16.0: `FormatoArray.floats()` (colour types become a refusal at the call sites).
     /// Every element as Float, in C order, each converted the way a C cast does (round to nearest even; what `H5Dread` into
     /// `H5T_NATIVE_FLOAT` did): float32 is copied as stored. Nil for a colour type, which no 4D source holds.
     package nonisolated func float32Values() -> [Float]? {

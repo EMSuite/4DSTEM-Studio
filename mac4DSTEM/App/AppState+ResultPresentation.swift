@@ -76,8 +76,10 @@ extension AppState {
     /// Test seam (review row 25): awaited after the pixels are computed and
     /// before the run lands, so a test can hold a quiet run back and force the
     /// ordering "commit lands first, the stale quiet run second" without sleeps.
-    /// Nil in production.
+    /// Debug builds only (#310): a release build has no seam to set.
+    #if DEBUG
     static var virtualDetectorBeforeLanding: (@MainActor (_ quiet: Bool, _ aperture: Aperture) async -> Void)?
+    #endif
 
     func scheduleLiveVirtualDetector() {
         guard navigation.analysisMode == .virtualDetector else { return }
@@ -188,7 +190,8 @@ extension AppState {
         case .phaseMapping:
             let kind = resultPresentation.product?.kind
             if phaseMapping.map != nil, phaseMapping.lastRun != nil {
-                if kind != "phase_map", kind != "phase_match_distance", kind != "precipitate_objects" {
+                if kind != "phase_map", kind != "phase_match_distance", kind != "precipitate_objects",
+                   kind != PhaseResultPicture.orientation.productKind {
                     publishPhaseMapProduct()
                 }
             } else if resultPresentation.product != nil {
@@ -412,7 +415,9 @@ extension AppState {
                     maximumTileRows: maximumTileRows,
                     cancellation: cancellation, progress: progressUpdate)
             }
+            #if DEBUG
             await Self.virtualDetectorBeforeLanding?(quiet, ap)
+            #endif
             guard epoch == datasetSession.epoch else { return .failed("The dataset changed during the run") }
             if cancellation?.isCancelled == true {
                 statusText = "Virtual detector cancelled"
@@ -549,7 +554,8 @@ extension AnalysisMode {
         if kind.hasPrefix("ptychography_") { return .singleslicePtychography }
         if kind.hasPrefix("diffraction_") { return .diffractionGroups }
         if kind == "bragg_vector_map" || kind == "disk_disagreement" { return .disks }
-        if kind == "phase_map" || kind == "phase_match_distance" || kind == "precipitate_objects" { return .phaseMapping }
+        if kind == "phase_map" || kind == "phase_match_distance" || kind == "precipitate_objects"
+            || kind == PhaseResultPicture.orientation.productKind { return .phaseMapping }
         return nil
     }
 }

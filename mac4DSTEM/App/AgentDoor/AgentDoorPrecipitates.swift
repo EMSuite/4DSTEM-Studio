@@ -46,7 +46,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.phaseMapping.map != nil else {
                 return .refusal(status: 409, message: "There is no phase map yet; precipitate objects come from Map Phases (run_task).")
             }
@@ -123,7 +123,7 @@ extension Mac4DSTEMAgentDoor {
                                                   + "the dataset's name followed by _objects.")],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let report = state.precipitateObjectReport else {
                 return .refusal(status: 409, message: "There are no precipitate objects yet; they come from Map Phases.")
             }
@@ -137,11 +137,18 @@ extension Mac4DSTEMAgentDoor {
         },
     ]
 
-    /// A text file of the Agent folder, read whole.
+    /// The largest text file an agent may hand the app (a CIF, a thickness table): read on the main actor, so bounded (#310).
+    static let agentTextByteLimit = 8 * 1024 * 1024
+
+    /// A text file of the Agent folder, read whole; one larger than `agentTextByteLimit` is refused unread.
     static func readAgentText(_ path: String) -> Result<String, ToolRefusal> {
         switch folder.resolve(path) {
         case .failure(let refusal): return .failure(ToolRefusal(status: 404, message: refusal.message))
         case .success(let url):
+            if let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize, size > agentTextByteLimit {
+                return .failure(ToolRefusal(status: 413, message: "\(path) is \(size / 1_048_576) MB; a text file the door reads is "
+                    + "at most \(agentTextByteLimit / 1_048_576) MB."))
+            }
             guard let text = try? String(contentsOf: url, encoding: .utf8) else {
                 return .failure(ToolRefusal(status: 404, message: "There is no readable text file \(path) in the Agent folder."))
             }

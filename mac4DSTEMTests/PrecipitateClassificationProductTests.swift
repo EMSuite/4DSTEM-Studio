@@ -14,17 +14,17 @@ import DSTEMSession
 @MainActor
 final class PrecipitateClassificationProductTests: XCTestCase {
 
-    private func classMap() -> PrecipitateSegmentation.ClassMapObjects {
-        PrecipitateSegmentation.classObjects(
+    private func classMap() throws -> PrecipitateSegmentation.ClassMapObjects {
+        try PrecipitateSegmentation.classObjects(
             labels: [0, 1, 1, -1], width: 2, height: 2,
             roles: .init(precipitateClasses: [1], matrix: [0], notIndexed: [-1]),
             pixelSize: nil, pixelUnit: nil
         )
     }
 
-    func testPublishRetainsTheSpatialClassResultUntilDatasetClear() {
+    func testPublishRetainsTheSpatialClassResultUntilDatasetClear() throws {
         let product = PrecipitateClassificationProduct()
-        let result = classMap()
+        let result = try classMap()
 
         XCTAssertNil(product.result)
         product.publish(result)

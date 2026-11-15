@@ -50,11 +50,14 @@ public nonisolated enum QuickLookRendering {
     public static func grayscale(_ frame: Peek.Frame) -> [UInt8] {
         let s = stretch(for: frame)
         var out = [UInt8](repeating: 0, count: frame.pixels.count)
-        let span = s.high - s.low
+        // In Double: on data reaching ±Float.greatestFiniteMagnitude, `high - low` overflowed Float to infinity, infinity / infinity
+        // gave NaN, and `UInt8(NaN)` trapped (mac4DSTEM#300). A value that still comes out NaN is drawn black.
+        let low = Double(s.low), span = Double(s.high) - Double(s.low)
         for (i, raw) in frame.pixels.enumerated() {
             guard raw.isFinite else { continue }
-            let v = s.logScale ? Float(Foundation.log10(Double(1 + raw - s.floor))) : raw
-            out[i] = UInt8(max(0, min(255, ((v - s.low) / span * 255).rounded())))
+            let v = s.logScale ? Foundation.log10(1 + Double(raw) - Double(s.floor)) : Double(raw)
+            let level = ((v - low) / span * 255).rounded()
+            out[i] = level.isNaN ? 0 : UInt8(max(0, min(255, level)))
         }
         return out
     }

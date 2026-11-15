@@ -425,16 +425,25 @@ struct PhaseMappingSections: View {
                 // Reads "Show Phase Map" while the distance is on screen — the
                 // way back, without a second row.
                 // A grains run scores by correlation, not distance: its companion is the reliability (#252).
-                let grainsRun = run.orientationSource == .grains
-                let control = PhaseResultPicture.control(
-                    owning: grainsRun ? .reliability : .distance, displayedKind: appState.displayedProduct?.kind)
-                InspectorAdaptiveButton(control.title, systemImage: control.systemImage,
-                                        help: grainsRun ? "How far each position's phase is ahead of the best other phase, "
-                                            + "0 to 100 (ASTAR's phase reliability)" : nil) {
-                    appState.showPhaseResult(control.target)
+                if run.orientationSource == .grains {
+                    let control = PhaseResultPicture.control(
+                        owning: .reliability, displayedKind: appState.displayedProduct?.kind)
+                    InspectorAdaptiveButton(control.title, systemImage: control.systemImage,
+                                            help: "How far each position's phase is ahead of the best other phase, "
+                                                + "0 to 100 (ASTAR's phase reliability)") {
+                        appState.showPhaseResult(control.target)
+                    }
+                    .disabled(appState.isBusy || appState.phaseOrientationField == nil)
+                    .accessibilityIdentifier("phaseMapping.showReliability")
+                } else {
+                    let control = PhaseResultPicture.control(
+                        owning: .distance, displayedKind: appState.displayedProduct?.kind)
+                    InspectorAdaptiveButton(control.title, systemImage: control.systemImage) {
+                        appState.showPhaseResult(control.target)
+                    }
+                    .disabled(appState.isBusy)
+                    .accessibilityIdentifier("phaseMapping.showDistance")
                 }
-                .disabled(appState.isBusy || (grainsRun && appState.phaseOrientationField == nil))
-                .accessibilityIdentifier(grainsRun ? "phaseMapping.showReliability" : "phaseMapping.showDistance")
                 if run.orientationSource != .typedZones {
                     // The orientation each position's phase was found at (#293): the second button of the pair,
                     // reading "Show Phase Map" while its picture is on screen.

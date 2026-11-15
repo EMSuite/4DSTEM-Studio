@@ -152,7 +152,7 @@ extension AppState {
     /// (its whole-cube pass included, which runs outside the operation center), an open the door started that has not begun
     /// yet, or the EDS room at work.
     var agentBusy: Bool {
-        isBusy || datasetSession.isLoading || edx.isBusy || Mac4DSTEMAgentDoor.isOpening(self)
+        isBusy || datasetSession.isLoading || edx.isBusy || openInFlight
     }
 
     // MARK: The window in full
@@ -172,7 +172,7 @@ extension AppState {
         ] as [String: Any]
         snapshot["operation"] = [
             "busy": agentBusy,
-            "name": AgentJSON.orNull(activeOperation ?? (datasetSession.isLoading || Mac4DSTEMAgentDoor.isOpening(self) ? "Opening" : nil)),
+            "name": AgentJSON.orNull(activeOperation ?? (datasetSession.isLoading || openInFlight ? "Opening" : nil)),
             "progress": AgentJSON.number(progress),
             "status": statusText,
             "error": AgentJSON.orNull(errorMessage ?? lastComputeFailure),

@@ -111,7 +111,7 @@ final class PhaseMapObjectsWiringTests: XCTestCase {
         XCTAssertEqual(labeled.roles.precipitateClasses, [1])
         XCTAssertEqual(labeled.roles.notIndexed, [PhaseMapObjectsBridge.notIndexedLabel])
 
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labeled.labels, width: map.width, height: map.height,
             roles: labeled.roles, pixelSize: nil, pixelUnit: nil
         )
@@ -167,9 +167,9 @@ final class PhaseMapObjectsWiringTests: XCTestCase {
 
     // MARK: - (e) Clearing drops the published result
 
-    func testClearingTheProductDropsThePublishedResult() {
+    func testClearingTheProductDropsThePublishedResult() throws {
         let product = PrecipitateClassificationProduct()
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: [0], width: 1, height: 1,
             roles: PrecipitateSegmentation.LabelRoles(
                 precipitateClasses: [], matrix: [0], notIndexed: []),
@@ -188,8 +188,8 @@ final class PhaseMapObjectsWiringTests: XCTestCase {
     /// first result land, so this must go red.
     func testStaleBackgroundResultIsDropped() {
         let product = PrecipitateClassificationProduct()
-        func objects(_ label: Int32) -> PrecipitateSegmentation.ClassMapObjects {
-            PrecipitateSegmentation.classObjects(
+        func objects(_ label: Int32) throws -> PrecipitateSegmentation.ClassMapObjects {
+            try PrecipitateSegmentation.classObjects(
                 labels: [label], width: 1, height: 1,
                 roles: .init(precipitateClasses: [1], matrix: [0], notIndexed: []),
                 pixelSize: nil, pixelUnit: nil)
@@ -197,16 +197,16 @@ final class PhaseMapObjectsWiringTests: XCTestCase {
         let first = product.beginComputation()
         let second = product.beginComputation()
         XCTAssertTrue(product.isComputing)
-        XCTAssertFalse(product.publish(objects(1), ifCurrent: first), "a newer run started")
+        XCTAssertFalse(product.publish(try objects(1), ifCurrent: first), "a newer run started")
         XCTAssertNil(product.result)
         XCTAssertTrue(product.isComputing, "the newer run is still computing")
-        XCTAssertTrue(product.publish(objects(0), ifCurrent: second))
+        XCTAssertTrue(product.publish(try objects(0), ifCurrent: second))
         XCTAssertEqual(product.result?.matrixPixels, 1, "the newer result, not the stale one")
         XCTAssertFalse(product.isComputing)
 
         let third = product.beginComputation()
         product.clear()
-        XCTAssertFalse(product.publish(objects(1), ifCurrent: third), "the dataset changed")
+        XCTAssertFalse(product.publish(try objects(1), ifCurrent: third), "the dataset changed")
         XCTAssertNil(product.result)
         XCTAssertFalse(product.isComputing)
     }

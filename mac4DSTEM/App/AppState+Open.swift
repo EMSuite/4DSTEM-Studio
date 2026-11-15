@@ -74,7 +74,9 @@ extension AppState {
                     data: pending.data, descriptor: source,
                     cancellation: datasetSession.loadCancellation,
                     progress: previewProgressHandler(
-                        rows: DatasetPreviewBuilder.sampledRowCount(for: source), epoch: pendingEpoch
+                        rows: DatasetPreviewBuilder.sampledRowCount(
+                            for: source, readBytesPerPattern: pending.data.view.readBytesPerPattern
+                        ), epoch: pendingEpoch
                     )
                 )
                 guard datasetSession.epoch == pendingEpoch, !datasetSession.loadWasCancelled else {
@@ -921,7 +923,9 @@ extension AppState {
         let previewResult = await PendingLoad.makePreview(
             data: fourD, descriptor: d, cancellation: datasetSession.loadCancellation,
             progress: previewProgressHandler(
-                rows: DatasetPreviewBuilder.sampledRowCount(for: d), epoch: epoch
+                rows: DatasetPreviewBuilder.sampledRowCount(
+                    for: d, readBytesPerPattern: fourD.view.readBytesPerPattern
+                ), epoch: epoch
             )
         )
         guard datasetSession.epoch == epoch else { return }

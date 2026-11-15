@@ -116,10 +116,17 @@ package nonisolated enum DatasetPreviewBuilder {
     /// Deterministic and separated out so it can be tested without any I/O:
     /// the same dataset always produces the same sample, which is what makes a
     /// preview comparable across two opens of the same file.
+    ///
+    /// `readBytesPerPattern` is what one sampled position actually READS
+    /// (`LoadView.readBytesPerPattern`: the read extent, before binning). A
+    /// binned view's `descriptor` holds bin² fewer bytes than the reader
+    /// streams, so sizing from the descriptor sampled bin² more positions than
+    /// the budget allows (#412). nil: the descriptor is the read extent.
     package static func stride(
-        for descriptor: DatasetDescriptor, byteBudget: Int = defaultByteBudget
+        for descriptor: DatasetDescriptor, readBytesPerPattern: Int? = nil,
+        byteBudget: Int = defaultByteBudget
     ) -> (y: Int, x: Int) {
-        let patternBytes = descriptor.qy * descriptor.qx * MemoryLayout<Float>.stride
+        let patternBytes = readBytesPerPattern ?? descriptor.qy * descriptor.qx * MemoryLayout<Float>.stride
         guard descriptor.is4D, patternBytes > 0,
               descriptor.ry > 0, descriptor.rx > 0 else { return (1, 1) }
         let affordable = max(1, byteBudget / patternBytes)
@@ -139,9 +146,10 @@ package nonisolated enum DatasetPreviewBuilder {
     /// division would have to agree with the builder's own loop for the bar
     /// to end at 100%. // v2 S4
     package static func sampledRowCount(
-        for descriptor: DatasetDescriptor, byteBudget: Int = defaultByteBudget
+        for descriptor: DatasetDescriptor, readBytesPerPattern: Int? = nil,
+        byteBudget: Int = defaultByteBudget
     ) -> Int {
-        let step = stride(for: descriptor, byteBudget: byteBudget).y
+        let step = stride(for: descriptor, readBytesPerPattern: readBytesPerPattern, byteBudget: byteBudget).y
         return max(1, (descriptor.ry + step - 1) / step)
     }
 
@@ -160,7 +168,7 @@ package nonisolated enum DatasetPreviewBuilder {
         guard descriptor.is4D, descriptor.ry > 0, descriptor.rx > 0 else {
             throw FourDError.allocationFailed
         }
-        let steps = stride(for: descriptor, byteBudget: byteBudget)
+        let steps = stride(for: descriptor, readBytesPerPattern: data.view.readBytesPerPattern, byteBudget: byteBudget)
         let sampledYs = Swift.stride(from: 0, to: descriptor.ry, by: steps.y).map { $0 }
         let sampledXs = Swift.stride(from: 0, to: descriptor.rx, by: steps.x).map { $0 }
         let detectorCount = descriptor.qy * descriptor.qx

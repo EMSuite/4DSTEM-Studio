@@ -1121,6 +1121,8 @@ final class AppState {
         })
         return ProductWorkflowReadiness(
             hasOriginProbe: readyKinds.contains(.originProbe),
+            hasOrigin: calibrationSession.calibration.originProvenance.readinessProvenance != nil
+                && calibrationSession.calibration.originFitIsSane,
             hasRotation: readyKinds.contains(.rotation),
             hasQScale: readyKinds.contains(.qScale),
             hasRScale: readyKinds.contains(.rScale),

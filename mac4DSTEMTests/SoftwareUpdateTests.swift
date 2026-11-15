@@ -78,9 +78,13 @@ final class SoftwareUpdateTests: XCTestCase {
             XCTAssertTrue(download.contains(check), "build-developer-id.sh no longer handles \(check)")
         }
         XCTAssertTrue(try text("tools/release.sh").contains("tools/release/appcast.sh"))
-        let feed = try text("tools/release/appcast.sh")
-        for part in ["sign_update", "sparkle:version", "sparkle:minimumSystemVersion", "releases/download/{tag}/mac4DSTEM-{version}.dmg"] {
-            XCTAssertTrue(feed.contains(part), "appcast.sh no longer writes \(part)")
+        let appcast = try text("tools/release/appcast.sh")
+        for part in ["sign_update", "tools/release/feed.py"] {
+            XCTAssertTrue(appcast.contains(part), "appcast.sh no longer runs \(part)")
+        }
+        let feed = try text("tools/release/feed.py")
+        for part in ["sparkle:version", "sparkle:minimumSystemVersion", "releases/download/{tag}/mac4DSTEM-{version}.dmg"] {
+            XCTAssertTrue(feed.contains(part), "feed.py no longer writes \(part)")
         }
         let store = try text("tools/release/build-app-store.sh")
         for check in ["otool -L", "SUFeedURL", "temporary-exception", "FormatoLibHDF5 FormatoLibSZ FormatoLibAEC"] {

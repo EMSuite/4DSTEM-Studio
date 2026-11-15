@@ -12,6 +12,7 @@
 import CoreGraphics
 import Foundation
 import ShellAgentDoor
+import ShellEDXAgent
 import ShellLayout
 #if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
 import DSTEMCore
@@ -74,7 +75,12 @@ enum Mac4DSTEMAgentDoor {
         guideTools + tools + runTools + kernelTools
             + scanMapTools + taskTools + folderTools
             + calibrationTools + phaseTools + analysisTools + imagingTools + precipitateTools + preprocessTools + actionTools + resultTools
+            + edsTools
     }
+
+    /// The Spectroscopy room's EDS tools (issue #254): MacEMUI's `EDXAgentTools`, written once for both apps, on the window's
+    /// `EDXSession`. They work on a spectrum image alone or beside a 4D scan.
+    static let edsTools: [AgentTool] = EDXAgentTools.tools { ($0 as? AppState)?.edx }
 
     static let tools: [AgentTool] = [
         AgentTool(name: "get_window", title: "Window state",

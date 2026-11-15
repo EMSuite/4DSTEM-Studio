@@ -103,7 +103,8 @@ final class DatasetSessionTests: XCTestCase {
         XCTAssertNil(session.reader)
         XCTAssertNil(session.fourD)
         XCTAssertTrue(session.datasets.isEmpty)
-        XCTAssertEqual(session.epoch, 2)
+        // begin (1), prepare with a new reader (2, mac4DSTEM#303), discard (3).
+        XCTAssertEqual(session.epoch, 3)
     }
 
     func testAppStateHoldsTheSeamWithoutForwardingProperties() {

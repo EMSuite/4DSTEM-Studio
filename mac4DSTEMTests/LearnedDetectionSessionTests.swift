@@ -113,6 +113,36 @@ final class LearnedDetectionSessionTests: XCTestCase {
                        "\(ran.differingFromNeuralEngine) values differ: prepare() handed back a detector off the Neural Engine")
     }
 
+    // MARK: prepare is single-flight (mac4DSTEM#303)
+
+    /// Two callers preparing the same package while it loads share one load, and `preparing` stays true until it ends. A fake loader
+    /// counts the loads and holds the first until both callers are waiting; it then fails, so no model is needed and this runs on
+    /// any Mac. Mutation: `prepare` without the in-flight lookup - red (two loads); the flag cleared by the first caller - red.
+    func testTwoPreparesOfOnePackageShareOneLoad() async throws {
+        struct Refused: Error {}
+        let session = LearnedDetectionSession()
+        let calls = LoadCounter()
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        session.loadDetector = { _, _ in
+            await calls.increment()
+            for await _ in gate { break }
+            throw Refused()
+        }
+        let url = URL(fileURLWithPath: "/nonexistent/model.mlpackage")
+        let first = Task { try await session.prepare(assetURL: url) }
+        let second = Task { try await session.prepare(assetURL: url) }
+        while await calls.value == 0 { await Task.yield() }
+        for _ in 0..<20 { await Task.yield() }   // the second caller has reached prepare
+        XCTAssertTrue(session.preparing)
+        open.yield(); open.finish()
+        for task in [first, second] {
+            do { _ = try await task.value; XCTFail("the fake load fails") } catch { XCTAssertTrue(error is Refused) }
+        }
+        let loads = await calls.value
+        XCTAssertEqual(loads, 1, "the second prepare loaded the package again")
+        XCTAssertFalse(session.preparing)
+    }
+
     // MARK: replayRefusal
 
     func testReplayRefusalForAClassicalRecordSetsClassAndReturnsNil() async {
@@ -225,4 +255,10 @@ final class LearnedDetectionSessionTests: XCTestCase {
         XCTAssertEqual(exported.column, 2.5)
         XCTAssertEqual(exported.units, "nm")
     }
+}
+
+/// Counts loads across the fake loader's calls.
+private actor LoadCounter {
+    private(set) var value = 0
+    func increment() { value += 1 }
 }

@@ -114,6 +114,21 @@ final class PhaseMapAppTests: XCTestCase {
                                                         resolution: coarse)
         XCTAssertTrue(candidates?.contains("candidate phases") ?? false, candidates ?? "nil")
 
+        // The matrix found at a minority of the positions too (#298, AA6060 at defaults: matrix 2 577, beta'' 5, not
+        // indexed 157 418): the geometry, so the two steps are named, and the sub-pixel tolerance; not the candidates.
+        // Mutation: the branch after the candidates' sentence (the AA6060 run reads "Check each one's zone axis").
+        let geometry = PhaseMapPresentation.diagnosis(map(noData: 0, notIndexed: 1574, matrix: 26, indexed: 0),
+                                                      resolution: coarse)
+        XCTAssertTrue(geometry?.contains("the matrix included (1 % matrix)") ?? false, geometry ?? "nil")
+        XCTAssertTrue(geometry?.contains("Origin from Bragg Peaks, then Fit Distortion from Spots") ?? false, geometry ?? "nil")
+        XCTAssertTrue(geometry?.contains("0.44 of one detector pixel") ?? false, geometry ?? "nil")
+        XCTAssertFalse(geometry?.contains("candidate phases") ?? true, geometry ?? "nil")
+        let corrected = PhaseMapPresentation.diagnosis(map(noData: 0, notIndexed: 1000, matrix: 400, indexed: 0),
+                                                       resolution: fine, distortionCorrected: true)
+        XCTAssertTrue(corrected?.contains("The distortion is corrected") ?? false, corrected ?? "nil")
+        XCTAssertFalse(corrected?.contains("Fit Distortion from Spots") ?? true, corrected ?? "nil")
+        XCTAssertFalse(corrected?.contains("detector pixel") ?? true, corrected ?? "nil")
+
         // And a map that found things says nothing at all.
         XCTAssertNil(PhaseMapPresentation.diagnosis(map(noData: 0, notIndexed: 200,
                                                         matrix: 400, indexed: 400),

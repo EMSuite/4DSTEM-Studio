@@ -284,7 +284,12 @@ extension AppState {
             qScaleIsPhysical: scale.provenance.isPhysical,
             peakCount: rawVectors.totalPeakCount,
             calibration: calibrationStamp,
-            libraryKMaxInvAngstrom: librarySettings.kMaxInvAngstrom
+            libraryKMaxInvAngstrom: librarySettings.kMaxInvAngstrom,
+            // Each candidate with the slab its entries were built with (its own, else the library's), as a structures run
+            // records them (#408): the run said nothing about the slab in typed-zones mode, which read as "ignored".
+            excitationSlabs: definitions.filter { $0.role == .candidate }.map {
+                "\($0.displayName): " + String(format: "%.3g", $0.excitationSlabInvAngstrom ?? referenceSettings.excitationSlabInvAngstrom)
+            }
         ), library: library)
 
         // Recorded BEFORE the map is published, so the map names this run

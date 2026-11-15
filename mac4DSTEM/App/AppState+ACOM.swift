@@ -396,7 +396,7 @@ extension AppState {
         applyACOMDisplay()
         statusText = "ACOM \(scope.resultQualifier) ✓  \(map.matchingBackend.rawValue)"
             + " · \(runSemantics.scale.provenance.displayName)"
-            + " · \(workCount.formatted()) positions · \(Num.fixed(Double(elapsed), 1)) s"
+            + " · \(workCount.formatted(.number.grouping(.never))) positions · \(Num.fixed(Double(elapsed), 1)) s"
         // A landed preview's natural next step is the full map, so the scope
         // — and with it the header's primary action — advances to it (R17,
         // owner decision). The segmented control shows the change, and the

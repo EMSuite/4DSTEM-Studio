@@ -18,6 +18,8 @@ enum ResultFormat {
         v.formatted(.number.precision(.fractionLength(fraction)).locale(locale))
             .replacingOccurrences(of: locale.groupingSeparator ?? ",", with: "\u{202F}")
     }
-    /// 412380 -> "412 380" (thin grouping, as the mock prints counts).
-    nonisolated static func counts(_ v: Double) -> String { grouped(v, locale: Locale(identifier: "en_US")) }
+    /// 412380 -> "412380": whole counts are written without a grouping separator (Paul, 15 Nov, both apps; #422).
+    nonisolated static func counts(_ v: Double) -> String {
+        v.formatted(.number.precision(.fractionLength(0)).grouping(.never).locale(Locale(identifier: "en_US")))
+    }
 }

@@ -84,6 +84,7 @@ enum Mac4DSTEMAgentDoor {
             + edsTools
             + personTools
             + materialsProjectTools
+            + viewTools
     }
 
     /// The Spectroscopy room's EDS tools (issue #254): MacEMUI's `EDXAgentTools`, written once for both apps, on the window's

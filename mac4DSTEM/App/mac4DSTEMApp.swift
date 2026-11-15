@@ -112,6 +112,8 @@ private struct DatasetWindow: View {
             }
             // "Ignore Session Sidecar…" / "Reopen Without This Session" ask before they act (owner card Q2 a).
             .reopenWithoutSessionDialog(appState)
+            // Closing the window, opening another file or quitting while an analysis runs asks first (#313).
+            .runInterruptionDialog(appState)
         .focusedSceneValue(\.appState, appState)
         // Info.plist declares CFBundleDocumentTypes, which puts mac4DSTEM in
         // Finder's "Open With" — this is the handler that requires.
@@ -152,7 +154,9 @@ private struct DatasetWindow: View {
         // The same event stops the window's running job (`windowClosed`): a closed window must not keep computing
         // for a dataset nobody can see. `onDisappear` fires when the hosting view leaves its window; a window
         // that merely hides, minimises or loses focus keeps its content in place and does not fire it.
+        .onAppear { RunGuard.enroll(appState) }
         .onDisappear {
+            RunGuard.withdraw(appState)
             OpenDatasetRegistry.withdraw(appState)
             Mac4DSTEMAgentDoor.withdraw(appState)
             appState.windowClosed()
@@ -460,6 +464,8 @@ private struct DatasetCommands: Commands {
 
 @main
 struct mac4DSTEMApp: App {
+    /// Quit asks before it stops a running analysis (#313, `RunGuard`).
+    @NSApplicationDelegateAdaptor(Mac4DSTEMAppDelegate.self) private var appDelegate
     // ONE instance for the whole process, shared by every dataset window and
     // the Settings scene — `UserDefaults` would make a second instance read
     // the same values, but only this one is `@Observable`-linked to what

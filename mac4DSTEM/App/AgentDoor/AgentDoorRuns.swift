@@ -22,6 +22,16 @@ extension Mac4DSTEMAgentDoor {
     static let busyRefusal = AgentToolOutput.refusal(
         status: 409, message: "The window is busy. Wait until get_window says busy is false, or call stop_run.")
 
+    /// The refusal of a tool that would replace the window's dataset (open_file, open_file_with_options, open_demo), or nil when it
+    /// may go ahead. During an analysis it names the run (#313): the window asks the person before an open stops a run
+    /// (`RunInterruptionDialog`), and an agent neither raises that question nor stops the run by opening.
+    static func openRefusal(_ state: AppState) -> AgentToolOutput? {
+        if state.analysisIsRunning {
+            return .refusal(status: 409, message: RunInterruptionWording.doorRefusal(operation: state.activeOperation))
+        }
+        return state.agentBusy ? busyRefusal : nil
+    }
+
     static let runTools: [AgentTool] = [
         AgentTool(name: "select_scan_position", title: "Select scan position",
                   summary: "Shows the diffraction pattern at scan position (x, y), as a click on the scan map does. In the Disks task "

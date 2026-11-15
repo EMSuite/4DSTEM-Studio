@@ -81,6 +81,24 @@ package final class CalibrationSession {
         return nil
     }
 
+    /// Write an R–Q rotation typed by hand (#275), as py4DSTEM's calibration takes one: `py4DSTEMDegrees` is `QR_rotation` in
+    /// degrees and `transpose` is `QR_flip`, the convention every screen, door answer and file of this app shows
+    /// (`RQRotationConvention`, ADR 040). Stored as the app's internal angle (the negative), wrapped to (−π, π] as Flip 180°
+    /// keeps it. The transpose is written with the angle, as `applyRotation` writes a fit's: an angle without its flag would
+    /// rotate a field whose axes are swapped against it.
+    ///
+    /// Returns the refusal sentence and writes nothing when the angle is not a number; an earlier rotation stands.
+    package func applyManualRotation(py4DSTEMDegrees: Double, transpose: Bool) -> String? {
+        guard py4DSTEMDegrees.isFinite else { return "Enter the R–Q rotation in degrees." }
+        var appRad = RQRotationConvention.app(fromPy4DSTEM: py4DSTEMDegrees * .pi / 180)
+        appRad = appRad.truncatingRemainder(dividingBy: 2 * .pi)
+        if appRad > .pi { appRad -= 2 * .pi } else if appRad <= -.pi { appRad += 2 * .pi }
+        calibration.rotationRad = Float(appRad)
+        calibration.transposeQR = transpose
+        provenance.rotation = .manual
+        return nil
+    }
+
     /// Write an accepted ellipse fit, same model as `applyRotation`: the
     /// decision of what an ellipse fit means lands here, where a test can
     /// reach it without an `AppState`. `sparseCoverage` decides the mark

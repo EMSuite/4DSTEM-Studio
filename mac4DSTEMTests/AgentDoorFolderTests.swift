@@ -106,6 +106,27 @@ final class AgentDoorFolderTests: XCTestCase {
         withExtendedLifetime(state) {}
     }
 
+    /// #313: during an analysis, open_file is refused with a sentence that names the run, and the run goes on; the window's own
+    /// question (`RunInterruptionDialog`) is for the person, never raised by an agent. Mutation: the door's open using the plain
+    /// busy refusal ("The window is busy") - red.
+    func testOpeningDuringARunIsRefusedNamingTheRun() async throws {
+        let state = AppState()
+        door.enroll(state) { [weak state] in state?.agentSummary() ?? [:] }
+        Mac4DSTEMAgentDoor.folder.use(folder: root)
+        door.runsAllowed = true
+        let token = state.beginCancellableOperation("Orientation mapping", status: "Running Orientation mapping…")
+        XCTAssertTrue(state.analysisIsRunning, "precondition: an analysis runs")
+
+        let refused = try await call("open_file", ["path": "a.dm4"])
+        XCTAssertTrue(refused.refused)
+        XCTAssertEqual(refused.text, RunInterruptionWording.doorRefusal(operation: "Orientation mapping"))
+        XCTAssertTrue(refused.text.hasPrefix("Orientation mapping is still running"), refused.text)
+        XCTAssertFalse(token.isCancelled, "the refusal must not stop the run")
+        XCTAssertTrue(state.isBusy)
+        XCTAssertNil(state.pendingRunInterruption, "an agent never raises the person's question")
+        XCTAssertFalse(state.openInFlight, "nothing was opened")
+    }
+
     /// Saving needs its own switch and never replaces a file.
     func testSavingWaitsForItsSwitchAndNeverReplacesAFile() async throws {
         let state = AppState()

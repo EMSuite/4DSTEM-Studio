@@ -837,6 +837,22 @@ package final class PhaseMappingProduct {
         onChange?()
     }
 
+    /// A structures run's claims (`StructurePhaseMapping.claims(at:peaks:)`, the kit's phase indices: 0 the matrix, k + 1 the
+    /// k-th candidate) with each phase moved to its position in the list, as `mapInListOrder` moves the map's. nil when an
+    /// index does not fit.
+    package nonisolated static func claimsInListOrder(_ claims: [PhaseDiskClaim], matrixSlot: Int,
+                                                      candidateSlots: [Int]) -> [PhaseDiskClaim]? {
+        var out: [PhaseDiskClaim] = []
+        out.reserveCapacity(claims.count)
+        for claim in claims {
+            guard case .phase(let kitIndex) = claim else { out.append(claim); continue }
+            if kitIndex == 0 { out.append(.phase(matrixSlot)); continue }
+            guard candidateSlots.indices.contains(kitIndex - 1) else { return nil }
+            out.append(.phase(candidateSlots[kitIndex - 1]))
+        }
+        return out
+    }
+
     /// A structures run's map (phase 0 the matrix, then the candidates in `candidateSlots` order) with its phase indices
     /// moved to the positions the phases have in the list, so colours, legend and objects read as for a typed run.
     /// `slotNames` are the list's display names, `matrixSlot` the matrix's position, `candidateSlots[k]` the position of

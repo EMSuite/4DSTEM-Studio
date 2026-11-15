@@ -93,6 +93,40 @@ final class AgentDoorCalibrationTests: XCTestCase {
         XCTAssertEqual(reference.x, 30.5); XCTAssertEqual(reference.y, 31.25)
     }
 
+    /// #275: the R–Q rotation and transpose by hand, py4DSTEM's QR_rotation (degrees) and QR_flip, as Prepare's typed rotation;
+    /// get_window reads both back in the same convention. Mutation: set_calibration without the rotation parameters, or the
+    /// door writing the typed angle unnegated - red.
+    func testATypedRotationIsSetCalibrationsQRRotationAndFlip() async throws {
+        let state = AppState()
+        await state.openDemoFixture(specification: demoCrop)
+        XCTAssertTrue(state.hasDataset, state.statusText)
+        door.enroll(state) { [weak state] in state?.agentSummary() ?? [:] }
+        door.runsAllowed = true
+        state.calibrationSession.calibration.rotationRad = nil   // whatever the demo brings: no rotation in force
+
+        let flipOnly = try await call("set_calibration", ["qr_flip": true])
+        XCTAssertTrue(flipOnly.refused, "a flip with no angle typed or measured has nothing to flip against")
+        XCTAssertTrue(flipOnly.text.contains("qr_rotation_deg"), flipOnly.text)
+
+        let set = try await call("set_calibration", ["qr_rotation_deg": 15, "qr_flip": true])
+        XCTAssertFalse(set.refused, set.text)
+        let stored = try XCTUnwrap(state.calibrationSession.calibration.rotationRad)
+        XCTAssertEqual(RQRotationConvention.displayDegrees(fromApp: stored), 15, accuracy: 1e-4)
+        XCTAssertEqual(state.calibrationSession.calibration.transposeQR, true)
+        XCTAssertEqual(state.calibrationSession.provenance.rotation, .manual)
+        let calibration = try XCTUnwrap(try object(set.text)["calibration"] as? [String: Any])
+        XCTAssertEqual(try XCTUnwrap(calibration["qr_rotation_deg"] as? Double), 15, accuracy: 1e-4)
+        XCTAssertEqual(calibration["qr_flip"] as? Bool, true)
+
+        // The angle alone keeps the transpose in force; the flip alone keeps the angle.
+        _ = try await call("set_calibration", ["qr_rotation_deg": -20])
+        XCTAssertEqual(state.calibrationSession.calibration.transposeQR, true)
+        _ = try await call("set_calibration", ["qr_flip": false])
+        XCTAssertEqual(state.calibrationSession.calibration.transposeQR, false)
+        XCTAssertEqual(RQRotationConvention.displayDegrees(fromApp: try XCTUnwrap(state.calibrationSession.calibration.rotationRad)),
+                       -20, accuracy: 1e-4)
+    }
+
     /// Mutation: a unit is applied after its size (the size lands in the old unit), or a field is skipped - red.
     func testTypedScalesLandAsPreparesFieldsPutThem() async throws {
         let state = AppState()

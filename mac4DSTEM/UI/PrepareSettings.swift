@@ -57,6 +57,8 @@ struct PrepareSettings: View {
     @State private var ellipseDraftA: Double?
     @State private var ellipseDraftB: Double?
     @State private var ellipseDraftThetaDegrees: Double?
+    @State private var rotationDraftDegrees: Double?
+    @State private var rotationDraftTranspose: Bool?
 
     /// The pipeline order of the calibration steps; the readiness line
     /// counts them in this order and it is the one place the order is stated.
@@ -398,6 +400,53 @@ struct PrepareSettings: View {
                              hint: "Flips inverted iDPC contrast")
                 }
             }
+            manualRotationRows(calibration)
+        }
+    }
+
+    /// The R–Q rotation typed by hand (#275): py4DSTEM's QR_rotation in degrees and QR_flip, the convention the "R–Q rotation"
+    /// row shows, applied only by the button, as the typed ellipse is. For a dataset whose centre-of-mass field cannot decide
+    /// the rotation, or a value known from another tool.
+    @ViewBuilder
+    private func manualRotationRows(_ calibration: Calibration) -> some View {
+        let degrees = rotationDraftDegrees
+            ?? calibration.rotationRad.map { RQRotationConvention.displayDegrees(fromApp: $0) } ?? 0
+        let transpose = rotationDraftTranspose ?? calibration.transposeQR ?? false
+        let help = "Enter the R–Q rotation by hand in py4DSTEM's convention (QR_rotation, degrees) and whether the detector axes are transposed (QR_flip): the numbers the R–Q rotation row shows. It replaces a measured rotation; DPC, strain and parallax follow it."
+        InspectorRow("Typed θ") {
+            NumericField(
+                "R–Q rotation in degrees",
+                value: Binding(get: { degrees }, set: { rotationDraftDegrees = $0 }),
+                format: .number.precision(.fractionLength(0...3)),
+                unit: "°"
+            )
+            .labelsHidden()
+            .accessibilityIdentifier("calibration.rotation.manualTheta")
+        }
+        .help(help)
+        InspectorRow("Transposed") {
+            Toggle("Detector axes transposed", isOn: Binding(get: { transpose }, set: { rotationDraftTranspose = $0 }))
+                .labelsHidden()
+                .accessibilityIdentifier("calibration.rotation.manualTranspose")
+        }
+        .help(help)
+        InspectorActionRow {
+            Button {
+                appState.applyManualRotation(py4DSTEMDegrees: degrees, transpose: transpose)
+            } label: {
+                Label("Apply Rotation", systemImage: "checkmark.circle")
+            }
+            .disabled(appState.isBusy || !appState.hasDataset)
+            .accessibilityIdentifier("calibration.rotation.applyManual")
+            .tooltip(help, hint: "Applies the rotation entered above")
+        }
+        .onChange(of: calibration.rotationRad) {
+            rotationDraftDegrees = nil
+            rotationDraftTranspose = nil
+        }
+        .onChange(of: calibration.transposeQR) {
+            rotationDraftDegrees = nil
+            rotationDraftTranspose = nil
         }
     }
 

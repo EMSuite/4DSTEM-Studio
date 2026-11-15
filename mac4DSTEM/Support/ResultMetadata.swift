@@ -154,7 +154,7 @@ extension AppState {
                 return ("parallax_preprocess", "Parallax incoherent BF preview",
                         "normalized_intensity")
             case .depth:
-                let depth = phaseContrast.parallaxDepth?.depthsAngstrom[phaseContrast.parallaxDepthSelectedIndex] ?? 0
+                let depth = phaseContrast.selectedParallaxDepthAngstrom ?? 0
                 return ("parallax_depth", String(format: "Parallax depth %.1f Å", depth),
                         "arbitrary_phase")
             case .iterativePhase:

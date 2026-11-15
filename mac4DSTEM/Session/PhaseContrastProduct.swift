@@ -81,6 +81,13 @@ package final class PhaseContrastProduct {
     package var parallaxDepthInformationLimit: Double = 0
     package var parallaxDepthInformationPower: Double = 1
     package var parallaxDepthSelectedIndex = 0
+
+    /// The depth of the selected depth plane, nil when no depth stack is held or the index is not one of its planes. The index is
+    /// reset only by a new run, so a name or an export read between runs could index past the stack (mac4DSTEM#300).
+    package var selectedParallaxDepthAngstrom: Double? {
+        guard let depths = parallaxDepth?.depthsAngstrom, depths.indices.contains(parallaxDepthSelectedIndex) else { return nil }
+        return depths[parallaxDepthSelectedIndex]
+    }
     package var parallaxResultProduct: ParallaxResultProduct = .preprocess
     package var parallaxQLowpassInvAngstrom: Double = 0
     package var parallaxQHighpassInvAngstrom: Double = 0

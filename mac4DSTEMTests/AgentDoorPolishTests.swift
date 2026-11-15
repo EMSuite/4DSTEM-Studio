@@ -76,7 +76,8 @@ final class AgentDoorPolishTests: XCTestCase {
         XCTAssertTrue(refused.text.contains("busy"), "a tool that acts waits, as get_window says: \(refused.text)")
 
         Mac4DSTEMAgentDoor.opening.remove(ObjectIdentifier(state))
-        XCTAssertEqual(try object(try await call("get_window").text)["busy"] as? Bool, false)
+        let after = try await call("get_window")
+        XCTAssertEqual(try object(after.text)["busy"] as? Bool, false)
     }
 
     /// Mutation: operation.error reading `errorMessage` alone - red (the failure is only in the status text).
@@ -84,11 +85,13 @@ final class AgentDoorPolishTests: XCTestCase {
         let state = AppState(); keep.append(state)
         door.enroll(state) { [weak state] in state?.agentSummary() ?? [:] }
         state.presentComputeFailure(SimpleError("The fit annulus holds no ring."))
-        let failed = try XCTUnwrap(try object(try await call("get_window").text)["operation"] as? [String: Any])
+        let failedWindow = try await call("get_window")
+        let failed = try XCTUnwrap(try object(failedWindow.text)["operation"] as? [String: Any])
         XCTAssertEqual(failed["error"] as? String, "The fit annulus holds no ring.")
 
         let token = state.beginCancellableOperation("Fit Ellipse", status: "Fitting…")
-        let next = try XCTUnwrap(try object(try await call("get_window").text)["operation"] as? [String: Any])
+        let nextWindow = try await call("get_window")
+        let next = try XCTUnwrap(try object(nextWindow.text)["operation"] as? [String: Any])
         XCTAssertTrue(next["error"] is NSNull, "the next step begins with no error: \(next)")
         state.finishCancellableOperation(token)
     }
@@ -97,7 +100,8 @@ final class AgentDoorPolishTests: XCTestCase {
     func testScanSummaryIsSaidWhenNoDetectionHasFinished() async throws {
         let state = AppState(); keep.append(state)
         door.enroll(state) { [weak state] in state?.agentSummary() ?? [:] }
-        let disks = try XCTUnwrap(try object(try await call("get_window").text)["disk_detection"] as? [String: Any])
+        let window = try await call("get_window")
+        let disks = try XCTUnwrap(try object(window.text)["disk_detection"] as? [String: Any])
         XCTAssertTrue(disks.keys.contains("scan_summary"))
         XCTAssertTrue(disks["scan_summary"] is NSNull)
     }

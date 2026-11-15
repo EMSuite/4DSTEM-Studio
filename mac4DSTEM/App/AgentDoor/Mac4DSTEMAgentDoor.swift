@@ -83,6 +83,7 @@ enum Mac4DSTEMAgentDoor {
             + calibrationTools + phaseTools + analysisTools + imagingTools + precipitateTools + preprocessTools + actionTools + resultTools
             + edsTools
             + personTools
+            + materialsProjectTools
             + viewTools
     }
 

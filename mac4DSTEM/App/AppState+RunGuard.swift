@@ -92,6 +92,13 @@ enum RunInterruptionWording {
         case .quit: return "\(run). Quitting mac4DSTEM stops it, and \(lost)"
         }
     }
+
+    /// The agent door's answer to an open during a run: refused, naming the run; the question is the person's, never an agent's.
+    static func doorRefusal(operation: String?) -> String {
+        let run = operation.map { "\($0) is still running" } ?? "An analysis is still running"
+        return "\(run) in this window, and opening another dataset would stop it. Wait until get_window says busy is false, "
+            + "or call stop_run first if the person wants the run stopped."
+    }
 }
 
 /// The open dataset windows, for Quit: the app delegate asks the first window that runs an analysis, and the answer stops the runs

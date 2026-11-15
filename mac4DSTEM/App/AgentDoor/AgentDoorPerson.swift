@@ -138,7 +138,7 @@ extension Mac4DSTEMAgentDoor {
                       + "dataset open it needs confirm true after the person said yes, since what is not saved goes with it.",
                   input: .window, parameters: [confirmParameter], acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.agentBusy else { return busyRefusal }
+            if let refusal = openRefusal(state) { return refusal }
             if let open = state.descriptor, call.arguments["confirm"] != "true" {
                 return needsConfirmation("The demo replaces \(open.fileName) in this window; results not saved to its session "
                     + "are lost.")

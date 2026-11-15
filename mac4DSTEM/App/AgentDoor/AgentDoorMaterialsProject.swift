@@ -92,7 +92,7 @@ extension Mac4DSTEMAgentDoor {
             }
             let asPhase = call.arguments["as"] != "acom"
             state.importFetchedCrystalModel(model, addAsPhaseSlot: asPhase)
-            state.statusText = "An agent imported \(quotedAgentText(model.displayName)) from Materials Project "
+            state.statusText = "An agent imported “\(model.displayName)” from Materials Project "
                 + (asPhase ? "as a phase." : "as ACOM's phase model.")
             return asPhase ? .json(phaseMappingSettings(of: state)) : .json(["acom_phase_model": model.displayName])
         },

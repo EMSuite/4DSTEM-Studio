@@ -28,7 +28,6 @@ final class AgentDoorPolishTests: XCTestCase {
     }
 
     override func tearDown() async throws {
-        Mac4DSTEMAgentDoor.opening.removeAll()
         door?.setEnabled(false)
         door = nil
         UserDefaults().removePersistentDomain(forName: defaultsSuite)
@@ -60,7 +59,7 @@ final class AgentDoorPolishTests: XCTestCase {
         door.enroll(state) { [weak state] in state?.agentSummary() ?? [:] }
         XCTAssertFalse(state.agentBusy)
 
-        Mac4DSTEMAgentDoor.opening.insert(ObjectIdentifier(state))   // what open_file does from its answer on
+        XCTAssertTrue(state.claimOpen())   // what open_file does from its answer on
         let windows = try await call("list_windows")
         let listed = try XCTUnwrap((try object(windows.text)["windows"] as? [[String: Any]])?.first, windows.text)
         XCTAssertEqual(listed["busy"] as? Bool, true, "list_windows")
@@ -75,7 +74,7 @@ final class AgentDoorPolishTests: XCTestCase {
         XCTAssertTrue(refused.refused)
         XCTAssertTrue(refused.text.contains("busy"), "a tool that acts waits, as get_window says: \(refused.text)")
 
-        Mac4DSTEMAgentDoor.opening.remove(ObjectIdentifier(state))
+        state.releaseOpenClaim()
         let after = try await call("get_window")
         XCTAssertEqual(try object(after.text)["busy"] as? Bool, false)
     }

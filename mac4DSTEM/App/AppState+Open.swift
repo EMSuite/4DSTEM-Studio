@@ -28,9 +28,10 @@ extension AppState {
             present(SimpleError(refusal))
             return
         }
+        if !preprocess { guard claimOpen() else { return } }   // the one-load guard (mac4DSTEM#303)
         if !preprocess { OpenDatasetRegistry.beginOpening(url, by: self) }
         Task {
-            defer { if !preprocess { OpenDatasetRegistry.endOpening(url, by: self) } }
+            defer { if !preprocess { OpenDatasetRegistry.endOpening(url, by: self); releaseOpenClaim() } }
             if !preprocess, await openAsSpectrumImageIfApplicable(url) { return }   // v5.0 WP2: there are no load options for a spectrum image
             let load = beginDatasetLoading("Opening \(url.lastPathComponent)…")
             defer { finishDatasetLoading(owner: load) }
@@ -64,6 +65,7 @@ extension AppState {
                     accessedSecurityScope: accessed,
                     fileByteCount: size?.intValue
                 )
+                pending.heldElsewhere = residency.bytesHeldElsewhere()
                 let pendingEpoch = datasetSession.epoch
                 // Sample the full source through the pending array's shared cache.
                 // Both open paths report determinate progress for the same epoch.
@@ -353,7 +355,10 @@ extension AppState {
         OpenDatasetRegistry.enroll(self) { [weak self] in self?.heldDatasetFilePaths ?? [] }
     }
 
-    func openFileAsync(url: URL) async {
+    /// `claimed`: the caller already holds the open's claim (`claimOpen`); otherwise it is claimed here, before the first await.
+    func openFileAsync(url: URL, claimed: Bool = false) async {
+        if !claimed { guard claimOpen() else { return } }
+        defer { releaseOpenClaim() }
         // v5.0 WP2: a Velox EMD (or a DM4 with an EDS spectrum image and no cube) opens as a spectrum image, never as a cube.
         if await openAsSpectrumImageIfApplicable(url) { return }
         // Review a6 / owner card D2 (a): one dataset, one window — the two windows' saves would replace each other's
@@ -444,7 +449,7 @@ extension AppState {
         reader: any FourDDataSource,
         specification: LoadSpecification = .fullExtent,
         runInitialAnalysis: Bool = true,
-        keepInMemory: Bool = false,
+        keepInMemory: Bool? = nil,
         initialScan: ScanPos? = nil
     ) async {
         guard sourceDescriptor.is4D else {
@@ -940,10 +945,28 @@ extension AppState {
     /// Does nothing visible when the cube is not admitted, which today is
     /// always — the shipped default request is `.streamed` (`.automatic` was
     /// dropped, v2 S3), and nothing in the UI requests `.resident` yet.
-    private func preloadResidentCube(keepInMemory: Bool = false) async {
+    /// `keepInMemory` nil: the default rule decides (#314), a cube whose held size fits a quarter of the RAM beside what
+    /// other windows hold is kept; true or false: the configurator's switch, as the person set it.
+    private func preloadResidentCube(keepInMemory choice: Bool? = nil) async {
         guard let fourD = datasetSession.fourD, let d = descriptor else { return }
         let totalPatterns = d.ry * d.rx
         guard totalPatterns > 0 else { return }
+        let cubeBytes = fourD.residentByteCountIfHeld
+        let elsewhere = residency.bytesHeldElsewhere()
+        let physical = ProcessInfo.processInfo.physicalMemory
+        let refused = KeepInMemoryDecision.decideOnThisMac(cubeBytes: cubeBytes) == .refused
+        let keepInMemory: Bool
+        if refused {
+            keepInMemory = false
+            residency.explain("Streaming: \(displayByteString(cubeBytes)) is above what this Mac's GPU can hold in one buffer.")
+        } else if let choice {
+            keepInMemory = choice
+            residency.explain(choice ? "Kept in memory: Keep in memory was on when it was opened."
+                                     : "Streaming: Keep in memory was off when it was opened.")
+        } else {
+            keepInMemory = KeepInMemoryDecision.keepsByDefault(cubeBytes: cubeBytes, heldElsewhere: elsewhere, physicalMemory: physical)
+            residency.explain(KeepInMemoryDecision.defaultReason(cubeBytes: cubeBytes, heldElsewhere: elsewhere, physicalMemory: physical))
+        }
         // What one position takes in memory: the stored bit depth (#260), not Float32.
         let heldBytesPerPattern = fourD.residentByteCountIfHeld / totalPatterns
         // The per-open "Keep in memory" switch is the only caller that asks

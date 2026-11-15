@@ -26,12 +26,6 @@ extension Mac4DSTEMAgentDoor {
     /// Whether the person lets agents write into the Agent folder (Settings > Agents).
     static var savesAllowed = false
 
-    /// The windows an agent's `open_file` is opening, from the tool's answer until the open returns.
-    static var opening: Set<ObjectIdentifier> = []
-
-    /// Whether an agent's open of `state` is in flight (`AppState.agentBusy`).
-    static func isOpening(_ state: AppState) -> Bool { opening.contains(ObjectIdentifier(state)) }
-
     /// What a file tool answers when its path names no file; an empty path is the folder itself, never "no file <folder name>".
     static func noFileMessage(_ url: URL) -> String {
         guard let root = folder.url, url.standardizedFileURL.path != root.standardizedFileURL.path else {
@@ -68,13 +62,11 @@ extension Mac4DSTEMAgentDoor {
             guard FileManager.default.fileExists(atPath: file.path, isDirectory: &isFolder), !isFolder.boolValue else {
                 return .refusal(status: 404, message: noFileMessage(file))
             }
+            // Busy from this answer on, not from the moment the open's own loading stage begins (#266: about a second later): the
+            // window's open is claimed now (`claimOpen`, the one-load guard of #303, which every open shares).
+            guard state.claimOpen() else { return busyRefusal }
             state.statusText = "An agent opened \(quotedAgentText(file.lastPathComponent))."
-            // Busy from this answer on, not from the moment the open's own loading stage begins (#266: about a second later).
-            opening.insert(ObjectIdentifier(state))
-            Task {
-                await state.openFileAsync(url: file)
-                opening.remove(ObjectIdentifier(state))
-            }
+            Task { await state.openFileAsync(url: file, claimed: true) }
             return .json(["opening": folder.relativePath(of: file)])
         },
         AgentTool(name: "save_result_image", title: "Save result picture",

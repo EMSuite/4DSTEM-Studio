@@ -1079,6 +1079,10 @@ final class AppState {
         didSet { activityLog.record(statusText) }
     }
     var errorMessage: String?
+    /// Owner: the open (`claimOpen`, mac4DSTEM#303). True from the moment an open is claimed, synchronously on the main actor, until
+    /// it returns: the one-load guard. `datasetSession.isLoading` starts only after the open's first awaits, so two opens (a drop and
+    /// ⌘O, a double Finder open, an agent's open_file) both passed a guard on it alone.
+    private(set) var openInFlight = false
     /// Owner: the run guard (`AppState+RunGuard.swift`, #313). The question asked before closing the window, opening another file
     /// or quitting stops a running analysis; nil when none is asked.
     var pendingRunInterruption: RunInterruption?
@@ -1490,18 +1494,32 @@ final class AppState {
         if case .failed(let reason)? = outcome, statusText == statusBefore { statusText = reason }
     }
 
-    /// One load at a time: the bundled HDF5 is not thread-safe (`ConcurrentOpenRefusalTests`).
+    /// One load at a time: the bundled HDF5 is not thread-safe (`OneLoadGuardTests`).
     func openFile(url: URL) {
         if routesOpenToNewWindow(url, configure: false) { return }   // a spectrum-only window (v5.0 WP2)
-        if datasetSession.isLoading { statusText = "Already opening a dataset — wait for that one to finish, or cancel it."; return }
         // Every open path funnels here (menus, toolbar, welcome, sidebar, Recents, Finder); opening would cancel an
         // in-flight sidecar save unwritten (review 2026-10-02 c4).
         if isBusy, SessionSidecarLocator.isSaveInFlight(activeOperation) {
             statusText = "Still saving the session file — open \(url.lastPathComponent) when the save finishes"; return
         }
         if askBeforeInterruptingRun(.open(url, configure: false)) { return }   // a running analysis is asked about first (#313)
-        Task { await openFileAsync(url: url) }
+        guard claimOpen() else { return }
+        Task { await openFileAsync(url: url, claimed: true) }
     }
+
+    /// The one-load guard (mac4DSTEM#303): claims this window's open now, synchronously, or refuses with the sentence when an open
+    /// is already claimed or loading. Every open claims here before its first await; the open releases the claim when it returns.
+    func claimOpen() -> Bool {
+        guard !openInFlight, !datasetSession.isLoading else {
+            statusText = "Already opening a dataset — wait for that one to finish, or cancel it."
+            return false
+        }
+        openInFlight = true
+        return true
+    }
+
+    /// Releases the claim `claimOpen` took (the open returned, whatever its outcome).
+    func releaseOpenClaim() { openInFlight = false }
 
     /// The load specification a previous session recorded for this file, if any.
     /// Read BEFORE the load, because it decides what gets read. Reopening a

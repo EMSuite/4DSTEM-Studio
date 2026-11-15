@@ -28,9 +28,10 @@ extension AppState {
             present(SimpleError(refusal))
             return
         }
+        if !preprocess { guard claimOpen() else { return } }   // the one-load guard (mac4DSTEM#303)
         if !preprocess { OpenDatasetRegistry.beginOpening(url, by: self) }
         Task {
-            defer { if !preprocess { OpenDatasetRegistry.endOpening(url, by: self) } }
+            defer { if !preprocess { OpenDatasetRegistry.endOpening(url, by: self); releaseOpenClaim() } }
             if !preprocess, await openAsSpectrumImageIfApplicable(url) { return }   // v5.0 WP2: there are no load options for a spectrum image
             let load = beginDatasetLoading("Opening \(url.lastPathComponent)…")
             defer { finishDatasetLoading(owner: load) }
@@ -353,7 +354,10 @@ extension AppState {
         OpenDatasetRegistry.enroll(self) { [weak self] in self?.heldDatasetFilePaths ?? [] }
     }
 
-    func openFileAsync(url: URL) async {
+    /// `claimed`: the caller already holds the open's claim (`claimOpen`); otherwise it is claimed here, before the first await.
+    func openFileAsync(url: URL, claimed: Bool = false) async {
+        if !claimed { guard claimOpen() else { return } }
+        defer { releaseOpenClaim() }
         // v5.0 WP2: a Velox EMD (or a DM4 with an EDS spectrum image and no cube) opens as a spectrum image, never as a cube.
         if await openAsSpectrumImageIfApplicable(url) { return }
         // Review a6 / owner card D2 (a): one dataset, one window — the two windows' saves would replace each other's

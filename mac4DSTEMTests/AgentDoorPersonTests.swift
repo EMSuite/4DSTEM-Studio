@@ -117,8 +117,15 @@ final class AgentDoorPersonTests: XCTestCase {
         }
         XCTAssertTrue(state.activityLog.messages.contains { $0.contains("An agent opened the demo data.") })
 
+        // #314: the demo is held by default, so release_cube releases it; a cube not in memory is refused in words.
+        let wasResident = state.residency.isResident
         let release = try await call("release_cube")
-        if !state.residency.isResident { XCTAssertTrue(release.refused, "a cube not in memory is refused in words") }
+        if wasResident {
+            XCTAssertFalse(release.refused, release.text)
+            XCTAssertFalse(state.residency.isResident, "release_cube left the cube in memory")
+        } else {
+            XCTAssertTrue(release.refused, "a cube not in memory is refused in words")
+        }
         let model = try await call("remove_learned_model")
         if state.learnedDetection.activeModel == nil { XCTAssertTrue(model.text.contains("bundled"), model.text) }
         let reopen = try await call("reopen_without_session")

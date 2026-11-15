@@ -441,16 +441,14 @@ package nonisolated enum ParallaxAligner {
                               column: $0.column - Float(medianColumn))
         }
         if medianRow != 0 || medianColumn != 0 {
-            shiftedStack = rollPlanes(
-                shiftedStack, planeCount: planeCount, count: count,
-                width: preprocessing.stackWidth, height: preprocessing.stackHeight,
-                rowShift: -medianRow, columnShift: -medianColumn
-            )
-            shiftedMasks = rollPlanes(
-                shiftedMasks, planeCount: planeCount, count: count,
-                width: preprocessing.stackWidth, height: preprocessing.stackHeight,
-                rowShift: -medianRow, columnShift: -medianColumn
-            )
+            // In place, one plane of scratch (#305): a rolled copy of each whole stack was two more stacks at the peak,
+            // which the limit above never counted.
+            rollPlanes(&shiftedStack, planeCount: planeCount, count: count,
+                       width: preprocessing.stackWidth, height: preprocessing.stackHeight,
+                       rowShift: -medianRow, columnShift: -medianColumn)
+            rollPlanes(&shiftedMasks, planeCount: planeCount, count: count,
+                       width: preprocessing.stackWidth, height: preprocessing.stackHeight,
+                       rowShift: -medianRow, columnShift: -medianColumn)
         }
 
         // py4DSTEM `_stack_mean = xp.mean(self._stack_BF_shifted)` (parallax.py:806). Lane R4 (2026-10-01): this was
@@ -587,23 +585,23 @@ package nonisolated enum ParallaxAligner {
         return mask
     }
 
-    private static func rollPlanes(
-        _ input: [Float], planeCount: Int, count: Int,
+    /// Rolls each of `count` planes (`np.roll` over the two plane axes) in place, through one plane of scratch.
+    package static func rollPlanes(
+        _ stack: inout [Float], planeCount: Int, count: Int,
         width: Int, height: Int, rowShift: Int, columnShift: Int
-    ) -> [Float] {
-        var output = [Float](repeating: 0, count: input.count)
-        for plane in 0..<count {
-            let base = plane * planeCount
+    ) {
+        var plane = [Float](repeating: 0, count: planeCount)
+        for index in 0..<count {
+            let base = index * planeCount
             for row in 0..<height {
                 let sourceRow = positiveModulo(row - rowShift, height)
                 for column in 0..<width {
                     let sourceColumn = positiveModulo(column - columnShift, width)
-                    output[base + row * width + column]
-                        = input[base + sourceRow * width + sourceColumn]
+                    plane[row * width + column] = stack[base + sourceRow * width + sourceColumn]
                 }
             }
+            stack.replaceSubrange(base..<(base + planeCount), with: plane)
         }
-        return output
     }
 
     private static func positiveModulo(_ value: Int, _ modulus: Int) -> Int {

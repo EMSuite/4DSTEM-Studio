@@ -32,7 +32,7 @@ nonisolated extension BraggVectorEMDWriter {
         vectorsWithoutRecipe: Bool = false,
         cancellation: AnalysisCancellationToken?,
         progress: (@Sendable (Double) -> Void)?
-    ) throws {
+    ) throws -> String? {
         // An existing sidecar that cannot be opened (locked by a read/write reader such as HDFView, damaged,
         // unreadable) is an ERROR, never "no file": treating it as absent built a fresh file and renamed it over
         // every saved result, the vectors, the labels and the recipe (review 2026-10-02 a4).
@@ -237,11 +237,11 @@ nonisolated extension BraggVectorEMDWriter {
         // reader's own validation (a file this build writes must be a file this
         // build reads) and its projection must equal the record being written
         // beside it, or it is omitted and the omission is reported
-        // (`takeLineageOmission`). A session whose only runs were calibrations,
+        // (returned by the write). A session whose only runs were calibrations,
         // saved over a file that has a recipe, is the second case: the recipe
         // stays, the calibration nodes are not written.
         let lineageCandidate = replayRecord?.lineage?.jsonString ?? preservedLineageJSON
-        lineageOmission = nil
+        var lineageOmission: String?
         if let candidate = lineageCandidate {
             switch SessionLineage.writable(
                 candidate, alongside: recordToWrite.flatMap(SessionReplayRecord.parse)
@@ -281,6 +281,7 @@ nonisolated extension BraggVectorEMDWriter {
         }
         progress?(1)
         try checkCancellation(cancellation)   // after the last progress tick: a cancel raised by it still stops before the publish
+        return lineageOmission
     }
 
     /// True when the stored disks of `file` have no recipe behind them: it carries the marker, or it predates the replay

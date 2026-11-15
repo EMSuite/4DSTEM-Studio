@@ -375,7 +375,7 @@ struct ReductionSizeRows: View {
         if let fileBytes = pending.fileByteCount {
             ReductionSizeRow("File on disk", displayByteString(fileBytes))
         }
-        ReductionSizeRow("Whole cube (f32)", displayByteString(pending.fullExtentByteCount))
+        ReductionSizeRow("Whole cube (\(pending.fullExtentHeldTypeName))", displayByteString(pending.fullExtentHeldByteCount))
     }
 }
 

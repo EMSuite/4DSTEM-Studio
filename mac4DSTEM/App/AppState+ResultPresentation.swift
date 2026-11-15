@@ -190,7 +190,8 @@ extension AppState {
         case .phaseMapping:
             let kind = resultPresentation.product?.kind
             if phaseMapping.map != nil, phaseMapping.lastRun != nil {
-                if kind != "phase_map", kind != "phase_match_distance", kind != "precipitate_objects" {
+                if kind != "phase_map", kind != "phase_match_distance", kind != "precipitate_objects",
+                   kind != PhaseResultPicture.orientation.productKind {
                     publishPhaseMapProduct()
                 }
             } else if resultPresentation.product != nil {
@@ -553,7 +554,8 @@ extension AnalysisMode {
         if kind.hasPrefix("ptychography_") { return .singleslicePtychography }
         if kind.hasPrefix("diffraction_") { return .diffractionGroups }
         if kind == "bragg_vector_map" || kind == "disk_disagreement" { return .disks }
-        if kind == "phase_map" || kind == "phase_match_distance" || kind == "precipitate_objects" { return .phaseMapping }
+        if kind == "phase_map" || kind == "phase_match_distance" || kind == "precipitate_objects"
+            || kind == PhaseResultPicture.orientation.productKind { return .phaseMapping }
         return nil
     }
 }

@@ -14,6 +14,7 @@
 import CoreGraphics
 import Foundation
 import ShellAgentDoor
+import ShellEDXModel
 import ShellLayout
 import SwiftUI
 #if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
@@ -142,9 +143,16 @@ extension AppState {
             "has_spectrum_image": hasSpectrumImage,
             "workspace": navigation.workspaceArea.title,
             "task": navigation.analysisMode.rawValue,
-            "busy": isBusy,
+            "busy": agentBusy,
             "status": statusText,
         ]
+    }
+
+    /// Busy as an agent must read it, the same in list_windows and get_window (#266, #323): an operation, an open in flight
+    /// (its whole-cube pass included, which runs outside the operation center), an open the door started that has not begun
+    /// yet, or the EDS room at work.
+    var agentBusy: Bool {
+        isBusy || datasetSession.isLoading || edx.isBusy || Mac4DSTEMAgentDoor.isOpening(self)
     }
 
     // MARK: The window in full
@@ -160,13 +168,14 @@ extension AppState {
             "scan_position": ["x": selectedScan.x, "y": selectedScan.y],
             "pattern_shown": patternDisplayMode.rawValue,
             "task_settings": AgentJSON.orNull(agentTaskSettings),
+            "display": agentDisplay,
         ] as [String: Any]
         snapshot["operation"] = [
-            "busy": isBusy,
-            "name": AgentJSON.orNull(activeOperation),
+            "busy": agentBusy,
+            "name": AgentJSON.orNull(activeOperation ?? (datasetSession.isLoading || Mac4DSTEMAgentDoor.isOpening(self) ? "Opening" : nil)),
             "progress": AgentJSON.number(progress),
             "status": statusText,
-            "error": AgentJSON.orNull(errorMessage),
+            "error": AgentJSON.orNull(errorMessage ?? lastComputeFailure),
         ] as [String: Any]
         snapshot["result"] = agentResult
         snapshot["pattern"] = agentPattern
@@ -313,6 +322,7 @@ extension AppState {
                 "failure": AgentJSON.orNull(diagnostics.detectionFailure),
             ] as [String: Any]
         }
+        out["scan_summary"] = NSNull()   // said, not left out: no whole-scan detection has finished, or the last was cancelled (#266)
         if let summary = completedDiskSummary {
             out["scan_summary"] = [
                 "positions": summary.positionCount,

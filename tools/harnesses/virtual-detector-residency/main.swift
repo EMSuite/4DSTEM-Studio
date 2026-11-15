@@ -19,14 +19,13 @@
 //  become tolerance comparisons and this comment is the reason. Do NOT widen a
 //  tolerance to make one of them pass — that is invariant I7.
 //
-//  v2 S18 changed HOW those tiles reach the GPU, and deliberately not WHICH
-//  tiles they are: the four reducers now bind the resident buffer at the tile's
-//  byte offset instead of copying the tile out to `[Float]` and back into a
-//  fresh MTLBuffer. The equality above is therefore the same claim as before —
-//  and `residentTileCopies` below is the separate claim that the copy is gone,
-//  which no comparison of outputs could make on its own.
+//  #260: the resident cube holds the STORED bit depth (uint8, uint16, ...) and
+//  every read converts per tile with the conversion a streamed read uses. The
+//  uint8 and uint16 sections at the end assert the buffer's length is the stored
+//  size and that every result is still `==` to streaming.
 //
 
+import FormatoCore
 import Foundation
 import Metal
 import ShellMetal   // MetalEngine (MacEMUI) loads its library from its own bundle
@@ -162,7 +161,17 @@ do {
     guard ResidencyAdmission.shouldAdmit(
         .resident, descriptor: d, maximumBufferLength: d.byteCountAsFloat32
     ) else { fail(".resident refused a cube exactly at maxBufferLength") }
-    pass("admission rule — working-set fraction, float32 sizing, buffer-length clamp")
+    // #260: admission weighs the bytes the buffer will hold. A uint16 cube is
+    // half its Float32 size, so it is admitted where the Float32 figure is not.
+    guard ResidencyAdmission.shouldAdmit(
+        .resident, descriptor: huge, byteCount: 2 << 30, maximumBufferLength: 3 << 30
+    ), !ResidencyAdmission.shouldAdmit(
+        .resident, descriptor: huge, maximumBufferLength: 3 << 30
+    ) else { fail("admission did not weigh the stored size given to it") }
+    guard ResidencyAdmission.admits(huge, byteCount: 2 << 30, workingSetSize: eightGB, fraction: 0.3) else {
+        fail("a 2 GB uint16 cube should fit 30% of an 8 GB working set")
+    }
+    pass("admission rule — working-set fraction, stored and float32 sizing, buffer-length clamp")
 }
 
 // MARK: - Preload
@@ -319,10 +328,9 @@ pass("resident dispatches touched the reader zero times after the preload")
 // These paths still tile (their reductions combine across tiles), but a
 // resident array never leaves memory to get them. Same tiling, same order, so
 // still exactly equal — and with `maximumTileRows: 2` against ry = 7 the ranges
-// are 0..<2, 2..<4, 4..<6, 6..<7, so THREE of the four dispatches bind at a
-// non-zero byte offset. That is what catches an offset error in
-// `TileGPUSource.binding(for:prefetching:label:)`; before v2 S18 the same
-// ranges caught one in `FourDArray.tile(yRange:from:)`.
+// are 0..<2, 2..<4, 4..<6, 6..<7, so THREE of the four reads start at a
+// non-zero offset. That is what catches an offset error in
+// `FourDArray.tile(yRange:from:)`.
 
 // MARK: - The instrument itself, before anything trusts its zero (v2 S18, Gate B)
 
@@ -344,45 +352,6 @@ do {
              """)
     }
     pass("residentTileCopies is alive — one copied tile moves it by exactly 1")
-}
-
-// MARK: - TileGPUSource returns the cube's OWN buffer, not a copy of it
-
-// The counter above cannot see this. It lives in `FourDArray.tile(yRange:from:)`
-// — the route `TileGPUSource` deliberately no longer takes — so reinstating a
-// staging copy INSIDE `TileGPUSource.binding` leaves it reading 0/0 while every
-// value stays bit-identical (they are the same bytes). Gate B demonstrated
-// exactly that, three different ways (C02, C10, C20), all green here and green
-// across all 37 scientific harnesses.
-//
-// Assert the contract directly instead of inferring it from a counter: while
-// resident, the binding IS the cube's buffer, at the tile's byte offset. A copy
-// of any spelling fails `===`.
-do {
-    guard let cube = await residentData.resident(for: d) else {
-        fail("the resident cube vanished before the binding contract check")
-    }
-    var source = TileGPUSource(data: residentData, descriptor: d, cube: cube)
-    let bytesPerScanRow = d.rx * d.qy * d.qx * MemoryLayout<Float>.stride
-    for range in [0..<2, 2..<4, 4..<6, 6..<7] {
-        let bound = try await source.binding(
-            for: range, prefetching: nil, label: "binding contract"
-        )
-        guard bound.buffer === cube.buffer else {
-            fail("""
-                 TileGPUSource staged a COPY for rows \(range) instead of \
-                 binding the resident cube — this is the ~0.375x working-set \
-                 waste v2 S18 removed, silently reintroduced.
-                 """)
-        }
-        guard bound.offset == range.lowerBound * bytesPerScanRow else {
-            fail("""
-                 binding for rows \(range) is at byte offset \(bound.offset), \
-                 expected \(range.lowerBound * bytesPerScanRow)
-                 """)
-        }
-    }
-    pass("TileGPUSource binds the cube's own buffer at the right offset, no staging")
 }
 
 // Re-baselined AFTER the positive control's deliberate copy.
@@ -451,8 +420,8 @@ expectIdentical(residentCoM, streamCoM, "centre of mass")
 
 // Since aea14a99 the selected-area diffraction is CuboKit's VirtualDiffraction, read through CuboCubeSource like the
 // statistics, origins and centre of mass: it copies tiles out of the resident cube instead of binding its buffer (the
-// v2 S18 zero-copy claim held for the app's own Metal reducer, which that commit deleted). The binding contract of
-// TileGPUSource itself is checked above. This guards against a reducer copying the same tile more than once.
+// v2 S18 zero-copy claim held for the app's own Metal reducer, which that commit deleted; TileGPUSource, left without a
+// caller, went with #260). This guards against a reducer copying the same tile more than once.
 let diffractionCopies = copiesAfterDiffraction - copiesBeforeReducers
 guard diffractionCopies <= 4 else {
     fail("selected-area diffraction copied \(diffractionCopies) tile(s) out of the resident cube, at most one per tile (4)")
@@ -658,6 +627,129 @@ do {
         fail("a cropped cube matched a full-extent load of the same shape")
     }
     pass("staleness guard — source, shape AND load specification must all match")
+}
+
+// MARK: - Stored bit depth (#260): uint8 and uint16 cubes
+
+/// A reader that stores its cube as `type` and hands it out both ways: Float32
+/// through `FormatoArray.float32Values()` (what every real reader does) and the
+/// stored bytes through `readStoredScanTile`. Full extent only.
+actor StoredCountingSource: FourDDataSource {
+    let descriptor: DatasetDescriptor
+    let type: FormatoDataType
+    let bytes: Data
+    private(set) var tileReads = 0
+    private(set) var storedTileReads = 0
+    private(set) var patternReads = 0
+
+    init(descriptor: DatasetDescriptor, type: FormatoDataType, bytes: Data) {
+        self.descriptor = descriptor
+        self.type = type
+        self.bytes = bytes
+    }
+
+    func discoverPrimaryDataset() throws -> DatasetDescriptor { descriptor }
+    nonisolated func loadPushdown(for view: LoadView) -> LoadPushdown { .none }
+
+    private func slab(_ first: Int, _ count: Int) -> FormatoArray {
+        let size = type.byteSize
+        return try! FormatoArray(dataType: type, shape: [count], bytes: bytes.subdata(in: (first * size)..<((first + count) * size)))
+    }
+
+    func readPattern(_ view: LoadView, ry: Int, rx: Int) throws -> [Float] {
+        patternReads += 1
+        let n = descriptor.qy * descriptor.qx
+        return slab((ry * descriptor.rx + rx) * n, n).float32Values()!
+    }
+
+    func readScanRow(_ view: LoadView, ry: Int) throws -> [Float] {
+        let n = descriptor.rx * descriptor.qy * descriptor.qx
+        return slab(ry * n, n).float32Values()!
+    }
+
+    func readScanTile(_ view: LoadView, yRange: Range<Int>) throws -> FourDScanTile {
+        tileReads += 1
+        let n = descriptor.rx * descriptor.qy * descriptor.qx
+        return FourDScanTile(yRange: yRange, scanWidth: descriptor.rx, detectorHeight: descriptor.qy,
+                             detectorWidth: descriptor.qx,
+                             pixels: slab(yRange.lowerBound * n, yRange.count * n).float32Values()!)
+    }
+
+    nonisolated func storedElementType(for view: LoadView) -> FormatoDataType? {
+        view.specification.detectorBin == 1 ? type : nil
+    }
+
+    func readStoredScanTile(_ view: LoadView, yRange: Range<Int>) throws -> FourDStoredTile {
+        storedTileReads += 1
+        let n = descriptor.rx * descriptor.qy * descriptor.qx
+        return FourDStoredTile(yRange: yRange, dataType: type, bytes: slab(yRange.lowerBound * n, yRange.count * n).bytes)
+    }
+
+    func readDoubleAttribute(_ name: String, onObjectPath path: String) -> Double? { nil }
+    func pixelCalibration() -> PixelCalibration? { nil }
+}
+
+for (type, name) in [(FormatoDataType.uint16, "uint16"), (.uint8, "uint8")] {
+    let sd = DatasetDescriptor(filePath: "synthetic-\(name)", datasetPath: "/synthetic",
+                               shape: d.shape, dtypeDescription: name, chunkShape: nil)
+    let count = sd.shape.reduce(1, *)
+    var raw = Data(capacity: count * type.byteSize)
+    for k in 0..<count {
+        let value = (k &* 2654435761) >> 7
+        if type == .uint16 {
+            withUnsafeBytes(of: UInt16(truncatingIfNeeded: value).littleEndian) { raw.append(contentsOf: $0) }
+        } else {
+            raw.append(UInt8(truncatingIfNeeded: value))
+        }
+    }
+    let storedSource = StoredCountingSource(descriptor: sd, type: type, bytes: raw)
+    let storedData = FourDArray(reader: storedSource, descriptor: sd)
+    await storedData.setResidencyRequest(.resident)
+    guard try await storedData.makeResident(maximumRows: fillTileRows), await storedData.isResident else {
+        fail("[\(name)] the stored-type cube did not go resident")
+    }
+    let stored = count * type.byteSize
+    guard await storedData.residentByteCount == stored, storedData.residentByteCountIfHeld == stored,
+          let held = await storedData.resident(for: sd), held.buffer.length == stored, held.elementType == type else {
+        fail("[\(name)] the resident buffer is not the stored size \(stored) B (Float32 would be \(count * 4) B)")
+    }
+    guard await storedSource.tileReads == 0, await storedSource.storedTileReads == expectedTiles else {
+        fail("[\(name)] the fill read Float32 tiles instead of stored ones")
+    }
+    pass("[\(name)] resident buffer holds \(stored) B, the stored size (Float32: \(count * 4) B)")
+    let binned = try LoadView(source: sd, specification: LoadSpecification(detectorBin: 2))
+    guard storedSource.residentElementType(for: binned) == .float32 else {
+        fail("[\(name)] a binned view must be held as Float32")
+    }
+    pass("[\(name)] a binned view is held as float32")
+
+    let streamSourceN = StoredCountingSource(descriptor: sd, type: type, bytes: raw)
+    let streamDataN = FourDArray(reader: streamSourceN, descriptor: sd)
+    for (shapeName, shape) in shapes {
+        let a = try await VirtualDetector.tiledImage(data: storedData, descriptor: sd, shape: shape)
+        let b = try await VirtualDetector.tiledImage(data: streamDataN, descriptor: sd, shape: shape, maximumTileRows: 1)
+        expectIdentical(a.pixels, b.pixels, "[\(name)] virtual image [\(shapeName)]")
+    }
+    let sa = try await VirtualDetector.tiledDPStatistics(data: storedData, descriptor: sd, maximumTileRows: 2)
+    let sb = try await VirtualDetector.tiledDPStatistics(data: streamDataN, descriptor: sd, maximumTileRows: 2)
+    expectIdentical(sa.maxDP, sb.maxDP, "[\(name)] DP statistics [max]")
+    expectIdentical(sa.meanDP, sb.meanDP, "[\(name)] DP statistics [mean]")
+    let da = try await VirtualDetector.tiledDiffraction(data: storedData, descriptor: sd, region: region, maximumTileRows: 2)
+    let db = try await VirtualDetector.tiledDiffraction(data: streamDataN, descriptor: sd, region: region, maximumTileRows: 2)
+    expectIdentical(da.pixels, db.pixels, "[\(name)] selected-area diffraction")
+    let ca = try await VirtualDetector.tiledCenterOfMass(data: storedData, descriptor: sd, center: (5, 4), maximumTileRows: 2)
+    let cb = try await VirtualDetector.tiledCenterOfMass(data: streamDataN, descriptor: sd, center: (5, 4), maximumTileRows: 2)
+    expectIdentical(ca, cb, "[\(name)] centre of mass")
+    for ry in 0..<sd.ry {
+        for rx in 0..<sd.rx {
+            let p = try await storedData.pattern(ry: ry, rx: rx), q = try await streamDataN.pattern(ry: ry, rx: rx)
+            guard p.pixels == q.pixels, p.qy == q.qy, p.qx == q.qx else { fail("[\(name)] pattern (\(ry), \(rx)) differs") }
+        }
+    }
+    guard await storedSource.patternReads == 0, await storedSource.tileReads == 0 else {
+        fail("[\(name)] the resident cube went back to the reader")
+    }
+    pass("[\(name)] all patterns served from the resident cube, identical, zero reader reads")
 }
 
 print("virtual-detector-residency: all passed")

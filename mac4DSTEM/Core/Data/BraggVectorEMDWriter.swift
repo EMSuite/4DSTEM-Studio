@@ -34,19 +34,6 @@ package nonisolated enum BraggVectorEMDWriter {
     /// another view keeps its own here, so a reopen never draws one crop's disks at another same-size crop's positions.
     /// Additive and safe to ignore: absent, the root's view stands for the grid (every file written before it).
     static let peaksViewAttribute = "mac4dstem_peaks_view"
-    /// Why the last write left the lineage out, or nil when it wrote it (or had
-    /// none). Written inside `writeFile` and read by `takeLineageOmission`,
-    /// both under `HDF5Serial` — the lock every sidecar write already holds.
-    nonisolated(unsafe) static var lineageOmission: String?
-
-    /// The reason the most recent sidecar write did not carry the lineage, once:
-    /// the caller logs it. Nil when the lineage was written, or there was none.
-    package static func takeLineageOmission() -> String? {
-        HDF5Serial.run {
-            defer { lineageOmission = nil }
-            return lineageOmission
-        }
-    }
     /// The hand-clicked disk-centre labels (C7 session 4, 2026-09-08), as the
     /// same JSON archived `tools/disk-detector/label_centres.py` writes — one
     /// attribute on the session root, beside calibration. Additive content,
@@ -240,6 +227,7 @@ package nonisolated enum BraggVectorEMDWriter {
 
     /// `qHeight` is the detector row count and becomes py4DSTEM Qshape[0];
     /// `qWidth` is the detector column count and becomes Qshape[1].
+    @discardableResult
     package static func write(
         vectors: BraggVectors,
         qWidth: Int,
@@ -249,10 +237,10 @@ package nonisolated enum BraggVectorEMDWriter {
         loadSpecification: LoadSpecification? = nil,
         cancellation: AnalysisCancellationToken? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
-    ) throws {
+    ) throws -> String? {
         HDF5Serial.acquire(); defer { HDF5Serial.release() }
         try validate(vectors: vectors, qWidth: qWidth, qHeight: qHeight)
-        try publish(vectors: vectors, map: nil, rgbaMap: nil,
+        return try publish(vectors: vectors, map: nil, rgbaMap: nil,
                     qWidth: qWidth, qHeight: qHeight,
                     calibration: calibration, preserving: nil, to: destination,
                     loadSpecification: loadSpecification,
@@ -283,6 +271,7 @@ package nonisolated enum BraggVectorEMDWriter {
     /// Add or replace the stable scalar result in a session sidecar. If the
     /// existing sidecar contains BraggVectors and no new vectors are supplied,
     /// HDF5 copies that object into the new temporary file before publication.
+    @discardableResult
     package static func mergeResultMap(
         _ map: ScalarResultMap,
         vectors: BraggVectors?,
@@ -296,7 +285,7 @@ package nonisolated enum BraggVectorEMDWriter {
         vectorsWithoutRecipe: Bool = false,
         cancellation: AnalysisCancellationToken? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
-    ) throws {
+    ) throws -> String? {
         HDF5Serial.acquire(); defer { HDF5Serial.release() }
         guard map.width > 0, map.height > 0,
               map.pixels.count == map.width * map.height,
@@ -316,7 +305,7 @@ package nonisolated enum BraggVectorEMDWriter {
         // calibration save: the writer rebuilds the whole file, so a result
         // save that omitted it silently ERASED the crop attribute — a reopen
         // then restored results against the full extent (found by S5). // v2 S5
-        try publish(vectors: vectors, map: map, rgbaMap: nil,
+        return try publish(vectors: vectors, map: map, rgbaMap: nil,
                     qWidth: qWidth, qHeight: qHeight,
                     calibration: calibration, preserving: existing, to: destination,
                     loadSpecification: loadSpecification, replayRecord: replayRecord, source: source,
@@ -324,6 +313,7 @@ package nonisolated enum BraggVectorEMDWriter {
                     cancellation: cancellation, progress: progress)
     }
 
+    @discardableResult
     package static func mergeRGBAResultMap(
         _ map: RGBAResultMap,
         vectors: BraggVectors?,
@@ -337,7 +327,7 @@ package nonisolated enum BraggVectorEMDWriter {
         vectorsWithoutRecipe: Bool = false,
         cancellation: AnalysisCancellationToken? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
-    ) throws {
+    ) throws -> String? {
         HDF5Serial.acquire(); defer { HDF5Serial.release() }
         guard map.width > 0, map.height > 0,
               map.rgba.count == map.width * map.height * 4 else {
@@ -350,7 +340,7 @@ package nonisolated enum BraggVectorEMDWriter {
         let existing = FileManager.default.fileExists(atPath: destination.path)
             ? destination : nil
         // Same rule as mergeResultMap: every rewrite restates the view. // v2 S5
-        try publish(vectors: vectors, map: nil, rgbaMap: map,
+        return try publish(vectors: vectors, map: nil, rgbaMap: map,
                     qWidth: qWidth, qHeight: qHeight,
                     calibration: calibration, preserving: existing, to: destination,
                     loadSpecification: loadSpecification, replayRecord: replayRecord, source: source,
@@ -360,6 +350,7 @@ package nonisolated enum BraggVectorEMDWriter {
 
     /// Atomically replace the session calibration while preserving every
     /// supported result object already present in the companion file.
+    @discardableResult
     package static func mergeCalibration(
         _ calibration: PixelCalibration,
         qWidth: Int,
@@ -378,7 +369,7 @@ package nonisolated enum BraggVectorEMDWriter {
         supportedSchema: Int = SessionSidecarFormat.currentSchema,
         cancellation: AnalysisCancellationToken? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
-    ) throws {
+    ) throws -> String? {
         HDF5Serial.acquire(); defer { HDF5Serial.release() }
         guard qWidth > 0, qHeight > 0 else {
             throw WriterError.invalidDimensions("the diffraction shape must be positive")
@@ -388,7 +379,7 @@ package nonisolated enum BraggVectorEMDWriter {
         // `supportedSchema` is the same documented test seam as on
         // `loadSession`: the write-side refusal is only exercisable against a
         // real file by lowering what the "build" supports. // v2 S5
-        try publish(vectors: nil, map: nil, rgbaMap: nil,
+        return try publish(vectors: nil, map: nil, rgbaMap: nil,
                     qWidth: qWidth, qHeight: qHeight,
                     calibration: calibration, preserving: existing, to: destination,
                     loadSpecification: loadSpecification, replayRecord: replayRecord, source: source,
@@ -399,6 +390,7 @@ package nonisolated enum BraggVectorEMDWriter {
 
     /// Atomically remove one named result while preserving calibration,
     /// BraggVectors, and every other supported scalar/RGBA result.
+    @discardableResult
     package static func removeResult(
         kind: String,
         qWidth: Int,
@@ -410,7 +402,7 @@ package nonisolated enum BraggVectorEMDWriter {
         source: SessionSourceStamp? = nil,
         cancellation: AnalysisCancellationToken? = nil,
         progress: (@Sendable (Double) -> Void)? = nil
-    ) throws {
+    ) throws -> String? {
         HDF5Serial.acquire(); defer { HDF5Serial.release() }
         guard qWidth > 0, qHeight > 0,
               FileManager.default.fileExists(atPath: destination.path) else {
@@ -418,7 +410,7 @@ package nonisolated enum BraggVectorEMDWriter {
         }
         // Removal also rebuilds the file — it restates the view like every
         // other rewrite, or removing a result would erase the crop. // v2 S5
-        try publish(
+        return try publish(
             vectors: nil, map: nil, rgbaMap: nil,
             qWidth: qWidth, qHeight: qHeight, calibration: calibration,
             preserving: destination, to: destination, removingKind: kind,
@@ -487,13 +479,16 @@ package nonisolated enum BraggVectorEMDWriter {
         vectorsWithoutRecipe: Bool = false,
         cancellation: AnalysisCancellationToken?,
         progress: (@Sendable (Double) -> Void)?
-    ) throws {
+    ) throws -> String? {
         try checkCancellation(cancellation)
+        // Why the write left the lineage out (nil when it wrote it, or had none): returned, never left in a global another write
+        // could overwrite or read (mac4DSTEM#303).
+        var lineageOmission: String?
         // The kit builds the file under a scratch name (the item-replacement folder, so the sandbox allows it and the rename stays on the
         // destination's volume) and publishes it atomically over the destination: a cancel or a failure leaves the original as it was.
         do {
             try HDF5NewFile.write(to: destination) { session in
-                try writeFile(
+                lineageOmission = try writeFile(
                     into: session, vectors: vectors, map: map, rgbaMap: rgbaMap,
                     qWidth: qWidth, qHeight: qHeight,
                     calibration: calibration, preserving: existing, removingKind: removingKind,
@@ -506,6 +501,7 @@ package nonisolated enum BraggVectorEMDWriter {
         } catch {
             throw writeFailure("writing the session file", error)
         }
+        return lineageOmission
     }
 
     static func checkCancellation(_ token: AnalysisCancellationToken?) throws {

@@ -78,7 +78,7 @@ extension Mac4DSTEMAgentDoor {
                   parameters: [AgentParameter("path", .text, summary: "The file, relative to the Agent folder.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             switch folder.resolve(call.arguments["path"] ?? "") {
             case .failure(let refusal): return .refusal(status: 404, message: refusal.message)
             case .success(let url):
@@ -145,7 +145,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let descriptor = state.descriptor, let pending = state.makeCurrentViewPending(descriptor: descriptor) else {
                 return .refusal(status: 404, message: "This window has no dataset open to preprocess.")
             }

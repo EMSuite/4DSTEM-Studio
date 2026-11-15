@@ -115,6 +115,17 @@ final class ResultPresentationSeamTests: XCTestCase {
         )
     }
 
+    /// A virtual-detector run lands at most once, and never after a newer one (mac4DSTEM#303). Mutation: `>=` - red (the same
+    /// generation lands twice).
+    func testAVirtualDetectorGenerationLandsOnceAndNeverAfterANewerOne() {
+        let presentation = ResultPresentation()
+        let first = presentation.nextVDGeneration(), second = presentation.nextVDGeneration()
+        XCTAssertTrue(presentation.claimVDLanding(first))
+        XCTAssertFalse(presentation.claimVDLanding(first), "the same run landed twice")
+        XCTAssertTrue(presentation.claimVDLanding(second))
+        XCTAssertFalse(presentation.claimVDLanding(first), "an older run landed after a newer one")
+    }
+
     func testConstructionKeepsThePreSeamDefaults() {
         let presentation = ResultPresentation()
 

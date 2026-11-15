@@ -37,7 +37,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             let arguments = call.arguments
             let qUnits = arguments["q_units"].map { (typed: $0, unit: CalibrationUnitConversion.canonicalEditableReciprocalUnit($0)) }
@@ -85,7 +85,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             guard let step = call.arguments["step"].flatMap(CalibrationStep.init(rawValue:)) else {
                 return .refusal(status: 400, message: "Name the step.")

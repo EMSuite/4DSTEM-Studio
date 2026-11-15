@@ -61,10 +61,11 @@ package final class DatasetSession {
         self.fourD = array
     }
 
-    /// Records file discovery before activation. This preserves the configured
-    /// open pipeline's existing ordering without advancing the publish guard;
-    /// `activate(reader:view:)` remains the sole successful-activation bump.
+    /// Records file discovery before activation. The epoch moves with the reader (mac4DSTEM#303): from here on `reader` is the
+    /// new file's, so work started on the previous dataset must not publish, and it checks the epoch. It used to move only in
+    /// activation, which left a window in which a stale task passed its epoch check against the new reader.
     package func prepare(reader: any FourDDataSource, datasets: [DatasetDescriptor]) {
+        epoch &+= 1
         self.reader = reader
         self.datasets = datasets
     }

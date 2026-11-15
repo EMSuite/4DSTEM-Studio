@@ -54,7 +54,7 @@ enum ActivePane {
 // `RegionShape` moved to `Core/Analysis/VirtualDetector.swift` (C7 session 4,
 // budget relocation) — a placement change, not a policy change.
 
-enum ComparisonSlot: Equatable { case a, b }
+enum ComparisonSlot: Hashable { case a, b }
 
 /// What one analysis entry point did — returned by the five run functions so
 /// S6's replay executor learns the verdict from a typed value written at the
@@ -516,6 +516,12 @@ final class AppState {
     var sessionInventory: SessionSidecarInventory = .empty
     var comparisonProductA: DisplayedProduct?
     var comparisonProductB: DisplayedProduct?
+    /// Owner: the saved-result picks (`selectSavedSessionResult`, `loadSavedSessionResult`). The latest pick for the view and for
+    /// each comparison slot: an earlier pick whose file read finishes later does not land over it (mac4DSTEM#303).
+    @ObservationIgnored var savedResultPick = 0
+    @ObservationIgnored var comparisonPicks: [ComparisonSlot: Int] = [:]
+    /// Called after a saved result's file read, before it lands; tests hold one pick there while another finishes. Nil in the app.
+    @ObservationIgnored var savedResultReadForTesting: ((SessionResultDescriptor) async -> Void)?
 
     var meanPattern: DiffractionPattern?
     var maxPattern: DiffractionPattern?
@@ -958,6 +964,13 @@ final class AppState {
     /// Display-only horizontal mirror, composed after the rotation.
     var realSpaceDisplayMirrored = false
 
+    /// The comparison's "Same scale" (Results): A and B on one colour range. Here, not in the view, so the agent door sets it
+    /// (#297) and it outlives the comparison view being rebuilt for each new product.
+    var comparisonSameScale = false
+
+    /// The image panes' zooms while they are on screen, lent by the panes (`AgentDoorView.swift`, #297).
+    @ObservationIgnored let paneZooms = AgentPaneZooms()
+
     /// The orientation as it applies to whatever is on screen right now.
     /// Identity for anything that is not scan-domain, so a detector-domain
     /// product shown in the same viewer is never transformed.
@@ -1071,6 +1084,9 @@ final class AppState {
     var pendingRunInterruption: RunInterruption?
     /// Closes this window without asking again, set by the window (`WindowCloseGuard`); the run guard calls it once confirmed.
     @ObservationIgnored var closeWindowWithoutAsking: (() -> Void)?
+    /// Why the last compute step failed (`presentComputeFailure`), until the next operation begins: the agent door's
+    /// `operation.error` for a step that failed after it started (mac4DSTEM#266, #323). The person reads it in the status line.
+    var lastComputeFailure: String?
 
     private(set) var openDatasetRequest = 0
     private(set) var preprocessingExportRequest = 0
@@ -1228,6 +1244,7 @@ final class AppState {
             return refused
         }
         let token = operationCenter.begin(name: name, totalUnits: totalUnits)
+        lastComputeFailure = nil
         statusText = status
         return token
     }

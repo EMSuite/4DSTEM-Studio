@@ -31,7 +31,7 @@ extension Mac4DSTEMAgentDoor {
                                AgentParameter("y", .integer(0...100_000), summary: "Scan row, from 0.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let descriptor = state.descriptor, descriptor.is4D else {
                 return .refusal(status: 404, message: "This window has no 4D-STEM scan.")
             }
@@ -51,7 +51,7 @@ extension Mac4DSTEMAgentDoor {
                   parameters: DiskSetting.all.map(\.parameter) + [subpixelParameter],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             var params = state.diskDetection.diskParams
             if let mode = call.arguments["subpixel"].flatMap(subpixelMode(named:)) { params.subpixel = mode }
             for setting in DiskSetting.all {
@@ -72,7 +72,7 @@ extension Mac4DSTEMAgentDoor {
                       + "and get_log says how it ended.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             // The Spectroscopy room's Quantify runs on a spectrum image alone (#254), as the toolbar's does.
             if state.navigation.workspaceArea == .spectroscopy {
                 guard state.hasSpectrumImage else {

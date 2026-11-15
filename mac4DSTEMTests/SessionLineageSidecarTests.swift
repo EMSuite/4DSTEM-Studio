@@ -27,7 +27,6 @@ final class SessionLineageSidecarTests: XCTestCase {
     private let lineageName = SessionSidecarFormat.lineageAttribute
 
     override func setUpWithError() throws {
-        _ = BraggVectorEMDWriter.takeLineageOmission()   // drain what another test left
         workDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("SessionLineageSidecarTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
@@ -68,8 +67,10 @@ final class SessionLineageSidecarTests: XCTestCase {
         SessionReplayRecord(steps: lineage.projection().steps, lineage: lineage)
     }
 
+    /// Writes the calibration with `record`; returns why the write left the lineage out (nil when it wrote it, or had none).
+    @discardableResult
     private func save(_ record: SessionReplayRecord?, to url: URL,
-                      specification: LoadSpecification? = nil) throws {
+                      specification: LoadSpecification? = nil) throws -> String? {
         try BraggVectorEMDWriter.mergeCalibration(
             calibration, qWidth: 32, qHeight: 32, to: url,
             loadSpecification: specification, replayRecord: record)
@@ -109,8 +110,8 @@ final class SessionLineageSidecarTests: XCTestCase {
         lineage.apply(try lineage.rewindPlan(to: "s2").get())
         XCTAssertEqual(lineage.activeNodes().map(\.id), ["s1", "s2", "s3"], "precondition")
         let path = url("rewound")
-        try save(attached(lineage), to: path, specification: binned)
-        XCTAssertNil(BraggVectorEMDWriter.takeLineageOmission(), "the writer accepted the rewound lineage")
+        let omission = try save(attached(lineage), to: path, specification: binned)
+        XCTAssertNil(omission, "the writer accepted the rewound lineage")
         let snapshot = try BraggVectorEMDWriter.loadSession(from: path)
         XCTAssertNil(snapshot.lineageNote)
         XCTAssertEqual(snapshot.lineage, lineage)
@@ -380,9 +381,9 @@ final class SessionLineageSidecarTests: XCTestCase {
         XCTAssertEqual(oversized.nodes.count, 2_001, "precondition: decoded without validation")
         XCTAssertEqual(oversized.projection().steps.count, 2_001, "unknown kinds are recipe steps")
         let target = url("oversized")
-        try save(attached(oversized), to: target)
+        let omission = try save(attached(oversized), to: target)
         let snapshot = try BraggVectorEMDWriter.loadSession(from: target)   // must not throw
-        XCTAssertNotNil(BraggVectorEMDWriter.takeLineageOmission())
+        XCTAssertNotNil(omission)
         XCTAssertEqual(snapshot.replayRecord?.steps.count, 2_001, "the recipe is written")
         XCTAssertNil(snapshot.lineageNote)
         XCTAssertTrue(snapshot.lineage?.nodes.allSatisfy { $0.source == "v1" } ?? false,
@@ -398,8 +399,8 @@ final class SessionLineageSidecarTests: XCTestCase {
         try SidecarPatcher.write(
             .variableString(valid.replacingOccurrences(of: "\"step\":\"s2\"", with: "\"step\":\"s99\"")),
             named: lineageName, into: target)
-        try save(nil, to: target, specification: binned)
-        XCTAssertNotNil(BraggVectorEMDWriter.takeLineageOmission())
+        let omission = try save(nil, to: target, specification: binned)
+        XCTAssertNotNil(omission)
         let snapshot = try BraggVectorEMDWriter.loadSession(from: target)   // must not throw
         XCTAssertEqual(snapshot.lineage?.nodes.map(\.source), ["v1", "v1", "v1"])
         XCTAssertNotNil(snapshot.replayRecord, "the recipe was carried forward")
@@ -418,8 +419,8 @@ final class SessionLineageSidecarTests: XCTestCase {
         var calibrationOnly = SessionLineage()
         calibrationOnly.recordRun(kind: "calibration_origin", parameters: ["fit_function": "Plane"],
                                   frame: SessionLineage.Frame(), at: date(21))
-        try save(attached(calibrationOnly), to: target)
-        XCTAssertNotNil(BraggVectorEMDWriter.takeLineageOmission())
+        let omission = try save(attached(calibrationOnly), to: target)
+        XCTAssertNotNil(omission)
         let snapshot = try BraggVectorEMDWriter.loadSession(from: target)
         XCTAssertEqual(snapshot.replayRecord, plain, "the colleague's recipe is untouched")
         XCTAssertNil(snapshot.lineageNote, "no disagreement is ever written")
@@ -429,8 +430,28 @@ final class SessionLineageSidecarTests: XCTestCase {
     /// The agreeing writes report nothing. Mutation it catches: an omission
     /// note that is never cleared (the next good save would log a stale reason).
     func testAWriteThatKeepsTheLineageReportsNoOmission() throws {
-        try save(attached(sampleLineage()), to: url("clean"), specification: binned)
-        XCTAssertNil(BraggVectorEMDWriter.takeLineageOmission())
+        let omission = try save(attached(sampleLineage()), to: url("clean"), specification: binned)
+        XCTAssertNil(omission)
+    }
+
+    /// Two saves at once, one that omits its lineage and one that keeps it, each report only their own outcome (mac4DSTEM#303: the
+    /// omission went through a global, so one write's note could be read, or cleared, by the other). Mutation: the omission back in
+    /// a shared variable - the clean writes start reporting the other's note, red.
+    func testTwoSavesAtOnceEachReportTheirOwnOmission() throws {
+        let nodes = (1...2_001).map { nodeJSON(id: "s\($0)", kind: "kind_\($0)") }
+        let oversized = try JSONDecoder.lineage.decode(
+            SessionLineage.self, from: Data(lineageJSON(nodes: nodes, nextID: 3_000).utf8))
+        let omitting = attached(oversized), clean = attached(sampleLineage())
+        let results = OmissionResults()
+        DispatchQueue.concurrentPerform(iterations: 16) { i in
+            let omits = i.isMultiple(of: 2)
+            let note = try? save(omits ? omitting : clean, to: url("pair-\(i)"), specification: omits ? nil : binned)
+            results.add(omits: omits, note: note ?? nil)
+        }
+        XCTAssertEqual(results.all.count, 16)
+        for (omits, note) in results.all {
+            if omits { XCTAssertNotNil(note, "an omitting save reported nothing") } else { XCTAssertNil(note, "a clean save reported \(note ?? "")") }
+        }
     }
 
     // MARK: - Gate B fixes: a newer lineage is a note, not a refusal
@@ -451,8 +472,8 @@ final class SessionLineageSidecarTests: XCTestCase {
         XCTAssertNil(snapshot.lineage?.nodes.first?.inputs)
 
         // And a save over it replaces it, saying so — it is not carried unchecked.
-        try save(nil, to: target, specification: binned)
-        XCTAssertNotNil(BraggVectorEMDWriter.takeLineageOmission())
+        let omission = try save(nil, to: target, specification: binned)
+        XCTAssertNotNil(omission)
         XCTAssertNil(try BraggVectorEMDWriter.loadSession(from: target).lineageNote)
     }
 
@@ -478,8 +499,8 @@ final class SessionLineageSidecarTests: XCTestCase {
 
         let lineage = state.replay.lineage
         let path = url("manual-origin")
-        try save(attached(lineage), to: path)
-        XCTAssertNil(BraggVectorEMDWriter.takeLineageOmission(), "the writer accepted the lineage")
+        let omission = try save(attached(lineage), to: path)
+        XCTAssertNil(omission, "the writer accepted the lineage")
         let read = try XCTUnwrap(try BraggVectorEMDWriter.loadSession(from: path).lineage)
         // Not `read == lineage`: the file keeps whole seconds, the live run's clock does not.
         XCTAssertEqual(read.nodes.map(\.id), lineage.nodes.map(\.id))
@@ -676,4 +697,12 @@ final class FitAnywayRestoresOnReopenTests: XCTestCase {
         XCTAssertTrue(restored.contains("rests on your assertion"), restored)
         XCTAssertTrue(PrepareSettings.fitAnywayNote(occupiedBins: 9).contains("9/36 sectors"))
     }
+}
+
+/// The pairs of `testTwoSavesAtOnceEachReportTheirOwnOmission`, collected from its worker threads.
+private final class OmissionResults: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pairs: [(omits: Bool, note: String?)] = []
+    func add(omits: Bool, note: String?) { lock.lock(); pairs.append((omits, note)); lock.unlock() }
+    var all: [(omits: Bool, note: String?)] { lock.lock(); defer { lock.unlock() }; return pairs }
 }

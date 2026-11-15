@@ -165,8 +165,8 @@ extension AppState {
     /// A save just finished: if the writer left the lineage out (it will not
     /// write one it could not read back, or one that disagrees with the recipe
     /// beside it), say so in the session log.
-    func reportLineageOmission() {
-        if let note = BraggVectorEMDWriter.takeLineageOmission() { activityLog.record(note) }
+    func reportLineageOmission(_ note: String?) {
+        if let note { activityLog.record(note) }
     }
 
     /// A sink: something left the session (a file in a format). Not

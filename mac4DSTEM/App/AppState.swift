@@ -1079,6 +1079,11 @@ final class AppState {
         didSet { activityLog.record(statusText) }
     }
     var errorMessage: String?
+    /// Owner: the run guard (`AppState+RunGuard.swift`, #313). The question asked before closing the window, opening another file
+    /// or quitting stops a running analysis; nil when none is asked.
+    var pendingRunInterruption: RunInterruption?
+    /// Closes this window without asking again, set by the window (`WindowCloseGuard`); the run guard calls it once confirmed.
+    @ObservationIgnored var closeWindowWithoutAsking: (() -> Void)?
     /// Why the last compute step failed (`presentComputeFailure`), until the next operation begins: the agent door's
     /// `operation.error` for a step that failed after it started (mac4DSTEM#266, #323). The person reads it in the status line.
     var lastComputeFailure: String?
@@ -1494,6 +1499,7 @@ final class AppState {
         if isBusy, SessionSidecarLocator.isSaveInFlight(activeOperation) {
             statusText = "Still saving the session file — open \(url.lastPathComponent) when the save finishes"; return
         }
+        if askBeforeInterruptingRun(.open(url, configure: false)) { return }   // a running analysis is asked about first (#313)
         Task { await openFileAsync(url: url) }
     }
 

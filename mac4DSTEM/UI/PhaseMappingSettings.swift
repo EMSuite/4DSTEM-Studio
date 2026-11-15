@@ -466,22 +466,14 @@ struct PhaseMappingSections: View {
         return values.map { Num.fixed($0, 2, locale: locale) }.joined(separator: " · ") + " px"
     }
 
-    /// Materials Project is the default phase source (owner decision), then the person's own CIF; the built-in materials
-    /// (`CrystalModelLibrary.models`: Al, Au, Ni, Cu, Fe, Si, Mg, 2H-WS₂) are offered again below them (Paul, 13 Nov, #297), the
-    /// same list the agent door's add_phase takes, so a run needs no hand-written CIF for a common matrix. Then this session's
-    /// already-imported models.
+    /// Materials Project is the default phase source (owner decision); the
+    /// built-in library is not offered here — see the doc comment on
+    /// `CrystalModelLibrary.models`. The menu offers exactly the two sources
+    /// plus this session's already-imported models (CIF or Materials Project).
     private var addPhaseMenu: some View {
         InspectorAdaptiveMenu("Add Phase", systemImage: "plus") {
             Button("Materials Project…") { showMaterialsProjectSheet = true }
             Button("From CIF file…") { showCIFImporter = true }
-            Menu("Built-in Material") {
-                ForEach(CrystalModelLibrary.models) { model in
-                    Button(addPhaseMenuLabel(model, alreadyAdded: appState.phaseMapping.phases.contains { $0.model.id == model.id })) {
-                        add(model)
-                    }
-                }
-            }
-            .accessibilityIdentifier("phaseMapping.addBuiltIn")
             if !appState.acomSession.importedCrystalModels.isEmpty {
                 Divider()
                 ForEach(appState.acomSession.importedCrystalModels) { model in

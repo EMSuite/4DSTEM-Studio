@@ -127,7 +127,7 @@ structure can be in the list twice with typed zone axes.
 
 | Tool | What it does |
 |---|---|
-| `add_phase` | a CIF in the Agent folder (`path`) or a built-in material (`material`: `al_fcc`, `au_fcc`, `ni_fcc`, `cu_fcc`, `fe_bcc`, `si_diamond`, `mg_hcp`, `ws2_2h`, the list Add Phase > Built-in Material offers, #297) becomes a phase; the first phase is the matrix, `is_matrix` makes this one it; a file that does not read is refused in words, no modal |
+| `add_phase` | a CIF in the Agent folder becomes a phase, as Add Phase > From CIF file does; the first phase is the matrix, `is_matrix` makes this one it; a file that does not read is refused in words, no modal |
 | `set_phase` | one phase: `is_matrix` (exactly one is; the matrix moves by marking another), its own `excitation_slab_inv_angstrom` or `clear_excitation_slab` back to the default, and with typed zone axes `zone_axis` and `orientation_relationship` |
 | `remove_phase` | the minus button (Edit > Undo puts it back); removing the matrix makes the first phase the matrix |
 

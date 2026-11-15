@@ -247,11 +247,10 @@ package nonisolated enum CrystalModelSelection: Hashable, Sendable, Identifiable
 package nonisolated enum CrystalModelLibrary {
     /// Session S5 (owner's product decision): Materials Project is the
     /// default phase source and the user's own CIFs are the other one — this
-    /// library was taken out of the UI (`UI/MapSettings.swift`'s ACOM picker
-    /// still lists only "Materials Project…", "Import CIF…" and already-imported
-    /// models). Paul, 13 Nov 2026 (#297): Map Phases' "Add Phase" menu offers it
-    /// again under Built-in Material, and the agent door's add_phase takes the
-    /// same ids. It is also a **resolver**: `CrystalModelSelection.library(id)`
+    /// library is no longer offered as a UI choice (`UI/MapSettings.swift`'s
+    /// ACOM picker, `UI/PhaseMappingSettings.swift`'s "Add Phase" menu now
+    /// list only "Materials Project…", "Import CIF…" and already-imported
+    /// models). It stays here as a **resolver**: `CrystalModelSelection.library(id)`
     /// still exists and must still resolve, because a recipe recorded before
     /// this session (`Session/ReplayPlan.swift`) and every test that names a
     /// built-in model by id (`ws2_2h`, `au_fcc`, …) depend on it.

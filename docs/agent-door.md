@@ -185,3 +185,14 @@ Recent Datasets (the person's own history), and API keys, which never pass throu
 A tool whose control asks the person first (Clear Calibration's dialog, Remove Fine-Tuned Model, Try Demo Data over an open
 dataset) refuses with HTTP 409 and says in words what would be lost. The agent asks the person in the chat and, only after a
 yes, calls again with `confirm` true.
+
+## Materials Project (issue #297)
+
+| Tool | What it does |
+|---|---|
+| `fetch_materials_project` | fetches a material by its id (`mp-…`), as the sheet's Fetch does, and checks it against an expected formula and space group; answers at once; behind "Let agents run analyses", since it goes online |
+| `get_materials_project` | whether the person has stored a key, and the last fetch: the material (formula, space group, cell, deprecated), the verdict and whether it may be imported, or why it failed |
+| `import_materials_project` | the sheet's Import: as a phase of Map Phases or as ACOM's phase model; refused on a mismatch |
+
+The request uses the key the person stored in Settings. The key never passes through the door: no tool reads, returns, sets
+or logs it, and saving or removing it stays the person's.

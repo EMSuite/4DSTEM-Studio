@@ -226,6 +226,8 @@ jobs:
       - name: Fail on Accelerate / Metal / vDSP outside the allowlist
         # Decision D15. Plain grep, no build; also part of `inventory`, kept as its own job so the red is named.
         run: tools/check-kit-boundary.sh
+      - name: Update feed notes (release tools, #374)
+        run: tools/release/tests/test-feed.sh
 
   lint:
     name: Lint (shared SwiftLint and SwiftFormat config)

@@ -74,7 +74,8 @@ build has no updater, because the store updates it and refuses an app that updat
   second launch before it checks by itself (daily).
 - **Feed on the website**, `https://mac4dstem.com/appcast/mac4dstem.xml`: one URL that outlives the GitHub organisation's
   name. `tools/release.sh` writes it (`tools/release/appcast.sh`, one item: the new DMG on the GitHub release, its EdDSA
-  signature, the CHANGELOG section as plain text), and it is committed to the website as `appcast/mac4dstem.xml` in the
+  signature, and short notes: `docs/app-store/whats-new.txt` when it names the version, else the CHANGELOG section without
+  commit hashes and issue refs; the full list is the GitHub release, `sparkle:fullReleaseNotesLink`), and it is committed to the website as `appcast/mac4dstem.xml` in the
   PR that sets the download's version and size.
 - **Build number = version** in the download (`CURRENT_PROJECT_VERSION` set from `Config/Version.xcconfig` by
   `build-developer-id.sh`), because Sparkle compares `sparkle:version` with `CFBundleVersion`; the store build keeps

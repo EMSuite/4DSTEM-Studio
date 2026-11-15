@@ -38,7 +38,25 @@ extension AppState {
     /// Runs origin calibration if the radius is unknown; nil on failure.
     /// Shared by the two generators below that need a calibrated radius.
     private func ensureProbeRadius() async -> Float? {
-        if calibrationSession.calibration.probeRadius == nil { await calibrateOrigin() }
+        guard calibrationSession.calibration.probeRadius == nil else { return calibrationSession.calibration.probeRadius }
+        // A hand-set origin stays (#364, as #348: a calibration changes only when asked). Calibrate Origin would fit and replace
+        // it, so the radius is measured alone, as py4DSTEM's `get_probe_size` on the mean pattern, and the origin is left as typed.
+        if calibrationSession.calibration.originProvenance == .manual {
+            if meanPattern == nil { await computeDPStatistics() }
+            guard let mean = meanPattern,
+                  OriginCalibration.comparableBrightDiskCount(dp: mean.pixels, qy: mean.qy, qx: mean.qx) <= 1,
+                  let size = OriginCalibration.probeSize(dp: mean.pixels, qy: mean.qy, qx: mean.qx),
+                  size.r.isFinite, size.r > 0 else {
+                statusText = "Build Kernel needs a probe radius. Type one in Prepare, or run Calibrate Origin "
+                    + "(it replaces the hand-set origin)."
+                return nil
+            }
+            calibrationSession.calibration.probeRadius = size.r
+            calibrationSession.provenance.probe = .measuredInApp
+            refreshDiskDefaultsForMeasuredProbe()
+            return size.r
+        }
+        await calibrateOrigin()
         return calibrationSession.calibration.probeRadius
     }
 

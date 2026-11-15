@@ -58,7 +58,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
         var labels = [Int32](repeating: 0, count: 10 * 5)
         for c in 1...7 { labels[2 * 10 + c] = 1 }
 
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 10, height: 5, roles: roles(precipitate: [1]),
             pixelSize: nil, pixelUnit: nil
         )
@@ -108,7 +108,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
         var labels = [Int32](repeating: 0, count: 8 * 8)
         for k in 1...5 { labels[k * 8 + k] = 1 }
 
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 8, height: 8, roles: roles(precipitate: [1]),
             pixelSize: nil, pixelUnit: nil
         )
@@ -152,7 +152,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
         labels[2 * 5 + 2] = 1
         labels[3 * 5 + 1] = 1
 
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 5, height: 5, roles: roles(precipitate: [1]),
             pixelSize: nil, pixelUnit: nil
         )
@@ -168,7 +168,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
         // edge-adjacency, not an alternative to it.
         var edgeLabels = [Int32](repeating: 0, count: 5 * 5)
         edgeLabels[0] = 1; edgeLabels[1] = 1; edgeLabels[2] = 1; edgeLabels[3] = 1
-        let edgeResult = PrecipitateSegmentation.classObjects(
+        let edgeResult = try PrecipitateSegmentation.classObjects(
             labels: edgeLabels, width: 5, height: 5, roles: roles(precipitate: [1]),
             pixelSize: nil, pixelUnit: nil
         )
@@ -192,7 +192,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
         labels[2 * 6 + 0] = 1   // left column (col 0)
         labels[3 * 6 + 5] = 1   // right column (col width-1 = 5)
 
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 6, height: 6, roles: roles(precipitate: [1]),
             pixelSize: nil, pixelUnit: nil
         )
@@ -204,7 +204,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
         // NOT be flagged.
         var interior = [Int32](repeating: 0, count: 5 * 5)
         interior[2 * 5 + 2] = 1
-        let interiorResult = PrecipitateSegmentation.classObjects(
+        let interiorResult = try PrecipitateSegmentation.classObjects(
             labels: interior, width: 5, height: 5, roles: roles(precipitate: [1]),
             pixelSize: nil, pixelUnit: nil
         )
@@ -234,7 +234,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
         labels[0] = 1
         labels[1 * 2 + 1] = 2
 
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 2, height: 2, roles: roles(precipitate: [1, 2]),
             pixelSize: nil, pixelUnit: nil
         )
@@ -259,7 +259,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
         labels[1 * 3 + 1] = 1 // one interior precipitate pixel
 
         func density(_ pixelSize: Double?) throws -> ObjectStatistics.ArealDensity {
-            let result = PrecipitateSegmentation.classObjects(
+            let result = try PrecipitateSegmentation.classObjects(
                 labels: labels, width: 3, height: 3, roles: roles(precipitate: [1]),
                 pixelSize: pixelSize, pixelUnit: pixelSize == nil ? nil : "nm"
             )
@@ -285,7 +285,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
 
     func testAllMatrixMapReportsRequestedClassEmptyNotMissing() throws {
         let labels = [Int32](repeating: 0, count: 3 * 3) // every position is matrix, label 0
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 3, height: 3, roles: roles(precipitate: [1]),
             pixelSize: nil, pixelUnit: nil
         )
@@ -313,7 +313,7 @@ final class PrecipitateSegmentationAnalyticTests: XCTestCase {
     func testSinglePixelPrecipitateIsAWellFormedDegenerateObject() throws {
         var labels = [Int32](repeating: 0, count: 5 * 5)
         labels[2 * 5 + 2] = 1
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 5, height: 5, roles: roles(precipitate: [1]),
             pixelSize: nil, pixelUnit: nil
         )

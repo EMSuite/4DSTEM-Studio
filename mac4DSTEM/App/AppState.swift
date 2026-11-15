@@ -295,6 +295,9 @@ final class AppState {
     /// strain map; the object report reads them. Recomputed by `refreshPrecipitateJoins`.
     private(set) var precipitateJoins = PrecipitateJoins()
     @ObservationIgnored var precipitateJoinGeneration = 0
+    /// Owner: the precipitate object report (`precipitateObjectReport`). The last refusal of the report said in the Output, so a
+    /// refusal is said once, not at every redraw that reads the report (mac4DSTEM#300).
+    @ObservationIgnored var lastPrecipitateReportRefusal: String?
     /// The running join (one pooled fit per object can take a while): a newer request cancels it.
     @ObservationIgnored var precipitateJoinTask: Task<Void, Never>?
     /// What the standing composition per object was fitted with (the room's method hash; nil: not quantified).

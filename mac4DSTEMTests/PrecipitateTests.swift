@@ -14,8 +14,8 @@ import ImagoCore
 final class PrecipitateTests: XCTestCase {
 
     private func classObjects(_ labels: [Int32], width: Int, height: Int, notIndexed: Set<Int32> = [9],
-                              pixelSize: Double?, unit: String? = "nm") -> PrecipitateSegmentation.ClassMapObjects {
-        PrecipitateSegmentation.classObjects(
+                              pixelSize: Double?, unit: String? = "nm") throws -> PrecipitateSegmentation.ClassMapObjects {
+        try PrecipitateSegmentation.classObjects(
             labels: labels, width: width, height: height,
             roles: .init(precipitateClasses: [1], matrix: [0], notIndexed: notIndexed),
             pixelSize: pixelSize, pixelUnit: unit)
@@ -29,7 +29,7 @@ final class PrecipitateTests: XCTestCase {
         labels[55] = 1
         for r in 2...3 { for c in 3...6 { labels[r * 10 + c] = 1 } }
         for i in 80..<100 { labels[i] = 9 }
-        let result = classObjects(labels, width: 10, height: 10, pixelSize: 1)
+        let result = try classObjects(labels, width: 10, height: 10, pixelSize: 1)
         let cls = try XCTUnwrap(result.classes.first)
         XCTAssertEqual(result.analysedPixels, 80)
         XCTAssertEqual(cls.density.counted, 2)
@@ -41,7 +41,7 @@ final class PrecipitateTests: XCTestCase {
     func testNoPixelSizeNoDensity() throws {
         var labels = [Int32](repeating: 0, count: 100)
         labels[55] = 1
-        let cls = try XCTUnwrap(classObjects(labels, width: 10, height: 10, pixelSize: nil, unit: nil).classes.first)
+        let cls = try XCTUnwrap(try classObjects(labels, width: 10, height: 10, pixelSize: nil, unit: nil).classes.first)
         XCTAssertNil(cls.density.arealDensity)
         XCTAssertEqual(cls.density.counted, 1)
     }
@@ -51,7 +51,7 @@ final class PrecipitateTests: XCTestCase {
         var labels = [Int32](repeating: 0, count: 100)
         labels[55] = 1
         labels[0] = 1; labels[1] = 1
-        let cls = try XCTUnwrap(classObjects(labels, width: 10, height: 10, pixelSize: 1).classes.first)
+        let cls = try XCTUnwrap(try classObjects(labels, width: 10, height: 10, pixelSize: 1).classes.first)
         XCTAssertEqual(cls.objects.count, 2)
         XCTAssertEqual(cls.density.counted, 1)
         XCTAssertEqual(cls.density.edgeExcluded, 1)
@@ -64,7 +64,7 @@ final class PrecipitateTests: XCTestCase {
         let width = 24, height = 24
         var labels = [Int32](repeating: 0, count: width * height)
         for k in 0..<14 { labels[(5 + k) * width + (4 + k)] = 1; labels[(5 + k) * width + (5 + k)] = 1 }   // a 2-px-wide diagonal
-        let cls = try XCTUnwrap(classObjects(labels, width: width, height: height, pixelSize: nil, unit: nil).classes.first)
+        let cls = try XCTUnwrap(try classObjects(labels, width: width, height: height, pixelSize: nil, unit: nil).classes.first)
         let object = try XCTUnwrap(cls.objects.first)
         let mask = labels.map { $0 == 1 }
         let image = try Segmentation.label(mask, width: width, height: height, connectivity: .eight)
@@ -84,10 +84,40 @@ final class PrecipitateTests: XCTestCase {
         var labels = [Int32](repeating: 0, count: 100)
         labels[11] = 1; labels[33] = 1; labels[34] = 1                  // class 1: a pixel, then a 2-pixel bar
         labels[66] = 2                                                   // class 2
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 10, height: 10, roles: .init(precipitateClasses: [1, 2], matrix: [0], notIndexed: [9]),
             pixelSize: nil, pixelUnit: nil)
         XCTAssertEqual(result.classes.map { $0.objects.map(\.id) }, [[1, 2], [3]])
         XCTAssertEqual(result.classes[0].objects.map(\.area), [2, 1])
+    }
+}
+
+/// mac4DSTEM#300: a class map whose data does not hold together is refused with a sentence, not a `precondition` trap.
+final class PrecipitateClassMapRefusalTests: XCTestCase {
+    private func refusal(_ labels: [Int32], width: Int, height: Int,
+                         roles: PrecipitateSegmentation.LabelRoles) -> PrecipitateSegmentation.Refusal? {
+        do {
+            _ = try PrecipitateSegmentation.classObjects(labels: labels, width: width, height: height, roles: roles,
+                                                         pixelSize: nil, pixelUnit: nil)
+            return nil
+        } catch let refusal as PrecipitateSegmentation.Refusal {
+            return refusal
+        } catch {
+            XCTFail("refused as \(error)")
+            return nil
+        }
+    }
+
+    /// Mutation: any guard back to a `precondition` - the test process crashes, red.
+    func testAMalformedClassMapIsRefused() {
+        let roles = PrecipitateSegmentation.LabelRoles(precipitateClasses: [1], matrix: [0], notIndexed: [9])
+        XCTAssertNotNil(refusal([0, 1, 1], width: 2, height: 2, roles: roles), "labels that do not fill the map")
+        XCTAssertNotNil(refusal([], width: -1, height: 0, roles: roles), "negative dimensions")
+        XCTAssertNotNil(refusal([], width: Int.max, height: 2, roles: roles), "dimensions whose product overflows")
+        XCTAssertNotNil(refusal([0, 1, 1, 0], width: 2, height: 2,
+                                roles: .init(precipitateClasses: [1], matrix: [1], notIndexed: [9])), "a label in two roles")
+        XCTAssertNil(refusal([0, 1, 1, 0], width: 2, height: 2, roles: roles), "a well-formed map")
+        let message = refusal([0], width: 2, height: 2, roles: roles)?.localizedDescription ?? ""
+        XCTAssertTrue(message.hasPrefix("The precipitate objects cannot be found:"), message)
     }
 }

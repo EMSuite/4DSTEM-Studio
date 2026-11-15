@@ -344,16 +344,33 @@ extension AppState {
         // whole scan. A newer run or a dataset change while it computes wins
         // (`PrecipitateClassificationProduct.publish(_:ifCurrent:)`).
         let token = precipitateClassification.beginComputation()
-        let objects = await Task.detached(priority: .userInitiated) {
-            PrecipitateSegmentation.classObjects(
+        let outcome = await Task.detached(priority: .userInitiated) {
+            Result { try PrecipitateSegmentation.classObjects(
                 labels: labels, width: width, height: height, roles: roles,
-                pixelSize: pixelSize, pixelUnit: pixelUnit)
+                pixelSize: pixelSize, pixelUnit: pixelUnit) }
         }.value
+        let objects: PrecipitateSegmentation.ClassMapObjects
+        switch outcome {
+        case .success(let value): objects = value
+        case .failure(let refusal):
+            // A refusal, said, instead of a trap (mac4DSTEM#300); the previous objects stay until a new map classifies.
+            statusText = refusal.localizedDescription
+            return
+        }
         if precipitateClassification.publish(objects, ifCurrent: token) {
             refreshPrecipitateJoins()
             // Lineage node (ADR 047): consumes the phase map just recorded.
             recordLineageRun(kind: "precipitate_objects", parameters: objectsRunParameters)
         }
+    }
+
+    /// A refusal of the object report, said once: the report is read on every redraw, so the Output gets the sentence when it
+    /// changes, after the redraw (an Output line written inside a view update would be a state change during it).
+    private func sayPrecipitateReportRefusal(_ error: Error) {
+        let sentence = error.localizedDescription
+        guard sentence != lastPrecipitateReportRefusal else { return }
+        lastPrecipitateReportRefusal = sentence
+        Task { @MainActor [weak self] in self?.activityLog.record(sentence) }
     }
 
     /// What the objects run records: the connectivity and the reader's minimum size.
@@ -486,18 +503,24 @@ extension AppState {
         guard let objects = precipitateClassification.result, let map = phaseMapping.map,
               objects.width == map.width, objects.height == map.height else { return nil }
         let calibration = calibrationSession.calibration
-        return PrecipitateObjectReport.make(
-            objects: objects, phaseNames: map.phaseNames, matrixPhaseIndex: map.matrixPhaseIndex,
-            pixelSize: calibration.rPixelSize, pixelUnit: calibration.rPixelUnits,
-            minimumAreaPx: precipitateClassification.minimumObjectAreaPx,
-            provenance: precipitateReportProvenance(map: map),
-            sourceID: precipitateClassification.sourceID,
-            thicknessNm: precipitateThickness.flatMap { $0.isUsable ? $0.nanometres : nil },
-            thicknessSigmaNm: precipitateThickness.flatMap { $0.isUsable ? $0.sigmaNanometres : nil },
-            compositionJoin: precipitateJoins.composition, strainJoin: precipitateJoins.strain,
-            variantJoin: precipitateJoins.variants, variantSettings: precipitateVariantSettings,
-            endOnDirection: precipitateJoins.variantEndOnDirection, variantDirections: precipitateJoins.variantDirections,
-            variantDefaultToleranceDegrees: precipitateJoins.variantDefaultToleranceDegrees)
+        do {
+            return try PrecipitateObjectReport.make(
+                objects: objects, phaseNames: map.phaseNames, matrixPhaseIndex: map.matrixPhaseIndex,
+                pixelSize: calibration.rPixelSize, pixelUnit: calibration.rPixelUnits,
+                minimumAreaPx: precipitateClassification.minimumObjectAreaPx,
+                provenance: precipitateReportProvenance(map: map),
+                sourceID: precipitateClassification.sourceID,
+                thicknessNm: precipitateThickness.flatMap { $0.isUsable ? $0.nanometres : nil },
+                thicknessSigmaNm: precipitateThickness.flatMap { $0.isUsable ? $0.sigmaNanometres : nil },
+                compositionJoin: precipitateJoins.composition, strainJoin: precipitateJoins.strain,
+                variantJoin: precipitateJoins.variants, variantSettings: precipitateVariantSettings,
+                endOnDirection: precipitateJoins.variantEndOnDirection, variantDirections: precipitateJoins.variantDirections,
+                variantDefaultToleranceDegrees: precipitateJoins.variantDefaultToleranceDegrees)
+        } catch {
+            // Nil: the objects cannot be measured. Said once in the Output, in the classification's words (mac4DSTEM#300).
+            sayPrecipitateReportRefusal(error)
+            return nil
+        }
     }
 
     /// The outline of the objects selected in the object table, for the scan

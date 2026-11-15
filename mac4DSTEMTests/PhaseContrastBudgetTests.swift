@@ -136,6 +136,67 @@ final class PhaseContrastBudgetTests: XCTestCase {
         XCTAssertEqual(state.parallaxAlignmentHeldBytes + peak, 2 * s + level1.heldByteCount + 2 * s + fft)
     }
 
+    // MARK: - #413: the products after the fit are held too
+
+    /// Each product after the fit stays in memory while the next stage runs, so the held term counts it and the working limit
+    /// drops by it. Mutation it catches: `phaseContrastHeldBytes` dropping any one of the four products (each assertion is
+    /// on the sum after adding exactly one).
+    func testTheHeldTermCountsEveryProductAfterTheFit() {
+        let state = AppState()
+        XCTAssertFalse(state.residency.isResident, "the premise: a streamed cube")
+        XCTAssertEqual(state.phaseContrastHeldBytes, 0)
+        let f = MemoryLayout<Float>.stride
+        var expected = 0
+
+        let subpixel = ParallaxSubpixelResult(
+            upsampleFactor: 2, brightFieldUpsampleLimit: 2, darkFieldUpsampleLimit: 2,
+            kdeSigmaPixels: 0.125, lowpassFilter: false, lanczosOrder: nil,
+            paddedHeight: 32, paddedWidth: 32, paddedBF: [Float](repeating: 1, count: 32 * 32),
+            croppedBF: FloatImage(width: 16, height: 16, pixels: [Float](repeating: 1, count: 16 * 16)),
+            outputSamplingAngstrom: 0.5, probeShiftRows: [0, 0], probeShiftColumns: [0, 0],
+            positionCorrectionScores: []
+        )
+        state.phaseContrast.parallaxSubpixel = subpixel
+        expected += (32 * 32 + 16 * 16 + 4) * f
+        XCTAssertEqual(subpixel.heldByteCount, (32 * 32 + 16 * 16 + 4) * f)
+        XCTAssertEqual(state.phaseContrastHeldBytes, expected, "the KDE image")
+
+        let depth = ParallaxDepthResult(
+            depthsAngstrom: [-10, 0, 10], paddedStack: [Float](repeating: 0, count: 3 * 24 * 24),
+            paddedHeight: 24, paddedWidth: 24, scanHeight: 16, scanWidth: 16, samplingAngstrom: 1, usedFullFit: true,
+            informationLimitInvAngstrom: nil, informationPower: 1
+        )
+        state.phaseContrast.parallaxDepth = depth
+        expected += 3 * 24 * 24 * f
+        XCTAssertEqual(state.phaseContrastHeldBytes, expected, "the depth planes")
+
+        let plane = [Float](repeating: 0, count: 24 * 24)
+        let correction = ParallaxAberrationCorrectionResult(
+            paddedPhase: plane, correctedPhase: FloatImage(width: 16, height: 16, pixels: [Float](repeating: 0, count: 256)),
+            chiEven: plane, chiOdd: plane, transferReal: plane, transferImaginary: plane,
+            samplingAngstrom: 1, usedFullFit: true,
+            qLowpassInvAngstrom: nil, qHighpassInvAngstrom: nil, butterworthOrder: 2
+        )
+        state.phaseContrast.parallaxCorrection = correction
+        expected += (5 * 24 * 24 + 256) * f
+        XCTAssertEqual(state.phaseContrastHeldBytes, expected, "the phase correction")
+
+        let object = PtychographyComplexArray(width: 20, height: 20, real: [Float](repeating: 1, count: 400),
+                                              imaginary: [Float](repeating: 0, count: 400))
+        let probe = PtychographyComplexArray(width: 8, height: 8, real: [Float](repeating: 1, count: 64),
+                                             imaginary: [Float](repeating: 0, count: 64))
+        state.phaseContrast.singleslicePtychography = SingleslicePtychographyResult(
+            object: object, probe: probe, positions: [], errorHistory: [0],
+            objectSamplingRowAngstrom: 1, objectSamplingColumnAngstrom: 1,
+            options: SingleslicePtychographyOptions()
+        )
+        expected += (2 * 400 + 2 * 64) * f
+        XCTAssertEqual(state.phaseContrastHeldBytes, expected, "the ptychography object and probe")
+
+        let half = Int(min(ProcessInfo.processInfo.physicalMemory / 2, UInt64(Int.max)))
+        XCTAssertEqual(state.phaseContrastWorkingLimitBytes, max(PhaseContrastMemoryBudget.floorBytes, half - expected))
+    }
+
     // MARK: - Fix round: a re-preview is not charged for the products it replaces
 
     /// A re-preview with a preview and an alignment held gets the whole limit (half of RAM, streamed cube), not half − (2S + the

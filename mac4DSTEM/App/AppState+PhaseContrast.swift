@@ -33,12 +33,15 @@ extension AppState {
     }
 
     /// The bytes earlier phase-contrast stages hold while the next one runs (review d2, 2026-10-02; the owner of the products
-    /// is `phaseContrast`, this only reads them): the preprocessed stacks and the published alignment level, which every later
-    /// stage leaves in memory and none counted. The products after the fit (KDE image, depth planes, correction, ptychography)
-    /// are not counted.
+    /// is `phaseContrast`, this only reads them): the preprocessed stacks and the published alignment level, and the products
+    /// after the fit (KDE image, depth planes, correction, ptychography; #413), which every later stage leaves in memory.
     var phaseContrastHeldBytes: Int {
         (phaseContrast.parallaxPreprocess?.residentStackByteCount ?? 0)
             + (phaseContrast.parallaxAlignment?.heldByteCount ?? 0)
+            + (phaseContrast.parallaxSubpixel?.heldByteCount ?? 0)
+            + (phaseContrast.parallaxDepth?.heldByteCount ?? 0)
+            + (phaseContrast.parallaxCorrection?.heldByteCount ?? 0)
+            + (phaseContrast.singleslicePtychography?.heldByteCount ?? 0)
     }
 
     /// What the next alignment level's limit subtracts: the held stacks less what the level counts in its own peak because it

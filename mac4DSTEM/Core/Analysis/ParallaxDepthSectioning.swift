@@ -34,6 +34,9 @@ package nonisolated struct ParallaxDepthResult: Sendable {
 
     package var planeCount: Int { depthsAngstrom.count }
 
+    /// Bytes this product keeps while published: the padded depth stack (#413).
+    package var heldByteCount: Int { paddedStack.count * MemoryLayout<Float>.stride }
+
     package func croppedPlane(at index: Int) -> FloatImage? {
         guard depthsAngstrom.indices.contains(index) else { return nil }
         let top = (paddedHeight - scanHeight) / 2

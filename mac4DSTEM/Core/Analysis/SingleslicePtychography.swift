@@ -99,6 +99,11 @@ package nonisolated struct SingleslicePtychographyResult: Sendable {
     /// The defocus and aberrations the reconstruction's starting probe was built with - copied from the input, never from settings.
     package let probeAberrations: PtychographyProbeAberrations
 
+    /// Bytes this product keeps while published: the complex object and probe (#413).
+    package var heldByteCount: Int {
+        (object.real.count + object.imaginary.count + probe.real.count + probe.imaginary.count) * MemoryLayout<Float>.stride
+    }
+
     package func objectPhase(cropped: Bool = true) -> FloatImage {
         objectImage(cropped: cropped) { atan2($1, $0) }
     }

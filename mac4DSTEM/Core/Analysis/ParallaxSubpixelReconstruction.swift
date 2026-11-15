@@ -44,6 +44,12 @@ package nonisolated struct ParallaxSubpixelResult: Sendable {
     package let probeShiftColumns: [Float]
     package let positionCorrectionScores: [Float]
 
+    /// Bytes this product keeps while published: the padded and cropped BF planes and the per-pixel shifts (#413).
+    package var heldByteCount: Int {
+        (paddedBF.count + croppedBF.pixels.count + probeShiftRows.count + probeShiftColumns.count
+            + positionCorrectionScores.count) * MemoryLayout<Float>.stride
+    }
+
     // Explicit so the memberwise initializer is `package` (synthesized ones are internal). // v2.5 step 2b
     package nonisolated init(upsampleFactor: Double, brightFieldUpsampleLimit: Double, darkFieldUpsampleLimit: Double, kdeSigmaPixels: Double, lowpassFilter: Bool, lanczosOrder: Int?, paddedHeight: Int, paddedWidth: Int, paddedBF: [Float], croppedBF: FloatImage, outputSamplingAngstrom: Double, probeShiftRows: [Float], probeShiftColumns: [Float], positionCorrectionScores: [Float]) {
         self.upsampleFactor = upsampleFactor

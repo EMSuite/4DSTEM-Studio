@@ -684,7 +684,7 @@ final class AppState {
     }
 
     var acomWorkSummary: String {
-        "\(acomWorkPositionCount.formatted()) positions × \(acomTemplateCount) templates"
+        "\(acomWorkPositionCount.formatted(.number.grouping(.never))) positions × \(acomTemplateCount) templates"
     }
 
     var acomEstimatedDuration: TimeInterval? {

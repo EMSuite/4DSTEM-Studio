@@ -83,12 +83,12 @@ final class FormatStyleMigrationTests: XCTestCase {
         XCTAssertEqual(SpectroscopyPlaceholderFormat.number(0.0275, fraction: 0...2, locale: de), "0,03")
     }
 
-    /// The counts cells (ResultFormat.counts): en_US grouping, whole numbers, half-even on .5.
-    func testCountsCellsAreUnchanged() {
+    /// The counts cells (ResultFormat.counts): whole numbers without a grouping separator (#422), half-even on .5.
+    func testCountsCellsAreUngrouped() {
         let cases: [(Double, String)] = [
-            (412380, "412\(nnbsp)380"), (0, "0"), (2.5, "2"), (3.5, "4"), (1234.5, "1\(nnbsp)234"), (999999.5, "1\(nnbsp)000\(nnbsp)000"),
-            (-4120, "-4\(nnbsp)120"), (-2.5, "-2"), (1e12, "1\(nnbsp)000\(nnbsp)000\(nnbsp)000\(nnbsp)000"), (0.4, "0"),
-            (1380, "1\(nnbsp)380"), (1.5, "2"),
+            (412380, "412380"), (0, "0"), (2.5, "2"), (3.5, "4"), (1234.5, "1234"), (999999.5, "1000000"),
+            (-4120, "-4120"), (-2.5, "-2"), (1e12, "1000000000000"), (0.4, "0"),
+            (1380, "1380"), (1.5, "2"),
         ]
         for (v, expected) in cases {
             XCTAssertEqual(ResultFormat.counts(v), expected, "ResultFormat.counts \(v)")

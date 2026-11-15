@@ -641,7 +641,7 @@ extension AppState {
             (kind, name, units) = ("parallax_corrected_phase", "Parallax corrected phase", "arbitrary_phase")
         case .depth:
             image = phaseContrast.parallaxDepth?.croppedPlane(at: phaseContrast.parallaxDepthSelectedIndex)
-            let depth = phaseContrast.parallaxDepth?.depthsAngstrom[phaseContrast.parallaxDepthSelectedIndex] ?? 0
+            let depth = phaseContrast.selectedParallaxDepthAngstrom ?? 0
             (kind, name, units) = ("parallax_depth", String(format: "Parallax depth %.1f Å", depth), "arbitrary_phase")
         case .iterativePhase:
             image = phaseContrast.singleslicePtychography?.objectPhase()

@@ -73,6 +73,28 @@ final class PhaseContrastProductTests: XCTestCase {
         )
     }
 
+    /// mac4DSTEM#300: the selected index is reset only by a new run, so a name or an export read between runs could index past the
+    /// stack. Mutation: the bounds check removed - the out-of-range read traps, red (a crash).
+    func testASelectedDepthPastTheStackIsNoDepth() {
+        let product = PhaseContrastProduct()
+        XCTAssertNil(product.selectedParallaxDepthAngstrom, "no stack")
+        product.parallaxDepth = syntheticDepth()
+        XCTAssertEqual(product.selectedParallaxDepthAngstrom, 0)
+        product.parallaxDepthSelectedIndex = 5
+        XCTAssertNil(product.selectedParallaxDepthAngstrom, "an index past the one-plane stack")
+        product.parallaxDepthSelectedIndex = -1
+        XCTAssertNil(product.selectedParallaxDepthAngstrom)
+    }
+
+    /// The depth view's name reads the guarded depth: an index past the stack names the plane at 0 Å instead of trapping.
+    func testTheDepthViewWithAStaleIndexDoesNotTrap() {
+        let state = AppState()
+        state.phaseContrast.parallaxDepth = syntheticDepth()
+        state.phaseContrast.parallaxDepthSelectedIndex = 7
+        state.showParallaxProduct(.depth)
+        _ = state.currentResultDisplayName
+    }
+
     func testConstructionDefaults() {
         let product = PhaseContrastProduct()
 

@@ -83,6 +83,9 @@ package final class DatasetResidency {
     /// Adversarial review.
     private var generation = 0
     private var activePreload: Int?
+    /// Called once the array has been read and before the publish decision: the point a dataset switch can fall into. Tests set
+    /// it to switch the dataset there deterministically (mac4DSTEM#303); nil in the app.
+    @ObservationIgnored package var willPublishForTesting: (() -> Void)?
 
     /// Forget everything. Called when a dataset is replaced — the incoming
     /// `FourDArray` is a different object with its own (absent) buffer.
@@ -98,8 +101,10 @@ package final class DatasetResidency {
     package func request(_ newMode: Residency, on data: FourDArray?) async {
         mode = newMode
         guard let data else { return }
+        // Snapshotted before the await (mac4DSTEM#303): a dataset replaced meanwhile (`reset`) is not this array's to describe.
+        let entry = generation
         await data.setResidencyRequest(newMode)
-        await sync(with: data)
+        await sync(with: data, ifGeneration: entry)
     }
 
     /// Read the whole cube into one buffer if this machine admits it.
@@ -130,7 +135,11 @@ package final class DatasetResidency {
         // preserving a cube this object never granted would reintroduce the
         // drift it exists to prevent. In-app the stamp is a no-op today —
         // `preloadResidentCube` only ever follows `activate`'s fresh array.
+        // Snapshotted BEFORE the first await (mac4DSTEM#303): bumped after it, a `reset` (dataset switch) during the await
+        // was not seen, and dataset A's residency was published onto B.
+        let entry = self.generation
         await data.setResidencyRequest(mode)
+        guard self.generation == entry else { return false }
         generation &+= 1
         let generation = self.generation
         activePreload = generation
@@ -170,20 +179,26 @@ package final class DatasetResidency {
         // this object now describes a different dataset. Publishing here would
         // stamp the old cube's residency onto the new one.
         guard self.generation == generation else { return false }
-        await sync(with: data)
-        return isResident
+        await sync(with: data, ifGeneration: generation)
+        return self.generation == generation && isResident
     }
 
     /// Drop the cube and return to streaming. Safe at any time.
     package func release(_ data: FourDArray?) async {
         guard let data else { return }
+        let entry = generation
         await data.releaseResident()
-        await sync(with: data)
+        await sync(with: data, ifGeneration: entry)
     }
 
-    /// Publish what the array actually holds — never what was requested.
-    private func sync(with data: FourDArray) async {
-        isResident = await data.isResident
-        byteCount = await data.residentByteCount
+    /// Publish what the array actually holds — never what was requested — unless the dataset was replaced (`reset`) since
+    /// `generation` was read: both values are read first, then published together or not at all (mac4DSTEM#303).
+    private func sync(with data: FourDArray, ifGeneration generation: Int) async {
+        let resident = await data.isResident
+        let bytes = await data.residentByteCount
+        willPublishForTesting?()
+        guard self.generation == generation else { return }
+        isResident = resident
+        byteCount = bytes
     }
 }

@@ -773,13 +773,18 @@ extension AppState {
         guard let descriptor else { return }
         let url = sessionSidecar.location(for: descriptor)
         let epoch = datasetSession.epoch
+        savedResultPick &+= 1
+        let pick = savedResultPick
+        // The dataset unchanged AND no later pick: two quick picks can finish out of order (mac4DSTEM#303).
+        func current() -> Bool { epoch == datasetSession.epoch && pick == savedResultPick }
         do {
             switch saved.storage {
             case .scalarFloat32:
                 let map = try await Task.detached(priority: .utility) {
                     try BraggVectorEMDWriter.loadResultMap(id: saved.id, from: url)
                 }.value
-                guard epoch == datasetSession.epoch, let map else { return }
+                await savedResultReadForTesting?(saved)
+                guard current(), let map else { return }
                 publishRestoredProduct(   // v2.5 step 3b-6
                     kind: map.kind, displayName: map.displayName, valueUnits: map.valueUnits,
                     payload: .scalar(FloatImage(width: map.width, height: map.height, pixels: map.pixels)),
@@ -789,7 +794,8 @@ extension AppState {
                 let map = try await Task.detached(priority: .utility) {
                     try BraggVectorEMDWriter.loadRGBAResultMap(id: saved.id, from: url)
                 }.value
-                guard epoch == datasetSession.epoch, let map else { return }
+                await savedResultReadForTesting?(saved)
+                guard current(), let map else { return }
                 publishRestoredProduct(   // v2.5 step 3b-6
                     kind: map.kind, displayName: map.displayName, valueUnits: map.valueUnits,
                     payload: .rgba(RGBAImage(width: map.width, height: map.height, rgba: map.rgba)),
@@ -806,7 +812,7 @@ extension AppState {
             resultPresentation.bumpResultVersion()
             statusText = "Viewed saved \(saved.displayName) ← \(url.lastPathComponent)"
         } catch {
-            guard epoch == datasetSession.epoch else { return }
+            guard current() else { return }
             present(error)
         }
     }
@@ -817,6 +823,10 @@ extension AppState {
         guard let descriptor else { return }
         let url = sessionSidecar.location(for: descriptor)
         let epoch = datasetSession.epoch
+        let pick = (comparisonPicks[slot] ?? 0) &+ 1
+        comparisonPicks[slot] = pick
+        // The dataset unchanged AND no later pick into this slot (mac4DSTEM#303).
+        func current() -> Bool { epoch == datasetSession.epoch && pick == comparisonPicks[slot] }
         do {
             let product: DisplayedProduct?
             switch saved.storage {
@@ -824,6 +834,7 @@ extension AppState {
                 let map = try await Task.detached(priority: .utility) {
                     try BraggVectorEMDWriter.loadResultMap(id: saved.id, from: url)
                 }.value
+                await savedResultReadForTesting?(saved)
                 guard let map else { return }
                 let domain = try Self.savedDomain(map.provenance, displayName: map.displayName)
                 product = DisplayedProduct(
@@ -844,6 +855,7 @@ extension AppState {
                 let map = try await Task.detached(priority: .utility) {
                     try BraggVectorEMDWriter.loadRGBAResultMap(id: saved.id, from: url)
                 }.value
+                await savedResultReadForTesting?(saved)
                 guard let map else { return }
                 product = DisplayedProduct(
                     kind: map.kind, displayName: map.displayName,
@@ -861,14 +873,14 @@ extension AppState {
                     provenance: map.provenance
                 )
             }
-            guard epoch == datasetSession.epoch, let product else { return }
+            guard current(), let product else { return }
             switch slot {
             case .a: comparisonProductA = product
             case .b: comparisonProductB = product
             }
             statusText = "Loaded \(saved.displayName) into comparison \(slot == .a ? "A" : "B")"
         } catch {
-            guard epoch == datasetSession.epoch else { return }
+            guard current() else { return }
             present(error)
         }
     }
@@ -1568,15 +1580,14 @@ extension AppState {
             ]
             return (result.samplingAngstrom, result.samplingAngstrom, "A", provenance)
         case .depth:
-            guard let result = phaseContrast.parallaxDepth,
-                  result.depthsAngstrom.indices.contains(phaseContrast.parallaxDepthSelectedIndex) else {
+            guard let result = phaseContrast.parallaxDepth, let depth = phaseContrast.selectedParallaxDepthAngstrom else {
                 return (nil, nil, nil, [:])
             }
             let informationLimit = result.informationLimitInvAngstrom
                 .map { String($0) } ?? "off"
             let provenance: [String: String] = [
                 "source_product": "parallax_depth",
-                "depth_angstrom": String(result.depthsAngstrom[phaseContrast.parallaxDepthSelectedIndex]),
+                "depth_angstrom": String(depth),
                 "full_fit": String(result.usedFullFit),
                 "information_limit_inv_a": informationLimit,
                 "information_power": String(result.informationPower),

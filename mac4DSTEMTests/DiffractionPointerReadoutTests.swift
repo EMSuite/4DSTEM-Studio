@@ -39,7 +39,7 @@ final class DiffractionPointerReadoutTests: XCTestCase {
         Readout.Basis(
             calibration: calibration, detectorQX: 128, detectorQY: 128,
             scanX: scan.x, scanY: scan.y, scanWidth: scanSize.w, scanHeight: scanSize.h,
-            singlePosition: single, apertureCentre: aperture,
+            singlePosition: single,
             milliradians: milliradians, mradPerPixel: mradPerPixel)
     }
 
@@ -161,6 +161,17 @@ final class DiffractionPointerReadoutTests: XCTestCase {
         }
     }
 
+    /// mac4DSTEM#302: calibrating the vectors keeps the count of positions where detection failed, so whatever reads the
+    /// calibrated vectors can still tell a failed position from an empty one. Mutation: the count dropped from the rebuild -> red.
+    func testCalibratedVectorsKeepTheFailedPositionCount() throws {
+        let c = calibration(ellipse: (a: 1.1, b: 1.0, theta: 0.7))
+        let raw = BraggVectors(scanWidth: 2, scanHeight: 1, peaks: [[BraggPeak(x: 80, y: 70, intensity: 1)], []],
+                               failedPatternCount: 1)
+        let calibrated = raw.calibrated(with: c, referenceOrigin: (x: 64, y: 64))
+        XCTAssertNotEqual(calibrated.peaks[0][0].x, 80, "the ellipse was applied (not the unchanged vectors)")
+        XCTAssertEqual(calibrated.failedPatternCount, 1)
+    }
+
     // MARK: P5 the gates
 
     func testNoQWithoutAPhysicalQScaleButThePixelAndValueRemain() throws {
@@ -240,17 +251,14 @@ final class DiffractionPointerReadoutTests: XCTestCase {
         _ mode: PatternDisplayMode = .current, _ shape: RegionShape = .point, _ unit: PatternScaleUnit = .reciprocal,
         mrad: Float? = nil, scan: ScanPos = ScanPos(x: 2, y: 1), calibration: Calibration = Calibration()
     ) -> Readout.Basis {
-        .make(calibration: calibration, descriptor: descriptor, selectedScan: scan, patternMode: mode, regionShape: shape,
-              aperture: Aperture(centerX: 11, centerY: 22, inner: 0, outer: 5), scaleUnit: unit, mradPerPixel: mrad)
+        .make(calibration: calibration, descriptor: descriptor, selectedScan: scan, patternMode: mode, regionShape: shape, scaleUnit: unit, mradPerPixel: mrad)
     }
 
-    func testTheBasisTakesTheDescriptorsExtentsInTheirOrderAndTheAperturesCentreAsXThenY() {
+    func testTheBasisTakesTheDescriptorsExtentsInTheirOrder() {
         let b = session()
         XCTAssertEqual([b.scanWidth, b.scanHeight], [4, 3], "Rx, then Ry")
         XCTAssertEqual([b.detectorQX, b.detectorQY], [6, 5], "Qx (columns), then Qy (rows)")
         XCTAssertEqual([b.scanX, b.scanY], [2, 1])
-        XCTAssertEqual(b.apertureCentre?.x, 11, "the column")
-        XCTAssertEqual(b.apertureCentre?.y, 22, "the row")
     }
 
     func testOnlyTheCurrentPatternOfAPointSelectionIsTheSinglePosition() {

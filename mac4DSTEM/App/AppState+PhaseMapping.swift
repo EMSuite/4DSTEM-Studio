@@ -42,7 +42,14 @@ extension AppState {
         guard phaseMapping.runRefusal == nil else { return nil }
         let names = phaseMapping.phases.map(\.model.displayName)
         let ids = phaseMapping.phases.map(\.model.id)
+        // A typed relationship stands for its variants in the matrix (#342): one pair as a paper writes it, the rest from the
+        // matrix's symmetry about its zone axis.
+        let matrixSlot = phaseMapping.phases.first { $0.isMatrix }
         return phaseMapping.phases.map { slot in
+            let typed = slot.isMatrix ? [] : slot.orientationRelationships
+            let relationships = matrixSlot.map {
+                OrientationRelationshipVariants.expanded(typed, matrix: $0.model.structure, matrixZone: $0.zoneAxis)
+            } ?? typed
             let shared = names.filter { $0 == slot.model.displayName }.count > 1
             let sharedID = ids.filter { $0 == slot.model.id }.count > 1
             return PhaseDefinition(
@@ -51,7 +58,7 @@ extension AppState {
                 crystal: slot.model.structure,
                 role: slot.isMatrix ? .matrix : .candidate,
                 zoneAxes: [slot.zoneAxis],
-                orientationRelationships: slot.isMatrix ? [] : slot.orientationRelationships,
+                orientationRelationships: relationships,
                 excitationSlabInvAngstrom: slot.excitationSlabInvAngstrom
             )
         }
@@ -162,7 +169,7 @@ extension AppState {
         // enforced here too: a caller that skips the button (replay, a test)
         // must not get the silent all-"not indexed" map the owner got on an
         // uncalibrated cube (drive 2026-09-24).
-        if let refusal = phaseMappingQScaleRefusal {
+        if let refusal = phaseMappingQScaleRefusal ?? phaseMappingOriginRefusal {
             statusText = refusal
             return .failed(refusal)
         }
@@ -430,9 +437,9 @@ extension AppState {
     }
 
     /// After a sidecar's lineage is adopted: the standing phase-mapping run's phase list and settings are this
-    /// window's (#128), with the imported structures rebuilt from the CIF texts the session file carries. A window
-    /// that already holds a phase list keeps it (a list is about the specimen and is carried from cube to cube);
-    /// a setup that cannot be rebuilt whole is left out and the session log says why.
+    /// window's (#128), with the imported structures rebuilt from the CIF texts the session file carries. Opening a
+    /// dataset empties the phase list first (#294: every dataset is individual), so the guard below only keeps a list
+    /// entered after the open; a setup that cannot be rebuilt whole is left out and the session log says why.
     func restorePhaseSetupFromLineage() {
         guard let json = replay.lineage.activeNodes().last(where: { $0.kind == "phase_mapping" })?
             .parameters[PhaseSetupRecord.lineageKey] else { return }
@@ -653,6 +660,17 @@ extension AppState {
             .map { "\($0.model.displayName): \($0.orientationRelationshipText)" }
         if !orientationStatements.isEmpty {
             out["orientation_relationships"] = orientationStatements.joined(separator: " | ")
+            // The variants the run used: the typed pairs and the matrix's symmetry images of them (#342).
+            if let matrixSlot = phaseMapping.phases.first(where: { $0.isMatrix }) {
+                out["orientation_relationship_variants"] = phaseMapping.phases
+                    .filter { !$0.isMatrix && !$0.orientationRelationshipText.isEmpty }
+                    .map { slot in
+                        let pairs = OrientationRelationshipVariants.expanded(slot.orientationRelationships,
+                                                                             matrix: matrixSlot.model.structure, matrixZone: matrixSlot.zoneAxis)
+                        return "\(slot.model.displayName): " + pairs.map(OrientationRelationshipVariants.text).joined(separator: ", ")
+                    }
+                    .joined(separator: " | ")
+            }
         }
         for (index, name) in map.phaseNames.enumerated() {
             let counts = map.phaseCounts
@@ -694,6 +712,25 @@ extension AppState {
             + "peaks in detector pixels, so without it every position reads not indexed."
     }
 
+    /// Why the phase-mapping runs (Map Phases, Find Matrix Zone Axis) refuse the origin, or nil: they match vector LENGTHS
+    /// in Å⁻¹, so the vectors must be centred on a measured beam centre (fitted maps or a recorded one), the same rule Q from a
+    /// crystal applies (`SessionGates.reciprocalMetrologyRefusal`). mac4DSTEM#338: two dark-field detectors placed on spots
+    /// set the fitted origin aside (`updateAperture`), the vectors were re-centred 18 px off the beam on the second spot, and
+    /// Thronsen A read 26 of 2009 vectors on the matrix and θ′ face-on everywhere, with nothing said.
+    var phaseMappingOriginRefusal: String? {
+        guard let d = descriptor else { return nil }
+        let origin = calibrationSession.calibration.referenceOrigin(
+            detectorQX: d.qx, detectorQY: d.qy)
+        guard !origin.kind.isMeasuredBeamCentre else { return nil }
+        if canRestoreFittedOrigin {
+            return "Phase mapping needs the measured beam centre, and it was set aside for a centre set by hand: the vectors "
+                + "would be centred on that centre, not on a measured beam. Restore Fitted Origin in Calibration, or run "
+                + "Calibrate Origin."
+        }
+        return "Phase mapping needs a measured beam centre: without one the vectors would be centred on a guess, not on "
+            + "the beam. Run Calibrate Origin first."
+    }
+
     /// The sentence strain, ACOM and q from crystal refuse stale disks with,
     /// for the two phase-mapping runs (mac4DSTEM#69). Disks restored without
     /// a recipe read stale too, through `diskDetectionSettingsAreStale`.
@@ -711,7 +748,7 @@ extension AppState {
             return "Detect Bragg disks first — this fits the axis to the peaks disk detection found."
         }
         if diskDetectionSettingsAreStale { return Self.matrixZoneAxisStaleDisksRefusal }
-        return phaseMappingQScaleRefusal
+        return phaseMappingQScaleRefusal ?? phaseMappingOriginRefusal
     }
 
     /// Why the zone-axis ranking on the panel belongs to an earlier Q scale,
@@ -721,8 +758,7 @@ extension AppState {
         guard !phaseMapping.zoneAxisFits.isEmpty, let d = descriptor else { return nil }
         let calibration = calibrationSession.calibration
         let origin = calibration.referenceOrigin(
-            detectorQX: d.qx, detectorQY: d.qy,
-            apertureCentre: (x: aperture.centerX, y: aperture.centerY)).point
+            detectorQX: d.qx, detectorQY: d.qy).point
         return phaseMapping.zoneAxisStaleness(
             currentInvAngstromPerPixel: acomScaleSemantics.invAngstromPerPixel,
             currentCalibration: PhaseMappingProduct.CalibrationStamp(
@@ -764,8 +800,9 @@ extension AppState {
         }
         // Without a physical Q scale the sweep compares Å⁻¹ references with
         // pixel vectors through the exploratory slider value, and every axis
-        // reads "at chance" (drive 2026-09-24) — refuse and say why instead.
-        if let refusal = phaseMappingQScaleRefusal {
+        // reads "at chance" (drive 2026-09-24) — refuse and say why instead. An origin on the detector instead of the beam
+        // reads at chance too (mac4DSTEM#338).
+        if let refusal = phaseMappingQScaleRefusal ?? phaseMappingOriginRefusal {
             statusText = refusal
             return .failed(refusal)
         }

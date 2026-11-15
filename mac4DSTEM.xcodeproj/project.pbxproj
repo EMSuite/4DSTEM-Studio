@@ -160,6 +160,7 @@
 				Core/Crystal/MaterialsProjectImport.swift,
 				Core/Crystal/OrientationMatcher.swift,
 				Core/Crystal/OrientationPlan.swift,
+				Core/Crystal/OrientationRelationshipVariants.swift,
 				Core/Crystal/PhaseMappingScan.swift,
 				Core/Crystal/PhaseMapPresentation.swift,
 				Core/Data/BraggVectorEMDTypes.swift,
@@ -1220,11 +1221,14 @@
 		400000000000000111000000 /* Debug configuration for PBXNativeTarget "mac4DSTEMUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = 3B8SMSSAX4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEMUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -1237,11 +1241,14 @@
 		400000000000000112000000 /* Release configuration for PBXNativeTarget "mac4DSTEMUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = 3B8SMSSAX4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEMUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -1254,11 +1261,14 @@
 		400000000000000113000000 /* Develop configuration for PBXNativeTarget "mac4DSTEMUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = 3B8SMSSAX4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEMUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -1633,7 +1643,7 @@
 			repositoryURL = "https://github.com/mac4DSTEM/DiffractoKit";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.15.0;
+				minimumVersion = 0.16.0;
 			};
 		};
 		30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */ = {

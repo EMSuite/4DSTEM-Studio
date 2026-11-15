@@ -135,8 +135,7 @@ final class QCalibrationOriginGateTests: XCTestCase {
             radiiPixels: [4.0, 8.0, 16.0].map { PlantedQCalibration.g($0) / deltaQ }, on: state)
 
         XCTAssertNil(state.gates.reciprocalMetrologyRefusal(
-            for: state.calibrationSession.calibration, descriptor: descriptor,
-            apertureCentre: (x: state.aperture.centerX, y: state.aperture.centerY)
+            for: state.calibrationSession.calibration, descriptor: descriptor
         ), "a usable fitted origin must pass the metrology gate")
 
         await state.calibrateQFromCrystal()
@@ -155,6 +154,22 @@ final class QCalibrationOriginGateTests: XCTestCase {
         let summary = try XCTUnwrap(state.qCalibration.selfCheckSummary)
         XCTAssertTrue(summary.contains("predicted"), "the panel line must name both numbers: \(summary)")
         XCTAssertTrue(summary.contains("positions"), "and how many positions it rests on: \(summary)")
+    }
+
+    /// Diamond Si along [110] (#274): {111}, the forbidden {002} that double diffraction puts on the detector (planted 1 % above its
+    /// kinematic radius, as measured on the Si-SiGe scan) and {220}. Calibrate Q gives the kit {002} as a match-only shell and assigns
+    /// {111} at the planted scale. Mutation: drop `doubleDiffractionShells` from the call - another first shell or a refusal, red.
+    func testDiamond110RingsAreAssignedToTheirFirstShell() async throws {
+        let state = try await stateReadyToCalibrateQ()
+        install(residual: Self.probeRadius * 0.2, on: state)
+        state.acomSession.modelSelection = .library("si_diamond")
+        let a = 5.4309, deltaQ = 0.0205
+        let g = { (sumOfSquares: Double) in sumOfSquares.squareRoot() / a }
+        PlantedQCalibration.setRings(radiiPixels: [g(3), 1.01 * g(4), g(8)].map { $0 / deltaQ }, on: state)
+        await state.calibrateQFromCrystal()
+        XCTAssertEqual(state.qCalibration.estimate?.assignment?.label, "{111}", state.statusText)
+        let scale = try XCTUnwrap(state.calibrationSession.calibration.qPixelSize, state.statusText)
+        XCTAssertEqual(scale, deltaQ, accuracy: 0.005 * deltaQ)
     }
 
     /// The demo draws {110} at 45 degrees and {200} on the axes (a simple-cubic [001] zone, confirmed from the fixture's pixel
@@ -235,7 +250,7 @@ final class QCalibrationOriginGateTests: XCTestCase {
 
         let aperture = (x: state.aperture.centerX, y: state.aperture.centerY)
         XCTAssertNotNil(state.gates.reciprocalMetrologyRefusal(
-            for: state.calibrationSession.calibration, descriptor: descriptor, apertureCentre: aperture
+            for: state.calibrationSession.calibration, descriptor: descriptor
         ), "with nothing measured, the gate refuses — the other half of the pair")
 
         state.calibrationSession.calibration.recordedOriginX = Float(descriptor.qx) / 2
@@ -243,7 +258,7 @@ final class QCalibrationOriginGateTests: XCTestCase {
         state.calibrationSession.calibration.originProvenance = .fileMean
 
         XCTAssertNil(state.gates.reciprocalMetrologyRefusal(
-            for: state.calibrationSession.calibration, descriptor: descriptor, apertureCentre: aperture
+            for: state.calibrationSession.calibration, descriptor: descriptor
         ), "a recorded beam centre IS a measurement and must be admitted")
 
         // And it must be used as ITSELF. Before S13 this state produced
@@ -252,7 +267,7 @@ final class QCalibrationOriginGateTests: XCTestCase {
         // the two answers differ.
         state.calibrationSession.calibration.recordedOriginX = Float(descriptor.qx) / 2 + 7
         let resolved = state.calibrationSession.calibration.referenceOrigin(
-            detectorQX: descriptor.qx, detectorQY: descriptor.qy, apertureCentre: aperture
+            detectorQX: descriptor.qx, detectorQY: descriptor.qy
         )
         XCTAssertEqual(resolved.kind, .recordedMean)
         XCTAssertEqual(resolved.x, Float(descriptor.qx) / 2 + 7, accuracy: 1e-6,

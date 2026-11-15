@@ -76,6 +76,13 @@ package final class LearnedDetectionSession {
     /// from the disk-detection run's own cancellable-operation state:
     /// loading the asset happens BEFORE that operation begins.
     package private(set) var preparing = false
+    /// The load in flight per package: a second `prepare` of the same package awaits it instead of loading again, and `preparing`
+    /// stays true until the last one ends (mac4DSTEM#303: two callers each loaded, and the first one's end cleared the flag).
+    @ObservationIgnored private var loadsInFlight: [URL: Task<LearnedDiskDetector, Error>] = [:]
+    /// How a package is loaded (asset, its compiled copy): CoreML's load in the app; tests hand in a fake that counts and waits.
+    @ObservationIgnored package var loadDetector: @Sendable (URL, URL?) async throws -> LearnedDiskDetector = { asset, compiled in
+        try await LearnedDiskDetector.load(assetURL: asset, compiledURL: compiled)
+    }
 
     /// Set once the asset has loaded successfully — the identity provenance
     /// wants (`learned_model_sha256`) and the Disk detection section's
@@ -205,18 +212,30 @@ package final class LearnedDetectionSession {
     /// `beginCancellableOperation`.
     package func prepare(assetURL: URL) async throws -> LearnedDiskDetector {
         if let cached = detector, cached.assetURL == assetURL { return cached }
-        preparing = true
-        defer { preparing = false }
-        // Provenance belongs to the model being loaded, read before the await (the active model may change meanwhile).
+        if let inFlight = loadsInFlight[assetURL] { return try await inFlight.value }
+        // Provenance and the compiled copy belong to the model being loaded: read now, before the load's task starts (the
+        // active model may change before it does, or while it loads).
         let origin = modelOrigin, parent = activeModel?.parentSHA256
+        let precompiled = activeModel?.packageURL == assetURL ? activeModel?.compiledURL : nil
+        let load = Task { try await self.load(assetURL: assetURL, origin: origin, parent: parent, precompiled: precompiled) }
+        loadsInFlight[assetURL] = load
+        preparing = true
+        defer {
+            loadsInFlight[assetURL] = nil
+            preparing = !loadsInFlight.isEmpty
+        }
+        return try await load.value
+    }
+
+    /// One load of the package at `assetURL` (`prepare` makes it single-flight).
+    private func load(assetURL: URL, origin: String, parent: String?, precompiled: URL?) async throws -> LearnedDiskDetector {
         do {
             // A stored model's compiled copy is used when it loads; otherwise (a copy from another OS, say) compile.
-            let precompiled = activeModel?.packageURL == assetURL ? activeModel?.compiledURL : nil
             let loaded: LearnedDiskDetector
-            if let precompiled, let fast = try? await LearnedDiskDetector.load(assetURL: assetURL, compiledURL: precompiled) {
+            if let precompiled, let fast = try? await loadDetector(assetURL, precompiled) {
                 loaded = fast
             } else {
-                loaded = try await LearnedDiskDetector.load(assetURL: assetURL)
+                loaded = try await loadDetector(assetURL, nil)
             }
             loaded.origin = origin
             loaded.parentSHA256 = parent

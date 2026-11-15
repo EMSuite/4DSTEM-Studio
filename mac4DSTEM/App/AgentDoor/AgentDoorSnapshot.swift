@@ -160,6 +160,7 @@ extension AppState {
             "scan_position": ["x": selectedScan.x, "y": selectedScan.y],
             "pattern_shown": patternDisplayMode.rawValue,
             "task_settings": AgentJSON.orNull(agentTaskSettings),
+            "display": agentDisplay,
         ] as [String: Any]
         snapshot["operation"] = [
             "busy": isBusy,

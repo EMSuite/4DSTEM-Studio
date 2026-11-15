@@ -87,6 +87,7 @@ struct DiffractionPane: View {
         .selectsPaneOnClick(.diffraction)
         // View > Zoom acts on the pane the reader last clicked (the default is this one).
         .zoomCommandTarget(zoomModel, isTarget: appState.activePane == .diffraction && appState.displayedPattern != nil)
+        .onAppear { appState.paneZooms.pattern = zoomModel }   // lent to the agent door's set_view (#297)
     }
 
     /// Everything here is single-line on purpose: a wrapping title or readout
@@ -811,6 +812,7 @@ struct RealSpacePane: View {
         .selectsPaneOnClick(.realSpace)
         // View > Zoom acts on the pane the reader last clicked; in Results this is the only image pane, so it always does.
         .zoomCommandTarget(zoomModel, isTarget: (!allowsScanSelection || appState.activePane == .realSpace) && resultSize != nil)
+        .onAppear { appState.paneZooms.result = zoomModel }   // lent to the agent door's set_view (#297)
         // Arrow-key scan stepping is NOT here. It has exactly one owner —
         // `WorkspaceView`, on the container holding both panes, which is where
         // the old window had it and which is what lets the keys work while

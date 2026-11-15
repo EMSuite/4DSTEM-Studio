@@ -146,3 +146,11 @@ Behind "Let agents run analyses", like every tool that acts:
 | `run_calibration` | starts Calibrate Origin, Origin from Bragg Peaks, Fit Ellipse (in the fit annulus given) or Measure R–Q Rotation |
 
 Each answers with the calibration as `get_window` shows it, or says the step started. Clear Calibration stays with the person.
+
+## The view (issue #297)
+
+`set_view` (behind "Let agents run analyses") sets what the window shows, so an agent reads the screen as the person does:
+one pane's zoom (`pane` pattern, result or comparison; `zoom` fit, in or out, as View > Zoom does, about the centre), the
+result's display `orientation` (0, 90, 180, 270) and `mirrored` (display only, not the R–Q rotation), the pattern's
+`fit_overlay`, and the comparison's `same_scale`. Nothing computed changes. `get_window`'s `view.display` says each pane's zoom
+(null when the pane is not on screen) and the rest.

@@ -955,6 +955,13 @@ final class AppState {
     /// Display-only horizontal mirror, composed after the rotation.
     var realSpaceDisplayMirrored = false
 
+    /// The comparison's "Same scale" (Results): A and B on one colour range. Here, not in the view, so the agent door sets it
+    /// (#297) and it outlives the comparison view being rebuilt for each new product.
+    var comparisonSameScale = false
+
+    /// The image panes' zooms while they are on screen, lent by the panes (`AgentDoorView.swift`, #297).
+    @ObservationIgnored let paneZooms = AgentPaneZooms()
+
     /// The orientation as it applies to whatever is on screen right now.
     /// Identity for anything that is not scan-domain, so a detector-domain
     /// product shown in the same viewer is never transformed.

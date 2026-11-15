@@ -72,4 +72,24 @@ final class MonoclinicLibraryDensityTests: XCTestCase {
         XCTAssertEqual(state.acomTemplateCount, 1600)
         XCTAssertTrue(state.acomWorkSummary.hasSuffix("× 1600 templates"), state.acomWorkSummary)
     }
+
+    /// #411: the full-scan suggestion uses the same library as the Work row, so a monoclinic phase's is 4x a cubic one's on the
+    /// same scan. Mutation: `acomFullScanEstimatedDuration` without `symmetry:` (the cubic count) - red.
+    func testTheFullScanEstimateUsesTheMultipliedLibrary() throws {
+        let state = AppState()
+        state.descriptor = DatasetDescriptor(filePath: "/tmp/b411.h5", datasetPath: "/data",
+                                             shape: [32, 32, 128, 128], dtypeDescription: "float32", chunkShape: nil)
+        state.acomSession.quality = .balanced
+        state.acomSession.modelSelection = .library("au_fcc")
+        let cubic = try XCTUnwrap(state.acomFullScanEstimatedDuration)
+
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("b411-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("bdp.cif")
+        try MonoclinicOrientationTests.betaDoublePrimeCIF.write(to: url, atomically: true, encoding: .utf8)
+        state.importCrystalModel(from: url)
+        let model = try XCTUnwrap(state.acomSession.importedCrystalModels.first)
+        state.acomSession.modelSelection = .imported(model.id)
+        XCTAssertEqual(try XCTUnwrap(state.acomFullScanEstimatedDuration), 4 * cubic, accuracy: 1e-9)
+    }
 }

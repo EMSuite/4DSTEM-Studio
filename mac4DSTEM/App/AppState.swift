@@ -54,7 +54,7 @@ enum ActivePane {
 // `RegionShape` moved to `Core/Analysis/VirtualDetector.swift` (C7 session 4,
 // budget relocation) — a placement change, not a policy change.
 
-enum ComparisonSlot: Equatable { case a, b }
+enum ComparisonSlot: Hashable { case a, b }
 
 /// What one analysis entry point did — returned by the five run functions so
 /// S6's replay executor learns the verdict from a typed value written at the
@@ -513,6 +513,12 @@ final class AppState {
     var sessionInventory: SessionSidecarInventory = .empty
     var comparisonProductA: DisplayedProduct?
     var comparisonProductB: DisplayedProduct?
+    /// Owner: the saved-result picks (`selectSavedSessionResult`, `loadSavedSessionResult`). The latest pick for the view and for
+    /// each comparison slot: an earlier pick whose file read finishes later does not land over it (mac4DSTEM#303).
+    @ObservationIgnored var savedResultPick = 0
+    @ObservationIgnored var comparisonPicks: [ComparisonSlot: Int] = [:]
+    /// Called after a saved result's file read, before it lands; tests hold one pick there while another finishes. Nil in the app.
+    @ObservationIgnored var savedResultReadForTesting: ((SessionResultDescriptor) async -> Void)?
 
     var meanPattern: DiffractionPattern?
     var maxPattern: DiffractionPattern?

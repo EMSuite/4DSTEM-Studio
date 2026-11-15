@@ -86,6 +86,7 @@ extension OperationMetricsFormat {
 func importedCrystalModelLabel(_ model: CrystalModel) -> String {
     switch model.source {
     case .materialsProject: return "Materials Project \(model.id) — \(model.displayName)"
+    case .builtIn: return model.displayName   // Add Phase > Built-in Material (#297): nothing was imported
     default: return "Imported: \(model.displayName)"
     }
 }

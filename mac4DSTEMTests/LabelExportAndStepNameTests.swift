@@ -58,4 +58,10 @@ final class LabelExportAndStepNameTests: XCTestCase {
         XCTAssertEqual(addPhaseMenuLabel(m, alreadyAdded: false), "Imported: Al")
         XCTAssertEqual(addPhaseMenuLabel(m, alreadyAdded: true), "Imported: Al (another zone axis)")
     }
+
+    /// #297. Mutation: a built-in material labelled "Imported:" - red.
+    func testABuiltInMaterialIsNotLabelledImported() throws {
+        let gold = try XCTUnwrap(CrystalModelLibrary.model(id: "au_fcc"))
+        XCTAssertEqual(addPhaseMenuLabel(gold, alreadyAdded: false), gold.displayName)
+    }
 }

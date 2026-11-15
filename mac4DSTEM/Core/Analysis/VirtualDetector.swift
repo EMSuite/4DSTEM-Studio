@@ -302,6 +302,10 @@ package nonisolated enum VirtualDetector {
         return .rows(max(1, min(budget, try ScanTiling.automatic.rowsPerTile(for: shape))))
     }
 
+    /// `@concurrent` (#427): CuboKit's reducers are `nonisolated(nonsending)`, so they run on whatever executor awaits them.
+    /// Without this the MainActor caller (`runVirtualDetector`, every tick of an aperture drag) ran the whole reduction on the
+    /// main thread, and the UI froze for about a second per tick on a 2 GB cube.
+    @concurrent
     private static func kitImage(
         data: FourDArray, descriptor d: DatasetDescriptor, geometry: DetectorGeometry?,
         maximumTileRows: Int?, cancellation: AnalysisCancellationToken?, progress: (@Sendable (Double) -> Void)?
@@ -321,6 +325,7 @@ package nonisolated enum VirtualDetector {
     /// compensated and agree with the CPU reference to 2.4e-13, and on the study cube it is within 1.5 x the time of the
     /// kernel it replaced where the CPU path is not. A
     /// machine without a Metal device runs the CPU path.
+    @concurrent   // off the caller's actor, as `kitImage` (#427)
     package static func tiledDPStatistics(
         data: FourDArray,
         descriptor d: DatasetDescriptor,

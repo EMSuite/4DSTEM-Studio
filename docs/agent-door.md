@@ -165,3 +165,23 @@ to the room first.
 | `run_eds` | Auto ID, Quantify or Stop; answers at once, `get_eds` says busy until done; behind "Let agents run analyses" |
 
 `run_task` in the room presses Quantify, as the toolbar does, with or without a 4D scan.
+
+## Controls that were the person's (issue #297)
+
+| Tool | What it does |
+|---|---|
+| `get_settings` | Settings as the window shows them: General, Appearance, Analysis (with the model caches' sizes) and whether agents may run and save, with the Agent folder's name |
+| `set_settings` | the General, Appearance and Analysis pickers and switches, only the ones given; app-wide and kept |
+| `clear_calibration` | Clear Calibration: every calibration value back to Not set, the voltage kept, without reloading; needs `confirm` true |
+| `remove_learned_model` | Remove Fine-Tuned Model: the active fine-tuned detector model to the Trash, the bundled one active again; needs `confirm` true |
+| `reopen_without_session` | Reopen Without This Session: the window asks the person, as the button does, since results not saved to the session go with the reopen |
+| `release_cube` | Release cube: the dataset kept in memory is let go; the file is read from disk again |
+| `open_demo` | Try Demo Data; over an open dataset it needs `confirm` true |
+
+All but `get_settings` act, so they wait for "Let agents run analyses". What stays the person's, and why: the agents switches
+and the Agent folder (the door must not widen its own rights), Reset All Settings (it resets those switches too), Clear
+Recent Datasets (the person's own history), and API keys, which never pass through the door.
+
+A tool whose control asks the person first (Clear Calibration's dialog, Remove Fine-Tuned Model, Try Demo Data over an open
+dataset) refuses with HTTP 409 and says in words what would be lost. The agent asks the person in the chat and, only after a
+yes, calls again with `confirm` true.

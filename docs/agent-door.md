@@ -127,7 +127,7 @@ structure can be in the list twice with typed zone axes.
 
 | Tool | What it does |
 |---|---|
-| `add_phase` | a CIF in the Agent folder becomes a phase, as Add Phase > From CIF file does; the first phase is the matrix, `is_matrix` makes this one it; a file that does not read is refused in words, no modal |
+| `add_phase` | a CIF in the Agent folder (`path`) or a built-in material (`material`: `al_fcc`, `au_fcc`, `ni_fcc`, `cu_fcc`, `fe_bcc`, `si_diamond`, `mg_hcp`, `ws2_2h`, the list Add Phase > Built-in Material offers, #297) becomes a phase; the first phase is the matrix, `is_matrix` makes this one it; a file that does not read is refused in words, no modal |
 | `set_phase` | one phase: `is_matrix` (exactly one is; the matrix moves by marking another), its own `excitation_slab_inv_angstrom` or `clear_excitation_slab` back to the default, and with typed zone axes `zone_axis` and `orientation_relationship` |
 | `remove_phase` | the minus button (Edit > Undo puts it back); removing the matrix makes the first phase the matrix |
 
@@ -146,3 +146,14 @@ Behind "Let agents run analyses", like every tool that acts:
 | `run_calibration` | starts Calibrate Origin, Origin from Bragg Peaks, Fit Ellipse (in the fit annulus given) or Measure R–Q Rotation |
 
 Each answers with the calibration as `get_window` shows it, or says the step started. Clear Calibration stays with the person.
+
+## Materials Project (issue #297)
+
+| Tool | What it does |
+|---|---|
+| `fetch_materials_project` | fetches a material by its id (`mp-…`), as the sheet's Fetch does, and checks it against an expected formula and space group; answers at once; behind "Let agents run analyses", since it goes online |
+| `get_materials_project` | whether the person has stored a key, and the last fetch: the material (formula, space group, cell, deprecated), the verdict and whether it may be imported, or why it failed |
+| `import_materials_project` | the sheet's Import: as a phase of Map Phases or as ACOM's phase model; refused on a mismatch |
+
+The request uses the key the person stored in Settings. The key never passes through the door: no tool reads, returns, sets
+or logs it, and saving or removing it stays the person's.

@@ -120,6 +120,24 @@ final class AgentDoorPhasesTests: XCTestCase {
         withExtendedLifetime(state) {}
     }
 
+    /// A built-in material is a phase with no CIF (#297), the same list as Add Phase > Built-in Material.
+    /// Mutation: material ignored, or path and material both taken - red.
+    func testABuiltInMaterialBecomesAPhase() async throws {
+        let state = enrolledState()
+        let aluminium = try await call("add_phase", ["material": "al_fcc"])
+        XCTAssertFalse(aluminium.refused, aluminium.text)
+        XCTAssertEqual(state.phaseMapping.phases.first?.model.id, "al_fcc")
+        XCTAssertEqual(state.phaseMapping.phases.first?.isMatrix, true)
+        XCTAssertTrue(state.activityLog.messages.contains { $0.contains("from the built-in materials") })
+
+        let both = try await call("add_phase", ["material": "cu_fcc", "path": "gold.cif"])
+        XCTAssertTrue(both.refused)
+        let neither = try await call("add_phase", ["is_matrix": true])
+        XCTAssertTrue(neither.refused)
+        XCTAssertEqual(state.phaseMapping.phases.count, 1, "a refusal adds nothing")
+        withExtendedLifetime(state) {}
+    }
+
     /// Mutation: set_phase writes the wrong phase, cannot clear the slab, or lets the matrix go unmarked - red.
     func testAPhaseIsChangedByItsIndex() async throws {
         let state = enrolledState()

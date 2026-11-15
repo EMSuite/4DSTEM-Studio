@@ -997,9 +997,10 @@ struct RealSpacePane: View {
                 .accessibilityLabel("Inspecting quality field \(field.name), units \(field.units)")
                 .accessibilityIdentifier("result.statusBadge")
         } else if let status = appState.displayedProduct?.quantitativeStatus {
-            badge(text: status.rawValue.capitalized, color: statusColor(status))
-                .help("Interpretation status of the displayed result")
-                .accessibilityLabel("Interpretation status: \(status.rawValue.capitalized)")
+            let note = appState.strainWithoutEllipseNote
+            badge(text: status.rawValue.capitalized + (note == nil ? "" : " · no ellipse"), color: statusColor(status))
+                .help(note ?? "Interpretation status of the displayed result")
+                .accessibilityLabel("Interpretation status: \(status.rawValue.capitalized)" + (note.map { ". " + $0 } ?? ""))
                 .accessibilityIdentifier("result.statusBadge")
         }
     }

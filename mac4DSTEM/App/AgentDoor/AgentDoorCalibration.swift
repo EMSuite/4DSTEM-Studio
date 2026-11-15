@@ -19,8 +19,9 @@ import DSTEMSession
 extension Mac4DSTEMAgentDoor {
     static let calibrationTools: [AgentTool] = [
         AgentTool(name: "set_calibration", title: "Set calibration",
-                  summary: "Types the Q pixel size, the R pixel size (each with its unit), the accelerating voltage and a beam centre "
-                      + "by hand (origin_x and origin_y together), as Prepare's fields do; only the ones given, recorded as manual. "
+                  summary: "Types the Q pixel size, the R pixel size (each with its unit), the accelerating voltage, a beam centre "
+                      + "(origin_x and origin_y together) and the R–Q rotation and transpose (py4DSTEM's QR_rotation and QR_flip) "
+                      + "by hand, as Prepare's fields do; only the ones given, recorded as manual. "
                       + "A value the file gave is overridden; a fitted origin is set aside (restore_fitted_origin returns it). "
                       + "Answers with the calibration as get_window shows it.",
                   input: .window,
@@ -34,6 +35,11 @@ extension Mac4DSTEMAgentDoor {
                       AgentParameter("origin_x", .number(-100_000...100_000), summary: "Beam centre column, detector pixels (with origin_y). "
                                          + "Not a measurement: quantitative steps still ask for Calibrate Origin."),
                       AgentParameter("origin_y", .number(-100_000...100_000), summary: "Beam centre row, detector pixels (with origin_x)."),
+                      AgentParameter("qr_rotation_deg", .number(-720...720), summary: "R–Q rotation in degrees, py4DSTEM's QR_rotation "
+                                         + "(the sign get_window shows). Replaces a measured one; the transpose in force stays unless "
+                                         + "qr_flip is given."),
+                      AgentParameter("qr_flip", .boolean, summary: "Detector axes transposed, py4DSTEM's QR_flip. Alone, it changes "
+                                         + "the flag of the rotation in force (one must be typed or measured)."),
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
@@ -52,7 +58,21 @@ extension Mac4DSTEMAgentDoor {
             if (originX == nil) != (originY == nil) {
                 return .refusal(status: 400, message: "Give origin_x and origin_y together: a beam centre is one point.")
             }
+            // The R–Q rotation (#275), in py4DSTEM's convention as Prepare's typed rotation. Checked before anything is written.
+            let typedRotation = arguments["qr_rotation_deg"].flatMap(Double.init)
+            let typedFlip = arguments["qr_flip"].map { $0 == "true" }
+            let rotationInForce = state.calibrationSession.calibration.rotationRad.flatMap { $0.isFinite ? $0 : nil }
+            if typedFlip != nil, typedRotation == nil, rotationInForce == nil {
+                return .refusal(status: 409, message: "There is no R–Q rotation to transpose: give qr_rotation_deg with qr_flip, or "
+                    + "measure one (run_calibration step rotation).")
+            }
             if let originX, let originY { state.setManualOrigin(x: Float(originX), y: Float(originY)) }
+            if typedRotation != nil || typedFlip != nil {
+                // Finite by the parameter's range or by the guard above, so the session takes it (nothing refused after a write).
+                let degrees = typedRotation ?? RQRotationConvention.displayDegrees(fromApp: rotationInForce ?? 0)
+                let transpose = typedFlip ?? state.calibrationSession.calibration.transposeQR ?? false
+                state.applyManualRotation(py4DSTEMDegrees: degrees, transpose: transpose)
+            }
             // The voltage first (mrad needs its wavelength), then each unit before its size, as the row's picker and field.
             if let kV = arguments["voltage_kv"].flatMap(Double.init) { state.setManualAcceleratingVoltage(kV) }
             if let unit = qUnits?.unit { state.setManualQPixelUnits(unit) }

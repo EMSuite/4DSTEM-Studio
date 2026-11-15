@@ -84,6 +84,19 @@ extension AppState {
         }
     }
 
+    /// An R–Q rotation and transpose typed in Prepare or through the door's set_calibration (#275), in py4DSTEM's convention
+    /// (`QR_rotation` degrees, `QR_flip`). The decision is `CalibrationSession.applyManualRotation`; this re-derives what the
+    /// rotation feeds, as Flip 180° does, and reports either way.
+    func applyManualRotation(py4DSTEMDegrees: Double, transpose: Bool) {
+        if let refusal = calibrationSession.applyManualRotation(py4DSTEMDegrees: py4DSTEMDegrees, transpose: transpose) {
+            presentComputeFailure(SimpleError(refusal))
+            return
+        }
+        guard let rotation = calibrationSession.calibration.rotationRad else { return }
+        rotationChangedByHand(status: "Rotation set by hand · θ = " + RQRotationConvention.displayText(fromApp: rotation)
+            + (transpose ? ", detector transposed" : ""))
+    }
+
     /// Flip the calibrated R–Q rotation by 180° — the curl/divergence solver
     /// is blind to this (flipping both CoM components leaves both invariant),
     /// so inverted iDPC contrast is fixed here, by hand.
@@ -93,16 +106,21 @@ extension AppState {
         if rotation > .pi { rotation -= 2 * .pi }
         calibrationSession.calibration.rotationRad = rotation
         calibrationSession.provenance.rotation = .manual
-        phaseContrast.parallaxPreprocess = nil
-        phaseContrast.parallaxAlignment = nil
-        // Same rule as `calibrateRotation`: the flip stands either way, but a
-        // refused re-derivation keeps its own message on the status bar.
         // The strain tensor is mathematically invariant under a 180° flip
         // (ε' = (−I)·ε·(−I)ᵀ = ε), but the displayed frame label shows the
         // angle, so the display re-derives on the same one rule.
+        rotationChangedByHand(status: "Rotation flipped → θ = " + RQRotationConvention.displayText(fromApp: rotation))
+    }
+
+    /// After a rotation set by hand (Flip 180°, a typed angle): parallax built in the old frame is dropped, and strain and DPC
+    /// re-derive. Same rule as `calibrateRotation`: the rotation stands either way, but a refused re-derivation keeps its own
+    /// message on the status bar.
+    private func rotationChangedByHand(status: String) {
+        phaseContrast.parallaxPreprocess = nil
+        phaseContrast.parallaxAlignment = nil
         applyStrainDisplay()
         if applyDPCDisplay() == nil {
-            statusText = "Rotation flipped → θ = " + RQRotationConvention.displayText(fromApp: rotation)
+            statusText = status
         }
     }
 

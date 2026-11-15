@@ -56,6 +56,35 @@ final class DatasetPreviewTests: XCTestCase {
         XCTAssertEqual(steps.y, steps.x)
     }
 
+    /// #412: a bin-2 view's descriptor holds a quarter of the bytes each
+    /// sampled position READS. The stride must be sized from what is read, so
+    /// the binned and unbinned opens of one file sample the same positions and
+    /// both stay inside the budget.
+    func testABinnedViewIsStridedByTheBytesItReadsNotItsBinnedSize() throws {
+        let source = DatasetDescriptor(
+            filePath: "/tmp/x.h5", datasetPath: "/data",
+            shape: [200, 200, 256, 256], dtypeDescription: "float32", chunkShape: nil
+        )
+        let binned = try LoadView(source: source, specification: LoadSpecification(detectorBin: 2))
+        XCTAssertEqual(binned.descriptor.qy, 128)
+        let budget = 16 << 20
+        let unbinnedSteps = DatasetPreviewBuilder.stride(for: source, byteBudget: budget)
+        let binnedSteps = DatasetPreviewBuilder.stride(
+            for: binned.descriptor, readBytesPerPattern: binned.readBytesPerPattern, byteBudget: budget
+        )
+        XCTAssertEqual(binnedSteps.y, unbinnedSteps.y)
+        XCTAssertEqual(binnedSteps.x, unbinnedSteps.x)
+        let sampled = ((binned.descriptor.ry + binnedSteps.y - 1) / binnedSteps.y)
+            * ((binned.descriptor.rx + binnedSteps.x - 1) / binnedSteps.x)
+        XCTAssertLessThanOrEqual(sampled * binned.readBytesPerPattern, budget * 2)
+        XCTAssertEqual(
+            DatasetPreviewBuilder.sampledRowCount(
+                for: binned.descriptor, readBytesPerPattern: binned.readBytesPerPattern, byteBudget: budget
+            ),
+            DatasetPreviewBuilder.sampledRowCount(for: source, byteBudget: budget)
+        )
+    }
+
     /// The same file must give the same sample on every open, or two previews of
     /// one dataset are not comparable.
     func testStrideIsDeterministic() async throws {

@@ -698,6 +698,12 @@ nonisolated extension BraggVectorEMDWriter {
         )
     }
 
+    /// RGBA samples stored as some other number type, as bytes: libhdf5 converted any stored number to a byte, clipping; the same
+    /// here. A NaN reads as 0 (it passed `max`/`min` and trapped in `UInt8`, mac4DSTEM#300).
+    package static func rgbaBytes(fromStored values: [Double]) -> [UInt8] {
+        values.map { $0.isNaN ? 0 : UInt8(max(0, min(255, $0.rounded(.towardZero)))) }
+    }
+
     static func readRGBAResultMap(
         _ file: SidecarFile, nodeName: String, in parent: String
     ) throws -> RGBAResultMap? {
@@ -710,13 +716,13 @@ nonisolated extension BraggVectorEMDWriter {
             if array.dataType == .uint8 {
                 rgba = [UInt8](array.bytes)
             } else {
-                // libhdf5 converted any stored number to a byte, clipping; the same here.
-                rgba = array.doubles().map { UInt8(max(0, min(255, $0.rounded(.towardZero)))) }
+                rgba = rgbaBytes(fromStored: array.doubles())
             }
         } catch {
             throw SidecarFile.failure("reading the RGBA result pixels", error)
         }
-        guard rgba.count == width * height * 4 else { throw WriterError.hdf5("reading the RGBA result pixels") }
+        let (pixels, overflow) = (width * height).multipliedReportingOverflow(by: 4)
+        guard !overflow, rgba.count == pixels else { throw WriterError.hdf5("reading the RGBA result pixels") }
         return RGBAResultMap(
             width: width, height: height, rgba: rgba,
             kind: try file.stringAttribute("mac4dstem_kind", at: group)

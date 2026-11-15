@@ -110,9 +110,23 @@ extension AppState {
     /// Cooperative, like every Stop: the operation's token is cancelled (`reset` also frees the busy state and
     /// the keep-awake assertion), a dataset load in flight is asked to unwind, and a bound spectroscopy room
     /// lets go of its source and cancels its Auto ID / check runs. Called from the window's `onDisappear`.
-    func windowClosed() {
+    ///
+    /// It also lets go of the dataset itself (#426): the resident cube's buffer is released and the reader and array are dropped,
+    /// so the file's mapping goes with them. Freeing used to wait for `AppState`'s deinit, and SwiftUI keeps a closed window's
+    /// state alive (Instruments, #291: 2.16 GiB cube buffer and the DM4 mapping still held minutes after the close). The returned
+    /// task is the cube's release, for tests to await; the window does not wait for it.
+    @discardableResult
+    func windowClosed() -> Task<Void, Never> {
         operationCenter.reset()
         cancelDatasetLoad()
         if edx.hasImage || edx.isOpening { edx.close() }   // the EDS room lets go of its source and stops its runs
+        let fourD = datasetSession.fourD
+        residency.reset()
+        datasetSession.clearReaderAndArray()
+        if let openURL {
+            openURL.stopAccessingSecurityScopedResource()
+            self.openURL = nil
+        }
+        return Task { await fourD?.releaseResident() }
     }
 }

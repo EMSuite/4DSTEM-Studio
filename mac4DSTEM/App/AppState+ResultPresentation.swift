@@ -76,8 +76,10 @@ extension AppState {
     /// Test seam (review row 25): awaited after the pixels are computed and
     /// before the run lands, so a test can hold a quiet run back and force the
     /// ordering "commit lands first, the stale quiet run second" without sleeps.
-    /// Nil in production.
+    /// Debug builds only (#310): a release build has no seam to set.
+    #if DEBUG
     static var virtualDetectorBeforeLanding: (@MainActor (_ quiet: Bool, _ aperture: Aperture) async -> Void)?
+    #endif
 
     func scheduleLiveVirtualDetector() {
         guard navigation.analysisMode == .virtualDetector else { return }
@@ -412,7 +414,9 @@ extension AppState {
                     maximumTileRows: maximumTileRows,
                     cancellation: cancellation, progress: progressUpdate)
             }
+            #if DEBUG
             await Self.virtualDetectorBeforeLanding?(quiet, ap)
+            #endif
             guard epoch == datasetSession.epoch else { return .failed("The dataset changed during the run") }
             if cancellation?.isCancelled == true {
                 statusText = "Virtual detector cancelled"

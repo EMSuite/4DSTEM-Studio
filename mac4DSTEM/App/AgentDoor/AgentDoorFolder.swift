@@ -39,7 +39,7 @@ extension Mac4DSTEMAgentDoor {
                   summary: "The files in the Agent folder the person chose in Settings > Agents (and its subfolders): path relative to "
                       + "the folder, size in bytes, modification date. open_file opens one; save_result_image saves into the folder.",
                   input: .noWindow) { _ in
-            guard let listed = folder.listing() else { return .refusal(status: 404, message: AgentFolder.noFolder) }
+            guard let listed = folder.listing() else { return .refusal(status: 404, message: folder.missingMessage) }
             return .json(["folder": folder.url?.lastPathComponent ?? "", "files": listed.files, "truncated": listed.truncated])
         },
         AgentTool(name: "open_file", title: "Open file",
@@ -60,7 +60,7 @@ extension Mac4DSTEMAgentDoor {
             guard FileManager.default.fileExists(atPath: file.path, isDirectory: &isFolder), !isFolder.boolValue else {
                 return .refusal(status: 404, message: noFileMessage(file))
             }
-            state.statusText = "An agent opened \(file.lastPathComponent)."
+            state.statusText = "An agent opened \(quotedAgentText(file.lastPathComponent))."
             Task { await state.openFileAsync(url: file) }
             return .json(["opening": folder.relativePath(of: file)])
         },
@@ -78,7 +78,7 @@ extension Mac4DSTEMAgentDoor {
                     + "mac4DSTEM's Settings > Agents.")
             }
             guard !state.isBusy else { return busyRefusal }
-            guard let root = folder.url else { return .refusal(status: 404, message: AgentFolder.noFolder) }
+            guard let root = folder.url else { return .refusal(status: 404, message: folder.missingMessage) }
             let name: String
             switch fileName(call.arguments["name"], default: state.exportBaseName + "_result") {
             case .success(let made): name = made
@@ -123,6 +123,9 @@ extension Mac4DSTEMAgentDoor {
         return CGImageDestinationFinalize(destination) ? data as Data : nil
     }
 
+    /// The longest file name a save takes, in UTF-8 bytes before the extension.
+    static let fileNameByteLimit = 200
+
     /// A save's file name: letters, digits, spaces, `-`, `_` and `.`, no folders, ending in .png.
     static func fileName(_ given: String?, default fallback: String, extension ext: String = "png") -> Result<String, AgentFolderRefusal> {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_."))
@@ -134,6 +137,12 @@ extension Mac4DSTEMAgentDoor {
             while name.hasPrefix(".") { name = "_" + String(name.dropFirst()) }
         }
         if name.lowercased().hasSuffix("." + ext) { name = String(name.dropLast(ext.count + 1)) }
+        // A name the agent gives is refused when too long; the dataset's own is shortened (#310). macOS allows 255 bytes.
+        if given?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            while name.utf8.count > fileNameByteLimit { name.removeLast() }
+        } else if name.utf8.count > fileNameByteLimit {
+            return .failure(AgentFolderRefusal("A file name is at most \(fileNameByteLimit) bytes before its extension."))
+        }
         guard !name.isEmpty, !name.hasPrefix("."), name.unicodeScalars.allSatisfy(allowed.contains) else {
             return .failure(AgentFolderRefusal("A file name is letters, digits, spaces, - _ and . only, without folders, and does "
                 + "not start with a dot."))
@@ -149,7 +158,7 @@ extension Mac4DSTEMAgentDoor {
             return .failure(ToolRefusal(status: 403, message: "Saving is off. Ask the person to turn on \"Let agents save results "
                 + "there\" in mac4DSTEM's Settings > Agents."))
         }
-        guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: AgentFolder.noFolder)) }
+        guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: folder.missingMessage)) }
         let name: String
         switch fileName(given, default: fallback, extension: ext) {
         case .success(let made): name = made

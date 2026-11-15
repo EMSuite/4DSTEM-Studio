@@ -3,7 +3,8 @@
 //  Role: phase and orientation together at every scan position (mac4DSTEM#293), the shape an orientation map per phase is drawn
 //        from: which phase, its crystal orientation, the score that chose it. A run from the structures fills it today (the matrix
 //        orientation where the map says matrix, the precipitate orientation the second pass found where it says a phase);
-//        "Grains and phases (no matrix)" (#252, DiffractoKit#121) is to fill the same shape, so one map view serves both.
+//        "Grains and phases (no matrix)" (#252, DiffractoKit#121) fills the same shape with a reliability (`GrainsPhaseRun`), so
+//        one map view serves both.
 //        Pure: no SwiftUI, no AppState; the kit colours (`CrystalOrientationSymmetry.ipfColor`, its native keys).
 //
 //  Orientation convention: the kit's, columns = the lab x, y and the beam in the crystal's Cartesian frame, so the IPF-Z pole of a
@@ -30,13 +31,16 @@ package nonisolated struct PhaseOrientationField: Sendable {
     /// Per position: the crystal orientation of that phase, nil where none was found.
     package let orientation: [simd_double3x3?]
     /// Per position: the score that chose the phase (the matrix's template correlation, a precipitate's vector-matching
-    /// distance in Å⁻¹); NaN where none. Kept for the reliability map of #252; not drawn here.
+    /// distance in Å⁻¹, a grains run's winning correlation index); NaN where none.
     package let score: [Double]
+    /// Per position: ASTAR's phase reliability, 0 to 100, how far the winner is ahead of the best other phase (a grains run,
+    /// #252, at every position that had a winner, sure or not); nil for a run from the structures, which has none.
+    package let reliability: [Double]?
 
     package init(width: Int, height: Int, phaseNames: [String], symmetries: [CrystalOrientationSymmetry],
-                 phaseIndex: [Int], orientation: [simd_double3x3?], score: [Double]) {
+                 phaseIndex: [Int], orientation: [simd_double3x3?], score: [Double], reliability: [Double]? = nil) {
         self.width = width; self.height = height; self.phaseNames = phaseNames; self.symmetries = symmetries
-        self.phaseIndex = phaseIndex; self.orientation = orientation; self.score = score
+        self.phaseIndex = phaseIndex; self.orientation = orientation; self.score = score; self.reliability = reliability
     }
 
     /// From a run from the structures and its map in list order (`PhaseMappingProduct.mapInListOrder`). `candidateIndex[p]` is
@@ -106,6 +110,17 @@ package nonisolated struct PhaseOrientationField: Sendable {
             out[i * 4] = rgb.x; out[i * 4 + 1] = rgb.y; out[i * 4 + 2] = rgb.z; out[i * 4 + 3] = 255
         }
         return RGBAImage(width: width, height: height, rgba: out)
+    }
+
+    /// The reliability map (#252): each position with a winner at its reliability, 0 to 100; nil without reliabilities.
+    package func reliabilityImage() -> FloatImage? {
+        guard let reliability, reliability.count == width * height else { return nil }
+        return FloatImage(width: width, height: height, pixels: reliability.map { $0.isFinite ? Float($0) : .nan })
+    }
+
+    /// The positions the reliability map holds: those that had a winner.
+    package func reliabilityValidity() -> [Bool]? {
+        reliability.map { values in values.map(\.isFinite) }
     }
 
     /// The positions `ipfZImage(phase:)` colours: the phase's own positions with an orientation.

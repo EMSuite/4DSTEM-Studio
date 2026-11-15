@@ -52,6 +52,8 @@ struct PhaseMappingSections: View {
         @Bindable var product = appState.phaseMapping
         // Typed zone axes are the optional way since 5.3 (mac4DSTEM#184): their controls show only when switched on.
         let typed = product.orientationSource == .typedZones
+        // Grains and phases (#252): no matrix, so no matrix controls and no vector-matching tolerances.
+        let grains = product.orientationSource == .grains
 
         // This room speaks the inspector's shared vocabulary
         // (`InspectorRows.swift`): collapsible `InspectorSection`s with a
@@ -65,10 +67,22 @@ struct PhaseMappingSections: View {
             if let saved = appState.savedPhaseMappingRunNote {
                 InspectorNote(saved).accessibilityIdentifier("phaseMapping.savedRun")
             }
+            InspectorRow("Method") {
+                Picker("Method", selection: $product.method) {
+                    ForEach(PhaseMappingMethod.allCases, id: \.self) { method in
+                        Text(method.title).tag(method)
+                    }
+                }
+                .labelsHidden()
+                .accessibilityIdentifier("phaseMapping.method")
+            }
+            .help("Matrix with precipitates: one phase is the matrix, its spots are removed and the other phases are looked for "
+                  + "in what is left (Thronsen et al. 2024). Grains and phases: every position is matched against each "
+                  + "phase's templates and the best phase wins, with a reliability (ASTAR, Rauch & Dupuy 2005).")
             ForEach(Array(product.phases.enumerated()), id: \.element.id) { index, slot in
                 PhaseRow(index: index, slot: slot)
             }
-            if product.phases.count > 1 {
+            if product.phases.count > 1, !grains {
                 InspectorRow("Matrix") {
                     Picker("Matrix", selection: matrixSelection) {
                         // Two slots of one structure (the preset's two β″)
@@ -157,6 +171,7 @@ struct PhaseMappingSections: View {
             InspectorActionRow {
                 addPhaseMenu
             }
+            if !grains {
             InspectorDisclosure("Advanced", isExpanded: $showsPhasesAdvanced) {
                 InspectorRow("Typed zone axes") {
                     Toggle("Typed zone axes", isOn: Binding(
@@ -169,6 +184,7 @@ struct PhaseMappingSections: View {
                 .help("Off: the orientations of every phase are found from its structure. On: each phase is "
                       + "matched at the zone axis typed for it against a reference library "
                       + "(Thronsen et al. 2024), as before version 5.3.")
+            }
             }
         }
 
@@ -230,10 +246,12 @@ struct PhaseMappingSections: View {
             }
             }
 
+            if !grains {
             parameterField("Pair radius", value: $product.matching.pairRadiusInvAngstrom,
                            units: "Å⁻¹", format: "%.3f")
             parameterField("Matrix removal", value: $product.matching.matrixToleranceInvAngstrom,
                            units: "Å⁻¹", format: "%.3f")
+            }
 
             // `.knownVariants` (Thronsen et al.'s own rule) has no floors and
             // no "not indexed above" cliff — every survivor is scored and the
@@ -241,7 +259,9 @@ struct PhaseMappingSections: View {
             // merely supplemented, and the resolution-in-pixels block below
             // (which exists only to explain THOSE floors) does not apply
             // either.
-            if !typed {
+            if grains {
+                // The templates are scored by correlation, not by distance: no cutoff here; the reliability is the Result's.
+            } else if !typed {
                 parameterField("Residual cutoff",
                                value: $product.matching.residualCutoffInvAngstrom,
                                units: "Å⁻¹", format: "%.3f",
@@ -287,7 +307,7 @@ struct PhaseMappingSections: View {
             // (Known variants too: the Al–Mg–Si preset mapped Paul's bin-4
             // cube 100 % not indexed with no warning, issue #100); only the
             // "not indexed above" cliff is Search's own.
-            if let resolution = appState.phaseVectorResolution {
+            if !grains, let resolution = appState.phaseVectorResolution {
                 InspectorRow("On this detector") {
                     Text(Self.detectorResolutionText(resolution, rule: typed ? product.matching.classificationRule : .knownVariants))
                         .monospacedDigit()
@@ -404,14 +424,18 @@ struct PhaseMappingSections: View {
             InspectorActionRow {
                 // Reads "Show Phase Map" while the distance is on screen — the
                 // way back, without a second row.
+                // A grains run scores by correlation, not distance: its companion is the reliability (#252).
+                let grainsRun = run.orientationSource == .grains
                 let control = PhaseResultPicture.control(
-                    owning: .distance, displayedKind: appState.displayedProduct?.kind)
-                InspectorAdaptiveButton(control.title, systemImage: control.systemImage) {
+                    owning: grainsRun ? .reliability : .distance, displayedKind: appState.displayedProduct?.kind)
+                InspectorAdaptiveButton(control.title, systemImage: control.systemImage,
+                                        help: grainsRun ? "How far each position's phase is ahead of the best other phase, "
+                                            + "0 to 100 (ASTAR's phase reliability)" : nil) {
                     appState.showPhaseResult(control.target)
                 }
-                .disabled(appState.isBusy)
-                .accessibilityIdentifier("phaseMapping.showDistance")
-                if run.orientationSource == .structures {
+                .disabled(appState.isBusy || (grainsRun && appState.phaseOrientationField == nil))
+                .accessibilityIdentifier(grainsRun ? "phaseMapping.showReliability" : "phaseMapping.showDistance")
+                if run.orientationSource != .typedZones {
                     // The orientation each position's phase was found at (#293): the second button of the pair,
                     // reading "Show Phase Map" while its picture is on screen.
                     let orientation = PhaseResultPicture.control(
@@ -426,7 +450,7 @@ struct PhaseMappingSections: View {
                     .accessibilityIdentifier("phaseMapping.showOrientation")
                 }
             }
-            if run.orientationSource == .structures, let map = appState.phaseMapping.map, map.phaseNames.count > 1,
+            if run.orientationSource != .typedZones, let map = appState.phaseMapping.map, map.phaseNames.count > 1,
                let shown = appState.resolvedOrientationPhase {
                 InspectorRow("Orientation of") {
                     Picker("Orientation of", selection: Binding(get: { shown },
@@ -441,6 +465,18 @@ struct PhaseMappingSections: View {
                 .help("The phase whose orientations Show Orientation draws.")
             }
 
+            if run.orientationSource == .grains {
+                parameterField("Reliable above", value: Binding(
+                    get: { appState.phaseMapping.grainsReliableAbove },
+                    set: { value in
+                        appState.phaseMapping.grainsReliableAbove = min(100, max(0, value))
+                        appState.grainsReliabilityDidChange()
+                    }),
+                               units: "of 100", format: "%.0f",
+                               help: "A position is drawn as its best phase when that phase is at least this far ahead of the "
+                                   + "best other one (100 · (1 − runner-up / winner)); below it the position is not indexed. "
+                                   + "15 is ASTAR's published reading of a sure phase. Moving it redraws; nothing is matched again.")
+            }
             if run.orientationSource == .typedZones {
                 InspectorValueRow("Chance match at max |q|",
                                    String(format: "%.1f %%", locale: .autoupdatingCurrent, run.worstChanceMatchPercent))
@@ -559,6 +595,8 @@ struct PhaseMappingSections: View {
         /// shares carries its zone axis, so no two rows read the same.
         /// Typed zone axes switched on: the zone, relationship and slab rows show (mac4DSTEM#184).
         private var typed: Bool { appState.phaseMapping.orientationSource == .typedZones }
+        /// Grains and phases (#252): no phase is the matrix, and no excitation slab is used (the templates carry their own).
+        private var grains: Bool { appState.phaseMapping.orientationSource == .grains }
 
         private var rowName: String {
             let labels = PhaseMappingSlot.pickerLabels(appState.phaseMapping.phases)
@@ -577,7 +615,7 @@ struct PhaseMappingSections: View {
                         Text(slot.isMatrix ? "matrix · zone \(slot.zoneAxisText)"
                                            : "zone \(slot.zoneAxisText)")
                             .font(.caption2).foregroundStyle(.secondary)
-                    } else if slot.isMatrix {
+                    } else if slot.isMatrix, !grains {
                         Text("matrix").font(.caption2).foregroundStyle(.secondary)
                     }
                 }
@@ -613,7 +651,7 @@ struct PhaseMappingSections: View {
                     InspectorWarning(RoomAccessibilityText.relationshipMalformed)
                 }
             }
-            } else if !slot.isMatrix {
+            } else if !slot.isMatrix, !grains {
                 excitationSlabField
             }
             }
@@ -642,7 +680,8 @@ struct PhaseMappingSections: View {
         }
 
         private var color: Color {
-            let matrixIndex = appState.phaseMapping.phases.firstIndex(where: \.isMatrix) ?? 0
+            // The run's colours: no matrix in a grains run, so every phase takes a hue of its own.
+            let matrixIndex = grains ? -1 : appState.phaseMapping.phases.firstIndex(where: \.isMatrix) ?? 0
             let rgb = PhaseMapPresentation.color(phaseIndex: index, matrixPhaseIndex: matrixIndex)
             return Color(red: Double(rgb.r) / 255, green: Double(rgb.g) / 255,
                          blue: Double(rgb.b) / 255)

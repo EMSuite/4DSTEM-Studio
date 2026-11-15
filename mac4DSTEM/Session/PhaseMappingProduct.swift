@@ -752,10 +752,6 @@ package final class PhaseMappingProduct {
         onChange?()
     }
 
-    /// A structures run's map (phase 0 the matrix, then the candidates in `candidateSlots` order) with its phase indices
-    /// moved to the positions the phases have in the list, so colours, legend and objects read as for a typed run.
-    /// `slotNames` are the list's display names, `matrixSlot` the matrix's position, `candidateSlots[k]` the position of
-    /// the k-th candidate handed to the kit. Pure index bookkeeping; nil when an index does not fit.
     /// A structures run's claims (`StructurePhaseMapping.claims(at:peaks:)`, the kit's phase indices: 0 the matrix, k + 1 the
     /// k-th candidate) with each phase moved to its position in the list, as `mapInListOrder` moves the map's. nil when an
     /// index does not fit.
@@ -772,6 +768,10 @@ package final class PhaseMappingProduct {
         return out
     }
 
+    /// A structures run's map (phase 0 the matrix, then the candidates in `candidateSlots` order) with its phase indices
+    /// moved to the positions the phases have in the list, so colours, legend and objects read as for a typed run.
+    /// `slotNames` are the list's display names, `matrixSlot` the matrix's position, `candidateSlots[k]` the position of
+    /// the k-th candidate handed to the kit. Pure index bookkeeping; nil when an index does not fit.
     package nonisolated static func mapInListOrder(_ kitMap: PhaseMap, slotNames: [String], matrixSlot: Int,
                                                    candidateSlots: [Int]) -> PhaseMap? {
         guard slotNames.indices.contains(matrixSlot), candidateSlots.allSatisfy(slotNames.indices.contains),

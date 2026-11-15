@@ -25,7 +25,10 @@ extension AppState {
               pending.directBeamRefusal == nil else { return }
         _ = promotionRun.take()
         pending.cancelSingleDPFetch()
-        let keepInMemory = pending.effectiveKeepInMemory
+        // The person's own setting when they touched the switch (or it is refused); otherwise nil, and the open applies the
+        // default rule with what is held at that moment (#314).
+        let keepInMemory: Bool? = pending.keepInMemoryDecision == .refused ? false
+            : pending.keepInMemoryChoice.map { _ in pending.effectiveKeepInMemory }
         Task {
             let load = beginDatasetLoading("Opening \(pending.source.datasetPath)…")
             if let openURL { openURL.stopAccessingSecurityScopedResource() }

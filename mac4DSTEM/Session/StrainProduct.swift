@@ -92,6 +92,10 @@ package final class StrainProduct {
     /// of saving.
     package private(set) var originProvenance: [String: String] = [:]
 
+    /// Whether this map was computed with no ellipse correction (#266, Paul 15 Nov: the map stays Quantitative and its badge
+    /// says the ellipse is missing). Snapshotted at publish for the same reason as `originProvenance`.
+    package private(set) var computedWithoutEllipse = false
+
     // Run controls. Deliberately NOT cleared on dataset activation — the
     // pre-seam facade preserved them across activations, and a replayed
     // recipe overwrites them explicitly before running.
@@ -152,10 +156,11 @@ package final class StrainProduct {
     /// Publish a computed map. An automatic run adopts its resolved basis into
     /// the manual fields so switching the basis picker to Manual starts from
     /// the lattice that actually fit.
-    package func publish(_ newMap: StrainMap, originProvenance: [String: String] = [:]) {
+    package func publish(_ newMap: StrainMap, originProvenance: [String: String] = [:], withoutEllipse: Bool = false) {
         failureCause = nil
         map = newMap
         self.originProvenance = originProvenance
+        computedWithoutEllipse = withoutEllipse
         if basisMode == .automatic {
             g1X = newMap.refG1.x; g1Y = newMap.refG1.y
             g2X = newMap.refG2.x; g2Y = newMap.refG2.y

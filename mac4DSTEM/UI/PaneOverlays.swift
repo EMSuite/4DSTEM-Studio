@@ -28,6 +28,7 @@ import ShellMetal
 #if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
 import DSTEMCore
 import DSTEMSession
+import DiffractoCore
 import DiffractoOrientation
 #endif
 
@@ -1054,6 +1055,8 @@ struct HexagonalIPFLegend: View {
 /// `.identity` (unreduced) keeps the cubic key it always had.
 enum IPFLegendKind: Equatable {
     case cubic, hexagonal, monoclinic
+    /// A Laue class without a drawn key of its own: its fundamental zone, coloured by the kit's key (#293).
+    case other(LaueClass)
 
     static func kind(for symmetry: ACOMCrystalSymmetry?) -> IPFLegendKind {
         switch symmetry {
@@ -1061,6 +1064,66 @@ enum IPFLegendKind: Equatable {
         case .monoclinic: return .monoclinic
         case .cubic, .identity, .none: return .cubic
         }
+    }
+
+    /// The key of a phase's own symmetry: the three drawn keys for m-3m, 6/mmm and 2/m (the same native colours), the
+    /// fundamental zone for the other eight; nil (not known) keeps the cubic key, as for ACOM.
+    static func kind(forLaueClass laueClass: LaueClass?) -> IPFLegendKind {
+        switch laueClass {
+        case .mThreeBarM?, nil: return .cubic
+        case .sixOverMmm?: return .hexagonal
+        case .twoOverM?: return .monoclinic
+        case let laue?: return .other(laue)
+        }
+    }
+}
+
+/// The IPF key of a Laue class with no drawn key: the kit's sample of its fundamental zone in stereographic projection along
+/// the zone's own mean direction, each dot coloured by the kit's key for that class, so the key and the map cannot disagree.
+/// No corner labels: the zone's corners differ per class; the class's symbol names it.
+struct FundamentalZoneIPFLegend: View {
+    let laueClass: LaueClass
+    /// Sampled and coloured once per key, not on every draw.
+    private let dots: [(x: Double, y: Double, rgb: SIMD3<Float>)]
+
+    init(laueClass: LaueClass) {
+        self.laueClass = laueClass
+        dots = Self.dots(laueClass)
+    }
+
+    private static func dots(_ laue: LaueClass) -> [(x: Double, y: Double, rgb: SIMD3<Float>)] {
+        let symmetry = CrystalOrientationSymmetry(laueClass: laue)
+        guard let poles = try? symmetry.sampleFundamentalZone(count: 1500), !poles.isEmpty else { return [] }
+        let mean = simd_normalize(poles.reduce(SIMD3<Double>(repeating: 0), +))
+        let helper = abs(mean.z) < 0.9 ? SIMD3<Double>(0, 0, 1) : SIMD3<Double>(1, 0, 0)
+        let u = simd_normalize(simd_cross(helper, mean)), v = simd_cross(mean, u)
+        return poles.compactMap { p in
+            let d = simd_normalize(p), w = simd_dot(d, mean)
+            guard w > -0.999, let c = try? symmetry.ipfColor(direction: d, key: .native) else { return nil }
+            return (simd_dot(d, u) / (1 + w), simd_dot(d, v) / (1 + w), c)
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Canvas { context, size in
+                guard let minX = dots.map(\.x).min(), let maxX = dots.map(\.x).max(),
+                      let minY = dots.map(\.y).min(), let maxY = dots.map(\.y).max() else { return }
+                let scale = min((size.width - 6) / max(1e-6, maxX - minX), (size.height - 6) / max(1e-6, maxY - minY))
+                let ox = (size.width - (maxX - minX) * scale) / 2, oy = (size.height - (maxY - minY) * scale) / 2
+                for dot in dots {
+                    let x = ox + (dot.x - minX) * scale, y = oy + (maxY - dot.y) * scale
+                    context.fill(Path(ellipseIn: CGRect(x: x - 1.8, y: y - 1.8, width: 3.6, height: 3.6)),
+                                 with: .color(Color(red: Double(dot.rgb.x), green: Double(dot.rgb.y), blue: Double(dot.rgb.z))))
+                }
+            }
+            .frame(width: 96, height: 72)
+            Text(laueClass.symbol)
+                .font(.caption2.monospacedDigit())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Inverse pole figure color key of Laue class \(laueClass.symbol): its fundamental zone, "
+                            + "each direction in its colour")
     }
 }
 

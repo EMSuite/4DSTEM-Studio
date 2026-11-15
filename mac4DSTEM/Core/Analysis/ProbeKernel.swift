@@ -83,9 +83,6 @@ package nonisolated struct ProbeKernel: Sendable {
 
     /// Corner-centered, zero-sum kernel on the native grid [py * px].
     package let kernel: [Float]
-    /// conj(FFT2(kernel)) — the term every pattern's FFT is multiplied with.
-    package let ftRe: [Float]
-    package let ftIm: [Float]
 
     // MARK: Construction
     //
@@ -115,7 +112,7 @@ package nonisolated struct ProbeKernel: Sendable {
                           trenchRadii: (Float, Float)? = nil) -> ProbeKernel? {
         let px = qx
         let py = qy
-        guard let fft = FFT2D(nx: px, ny: py), radius > 0 else { return nil }
+        guard FFT2D(nx: px, ny: py) != nil, radius > 0 else { return nil }
         let (ri, ro) = trenchRadii ?? (radius, 2 * radius)
         let centreRow = py / 2, centreColumn = px / 2
         var disk = [Double](repeating: 0, count: py * px)
@@ -131,7 +128,7 @@ package nonisolated struct ProbeKernel: Sendable {
                 origin: (row: Double(centreRow), column: Double(centreColumn)), bilinear: true)
         else { return nil }
         return finish(built, px: px, py: py, probeRadius: radius, trenchRadii: (ri, ro),
-                      source: .synthetic, mode: .sigmoidTrench, probePath: nil, fft: fft)
+                      source: .synthetic, mode: .sigmoidTrench, probePath: nil)
     }
 
     /// Vacuum-probe kernel following py4DSTEM's measured-probe sigmoid route:
@@ -153,7 +150,7 @@ package nonisolated struct ProbeKernel: Sendable {
         }
         let qx = pattern.qx, qy = pattern.qy
         let px = qx, py = qy
-        guard let fft = FFT2D(nx: px, ny: py), radius > 0,
+        guard FFT2D(nx: px, ny: py) != nil, radius > 0,
               pattern.pixels.count == qx * qy else { return nil }
         let (ri, ro) = trenchRadii ?? (radius, 2 * radius)
         guard ro > ri else { return nil }
@@ -185,7 +182,7 @@ package nonisolated struct ProbeKernel: Sendable {
                 origin: (row: Double(originY), column: Double(originX)), bilinear: true)
         else { return nil }
         return finish(built, px: px, py: py, probeRadius: radius, trenchRadii: (ri, ro),
-                      source: source, mode: .sigmoidTrench, probePath: probePath, fft: fft)
+                      source: source, mode: .sigmoidTrench, probePath: probePath)
     }
 
     /// py4DSTEM `Probe.get_probe_kernel_flat` (probe.py): the probe divided by
@@ -209,7 +206,7 @@ package nonisolated struct ProbeKernel: Sendable {
     ) -> ProbeKernel? {
         let qx = pattern.qx, qy = pattern.qy
         let px = qx, py = qy
-        guard let fft = FFT2D(nx: px, ny: py), radius > 0,
+        guard FFT2D(nx: px, ny: py) != nil, radius > 0,
               pattern.pixels.count == qx * qy,
               originX.isFinite, originY.isFinite else { return nil }
         let values = pattern.pixels.map { $0.isFinite ? Double($0) : 0 }
@@ -219,27 +216,23 @@ package nonisolated struct ProbeKernel: Sendable {
                 origin: (row: Double(originY), column: Double(originX)), bilinear: false)
         else { return nil }
         return finish(built, px: px, py: py, probeRadius: radius, trenchRadii: (0, 0),
-                      source: source, mode: .flat, probePath: probePath, fft: fft)
+                      source: source, mode: .flat, probePath: probePath)
     }
 
-    /// The kit's Double kernel as the app's Float container, with conj(FFT2(kernel)) precomputed on the native grid.
+    /// The kit's Double kernel as the app's Float container. (Its conj(FFT2) was precomputed here and never read: the detection
+    /// is the kit's, which transforms the kernel itself; removed, mac4DSTEM#311.)
     private nonisolated static func finish(
         _ built: DetectorImage, px: Int, py: Int, probeRadius: Float, trenchRadii: (Float, Float),
-        source: ProbeKernelSource, mode: ProbeKernelMode, probePath: String?, fft: FFT2D
+        source: ProbeKernelSource, mode: ProbeKernelMode, probePath: String?
     ) -> ProbeKernel {
-        let kernel = built.values.map { Float($0) }
-        var re = kernel
-        var im = [Float](repeating: 0, count: kernel.count)
-        fft.transform(re: &re, im: &im, forward: true)
-        for index in im.indices { im[index] = -im[index] }
-        return ProbeKernel(px: px, py: py, qx: px, qy: py,
-                           probeRadius: probeRadius, trenchRadii: trenchRadii,
-                           source: source, mode: mode, probePath: probePath,
-                           kernel: kernel, ftRe: re, ftIm: im)
+        ProbeKernel(px: px, py: py, qx: px, qy: py,
+                    probeRadius: probeRadius, trenchRadii: trenchRadii,
+                    source: source, mode: mode, probePath: probePath,
+                    kernel: built.values.map { Float($0) })
     }
 
     // Explicit so the memberwise initializer is `package` (synthesized ones are internal). // v2.5 step 2b
-    package nonisolated init(px: Int, py: Int, qx: Int, qy: Int, probeRadius: Float, trenchRadii: (inner: Float, outer: Float), source: ProbeKernelSource, mode: ProbeKernelMode = .sigmoidTrench, probePath: String? = nil, kernel: [Float], ftRe: [Float], ftIm: [Float]) {
+    package nonisolated init(px: Int, py: Int, qx: Int, qy: Int, probeRadius: Float, trenchRadii: (inner: Float, outer: Float), source: ProbeKernelSource, mode: ProbeKernelMode = .sigmoidTrench, probePath: String? = nil, kernel: [Float]) {
         self.px = px
         self.py = py
         self.qx = qx
@@ -250,7 +243,5 @@ package nonisolated struct ProbeKernel: Sendable {
         self.mode = mode
         self.probePath = probePath
         self.kernel = kernel
-        self.ftRe = ftRe
-        self.ftIm = ftIm
     }
 }

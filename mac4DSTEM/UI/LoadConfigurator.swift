@@ -110,7 +110,7 @@ struct LoadConfigurator: View {
             ReductionSizeRows(pending: pending)
             if let loaded = pending.loadedByteCount {
                 ReductionSizeRow(
-                    "This selection (f32)",
+                    "This selection (\(pending.loadedElementTypeName))",
                     displayByteString(loaded)
                         + (pending.reductionSummary.map { " · \($0)" } ?? "")
                 )
@@ -124,13 +124,14 @@ struct LoadConfigurator: View {
             // would get an 8 GB Mac killed. The memory a load actually uses is
             // bounded in `FourDArray.scanTileRows`.
             ReductionSizeRow("GPU working-set limit", SystemMonitor.gpuWorkingSetText)
-            // Reads return float32 whatever the file stores, so a uint16 file
-            // costs twice its own size — the surprise this screen exists to
-            // remove.
+            // The cube is held at the file's bit depth (#260); a binned
+            // selection is computed, so it is held as float32 and can exceed
+            // the file's size — said here, before the load.
             keepInMemoryRow
-            Text(pending.effectiveKeepInMemory
-                 ? "Float32 expansion can exceed file size. The cube is read into memory once; analyses then run from it."
-                 : "Float32 expansion can exceed file size. Analyses stream in bounded tiles.")
+            Text((pending.loadedAsComputedFloat32 ? "A binned selection is held as float32. " : "")
+                 + (pending.effectiveKeepInMemory
+                    ? "The cube is read into memory once; analyses then run from it."
+                    : "Analyses stream in bounded tiles."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

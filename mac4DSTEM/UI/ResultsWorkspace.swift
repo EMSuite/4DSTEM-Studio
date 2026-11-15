@@ -18,8 +18,6 @@ import DSTEMSession
 /// result out of the app.
 struct ResultsWorkspace: View {
     @Environment(AppState.self) private var appState
-    /// The comparison's "Same scale", kept here so it outlives the comparison view being rebuilt for each new product.
-    @State private var comparisonSameScale = false
 
     private var hasVisibleResult: Bool {
         appState.resultPresentation.resultImage != nil || appState.resultPresentation.resultRGBA != nil
@@ -62,7 +60,8 @@ struct ResultsWorkspace: View {
 
             if let a = appState.comparisonProductA, let b = appState.comparisonProductB {
                 Divider()
-                ProductComparisonView(a: a, b: b, sameScale: $comparisonSameScale)
+                // "Same scale" is the window's (`AppState.comparisonSameScale`), so it outlives this view and the door sets it.
+                ProductComparisonView(a: a, b: b, sameScale: Bindable(appState).comparisonSameScale)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -491,6 +490,7 @@ struct ProductComparisonView: View {
         .onChange(of: [a, b].map { "\($0.kind)|\($0.displayName)|\($0.width)x\($0.height)" }) { _, _ in
             sampleCursors = [:]
         }
+        .onAppear { appState.paneZooms.comparison = zoomModel }   // lent to the agent door's set_view (#297)
         .accessibilityIdentifier("result.comparison")
     }
 

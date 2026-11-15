@@ -23,6 +23,7 @@
 //  rather than trusted.
 //
 
+import FormatoCore
 import Foundation
 import Metal
 
@@ -213,29 +214,25 @@ do {
     pass("all \(d.ry * d.rx) cropped+binned patterns match independent truth, zero reader reads")
 }
 
-// 2. TileGPUSource binds the cube's own buffer at a VIEW-row offset.
+// 2. Tiles out of the resident cube start at VIEW-row offsets (#260: TileGPUSource, which bound the buffer at those
+//    offsets, had no caller and was deleted; every read now goes through `scanTile`).
 do {
-    guard let cube = await residentData.resident(for: d) else {
-        fail("resident(for:) refused the view's own descriptor")
-    }
-    var gpuSource = TileGPUSource(data: residentData, descriptor: d, cube: cube)
+    let floatsPerViewScanRow = bytesPerViewScanRow / MemoryLayout<Float>.stride
     for range in [0..<2, 2..<4, 4..<5] {
-        let bound = try await gpuSource.binding(for: range, prefetching: nil, label: "crop")
-        guard bound.buffer === cube.buffer else { fail("staged a copy for rows \(range)") }
-        guard bound.offset == range.lowerBound * bytesPerViewScanRow else {
-            fail("""
-                 rows \(range) bound at byte offset \(bound.offset), expected \
-                 \(range.lowerBound * bytesPerViewScanRow) — a VIEW row, not a source row
-                 """)
+        let tile = try await residentData.scanTile(yRange: range)
+        let expected = Array(expectedViewCube[(range.lowerBound * floatsPerViewScanRow)..<(range.upperBound * floatsPerViewScanRow)])
+        guard tile.pixels == expected else {
+            fail("rows \(range) out of the resident cube are not the view's rows — a VIEW row, not a source row")
         }
-        guard bound.offset % 4 == 0 else { fail("offset \(bound.offset) is not 4-byte aligned") }
     }
-    pass("TileGPUSource offsets are whole VIEW scan rows (\(bytesPerViewScanRow) B), 4-byte aligned")
+    pass("resident tiles start at whole VIEW scan rows (\(bytesPerViewScanRow) B as float32)")
 }
 
 // 3. The resident buffer holds exactly the expected view cube.
 do {
     guard let cube = await residentData.resident(for: d) else { fail("cube vanished") }
+    // This reader hands out Float32 only, and the view is binned: the cube is held as float32 (#260).
+    guard cube.elementType == .float32 else { fail("a binned view was held as \(cube.elementType), not float32") }
     let floats = cube.byteCount / MemoryLayout<Float>.stride
     let base = cube.buffer.contents().bindMemory(to: Float.self, capacity: floats)
     let held = Array(UnsafeBufferPointer(start: base, count: floats))

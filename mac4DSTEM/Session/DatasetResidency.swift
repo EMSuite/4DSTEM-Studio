@@ -48,6 +48,24 @@ package final class DatasetResidency {
     /// Bytes held (0 when streaming).
     package private(set) var byteCount = 0
 
+    /// Why this dataset is held or streamed, in a sentence for the inspector (#314): the open's decision, set by the
+    /// opener. Nil until a dataset is opened.
+    package private(set) var reason: String?
+
+    /// Record the open's decision (`AppState.activate`).
+    package func explain(_ reason: String?) { self.reason = reason }
+
+    /// Bytes held resident by every other window's dataset: what an open counts against its share of the RAM (#314).
+    package func bytesHeldElsewhere() -> Int {
+        Self.ledger = Self.ledger.filter { $0.value.owner != nil }
+        return Self.ledger.filter { $0.key != ObjectIdentifier(self) }.reduce(0) { $0 + $1.value.bytes }
+    }
+
+    /// Each window's residency and the bytes it holds; an entry whose window closed drops out (weak owner).
+    private struct Held { weak var owner: DatasetResidency?; var bytes: Int }
+    private static var ledger: [ObjectIdentifier: Held] = [:]
+    private func publish() { Self.ledger[ObjectIdentifier(self)] = Held(owner: self, bytes: isResident ? byteCount : 0) }
+
     /// Determinate [0,1] while the preload runs, `nil` otherwise.
     ///
     /// The denominator is the cube, which is known exactly, so this phase is
@@ -62,9 +80,8 @@ package final class DatasetResidency {
     /// glance which path their analyses are taking (L2.6).
     ///
     /// It states only what is known. "Streaming" is not annotated with a reason
-    /// — too large, refused, not measured — because the reasons are not all
-    /// distinguishable here, and a confident wrong explanation is worse than a
-    /// bare fact.
+    /// here; the open that decided it says why in `reason` (#314), which the
+    /// inspector shows.
     package var summary: String {
         if isPreloading { return "Loading into memory…" }
         guard isResident else { return "Streaming" }
@@ -83,6 +100,9 @@ package final class DatasetResidency {
     /// Adversarial review.
     private var generation = 0
     private var activePreload: Int?
+    /// Called once the array has been read and before the publish decision: the point a dataset switch can fall into. Tests set
+    /// it to switch the dataset there deterministically (mac4DSTEM#303); nil in the app.
+    @ObservationIgnored package var willPublishForTesting: (() -> Void)?
 
     /// Forget everything. Called when a dataset is replaced — the incoming
     /// `FourDArray` is a different object with its own (absent) buffer.
@@ -93,13 +113,17 @@ package final class DatasetResidency {
         isResident = false
         byteCount = 0
         preloadFraction = nil
+        reason = nil
+        publish()
     }
 
     package func request(_ newMode: Residency, on data: FourDArray?) async {
         mode = newMode
         guard let data else { return }
+        // Snapshotted before the await (mac4DSTEM#303): a dataset replaced meanwhile (`reset`) is not this array's to describe.
+        let entry = generation
         await data.setResidencyRequest(newMode)
-        await sync(with: data)
+        await sync(with: data, ifGeneration: entry)
     }
 
     /// Read the whole cube into one buffer if this machine admits it.
@@ -130,7 +154,11 @@ package final class DatasetResidency {
         // preserving a cube this object never granted would reintroduce the
         // drift it exists to prevent. In-app the stamp is a no-op today —
         // `preloadResidentCube` only ever follows `activate`'s fresh array.
+        // Snapshotted BEFORE the first await (mac4DSTEM#303): bumped after it, a `reset` (dataset switch) during the await
+        // was not seen, and dataset A's residency was published onto B.
+        let entry = self.generation
         await data.setResidencyRequest(mode)
+        guard self.generation == entry else { return false }
         generation &+= 1
         let generation = self.generation
         activePreload = generation
@@ -170,20 +198,29 @@ package final class DatasetResidency {
         // this object now describes a different dataset. Publishing here would
         // stamp the old cube's residency onto the new one.
         guard self.generation == generation else { return false }
-        await sync(with: data)
-        return isResident
+        await sync(with: data, ifGeneration: generation)
+        return self.generation == generation && isResident
     }
 
     /// Drop the cube and return to streaming. Safe at any time.
     package func release(_ data: FourDArray?) async {
         guard let data else { return }
+        let entry = generation
         await data.releaseResident()
-        await sync(with: data)
+        await sync(with: data, ifGeneration: entry)
+        // The open's reason no longer holds once the person released the cube (#314).
+        if generation == entry, !isResident { reason = "Streaming: the cube was released." }
     }
 
-    /// Publish what the array actually holds — never what was requested.
-    private func sync(with data: FourDArray) async {
-        isResident = await data.isResident
-        byteCount = await data.residentByteCount
+    /// Publish what the array actually holds — never what was requested — unless the dataset was replaced (`reset`) since
+    /// `generation` was read: both values are read first, then published together or not at all (mac4DSTEM#303).
+    private func sync(with data: FourDArray, ifGeneration generation: Int) async {
+        let resident = await data.isResident
+        let bytes = await data.residentByteCount
+        willPublishForTesting?()
+        guard self.generation == generation else { return }
+        isResident = resident
+        byteCount = bytes
+        publish()
     }
 }

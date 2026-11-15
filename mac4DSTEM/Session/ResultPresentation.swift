@@ -79,8 +79,9 @@ package final class ResultPresentation {
     @ObservationIgnored private var vdStartedGeneration = 0
     @ObservationIgnored private var vdLandedGeneration = 0
     package func nextVDGeneration() -> Int { vdStartedGeneration += 1; return vdStartedGeneration }
+    /// Strictly newer than the last landed run: a generation lands at most once (mac4DSTEM#303; `>=` let the same one land twice).
     package func claimVDLanding(_ generation: Int) -> Bool {
-        guard generation >= vdLandedGeneration else { return false }
+        guard generation > vdLandedGeneration else { return false }
         vdLandedGeneration = generation
         return true
     }

@@ -113,7 +113,8 @@ extension AppState {
         // Snapshot the origin provenance WITH the map (Gate B, 2026-08-28):
         // these keys describe the fit this map was computed against, and
         // reading them at export time let them describe a different one.
-        strain.publish(map, originProvenance: originFitProvenance)
+        strain.publish(map, originProvenance: originFitProvenance,
+                       withoutEllipse: !calibrationSession.calibration.hasEllipse)
         refreshPrecipitateJoins()
         // Recipe step (v2 S5): the run's modes plus the RESOLVED basis — an
         // automatic basis re-derived on a different view can legitimately
@@ -142,5 +143,15 @@ extension AppState {
             + " · κ \(Num.fixed(Double(map.diagnostics.basisConditionNumber), 2))"
             + " · \(map.referencePositionCount)/\(map.diagnostics.referenceCandidateCount) ref"
         return .published
+    }
+}
+
+extension AppState {
+    /// The note the result badge adds when the displayed strain map was computed with no ellipse correction (#266): the map
+    /// stays Quantitative (Paul, 15 Nov), and the badge says what is missing. nil for every other result.
+    var strainWithoutEllipseNote: String? {
+        guard displayedResultKind.hasPrefix("strain"), strain.map != nil, strain.computedWithoutEllipse else { return nil }
+        return "Computed without an ellipse correction: elliptic distortion of the patterns reads as strain. "
+            + "Fit Ellipse in Prepare and run Strain again to remove it."
     }
 }

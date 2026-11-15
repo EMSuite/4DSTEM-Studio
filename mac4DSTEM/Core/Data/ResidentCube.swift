@@ -1,33 +1,24 @@
 //
 //  ResidentCube.swift
-//  Role: The whole datacube held as one float32 MTLBuffer, and the rule that
-//        decides whether a given cube is allowed to be held that way.
+//  Role: The whole datacube held as one MTLBuffer at its stored bit depth
+//        (uint8, int8, uint16, int16, uint32, int32 or float32; a binned view, an
+//        8-byte type or a reader without a stored read is held as float32, #260),
+//        and the rule that decides whether a given cube is allowed to be held.
 //
-//  WHY THIS IS CHEAP: `VirtualDetector.tiled` already builds an MTLBuffer per
-//  scan tile and hands it to the SAME compute functions a whole-cube path
-//  would call — there is no separate tiled kernel. A resident cube is just
-//  "the tile is the whole cube, and the buffer is not thrown away".
+//  READS. Every pattern and tile out of the cube converts per read with
+//  `FormatoDataType.convertToFloat32`, the conversion
+//  `FormatoArray.float32Values()` applies to a streamed read, so a resident read
+//  equals the streamed read bit for bit. Float32 exists only while a
+//  computation runs. Nothing binds the buffer on the GPU (TileGPUSource had no
+//  caller and was deleted with #260).
 //
-//  EXACTNESS (invariant I2, docs/load-pipeline-plan.md §4). `virtualMaskSum`
-//  and `virtualAperture` run one thread per SCAN position, summing over the
-//  detector in a fixed order, from a mask built out of qy/qx only. Tiles
-//  partition the SCAN axis, so a tile boundary never splits a per-output-pixel
-//  reduction and every tile sees the identical mask. The resident and tiled
-//  virtual images are therefore BIT-IDENTICAL, which is why
-//  tools/harnesses/virtual-detector-residency asserts exact `==` rather than a tolerance.
-//
-//  That argument does NOT cover reductions that combine tiles:
-//  `tiledDPStatistics` (weighted mean) and `tiledDiffraction` (running sum) are
-//  float-order dependent. They keep their tiled reduction even when the cube is
-//  resident — same ranges, same partials, same combination order — so they skip
-//  the disk without changing a single number. Since v2 S18 they also skip the
-//  COPY: `TileGPUSource` binds the resident buffer at the tile's byte offset
-//  (`setBuffer(_:offset:)`) instead of routing through `FourDArray.scanTile`,
-//  which materialized each tile as a Swift `[Float]` on the way to a fresh
-//  per-tile MTLBuffer. The bytes the GPU reads are the same bytes; only the
-//  staging is gone.
+//  EXACTNESS (invariant I2, docs/load-pipeline-plan.md §4): the resident and
+//  streamed paths hand the reducers the same Float32 tiles over the same scan
+//  ranges, so every number is bit-identical;
+//  tools/harnesses/virtual-detector-residency asserts exact `==`.
 //
 
+import FormatoCore
 import Foundation
 import Metal
 
@@ -50,11 +41,11 @@ import Metal
 package nonisolated enum Residency: Sendable {
     /// Bounded scan-row tiles. Always available, always tested (invariant I6).
     case streamed
-    /// One MTLBuffer holding the whole cube as float32.
+    /// One MTLBuffer holding the whole cube at its stored bit depth.
     case resident
 }
 
-/// The whole cube as one float32 buffer, with the descriptor it was built from.
+/// The whole cube as one buffer at `elementType`, with the descriptor it was built from.
 ///
 /// `@unchecked Sendable`: the buffer is filled once, before this value is
 /// published, and is only ever read afterwards — every kernel binds the cube as
@@ -66,8 +57,23 @@ package nonisolated struct ResidentCube: @unchecked Sendable {
     /// Which view of the source these bytes are. Compared by `matches`, because
     /// the descriptor alone cannot tell two equal-sized crops apart.
     package let specification: LoadSpecification
+    /// The element type the buffer holds (`FourDDataSource.residentElementType(for:)`).
+    package let elementType: FormatoDataType
 
-    package var byteCount: Int { descriptor.byteCountAsFloat32 }
+    /// Elements held: the view's.
+    package var elementCount: Int { descriptor.shape.reduce(1, *) }
+    /// Bytes held: `elementCount · elementType.byteSize` (the stored size, not Float32's).
+    package var byteCount: Int { elementCount * elementType.byteSize }
+
+    /// Converts elements `first ..< first + count` to Float into `out`, as a
+    /// streamed read converts them. False (nothing written) when the range is not
+    /// inside the buffer.
+    package func convert(_ first: Int, count: Int, into out: UnsafeMutablePointer<Float>) -> Bool {
+        let size = elementType.byteSize
+        guard first >= 0, count >= 0, (first + count) * size <= buffer.length else { return false }
+        let raw = UnsafeRawBufferPointer(start: buffer.contents() + first * size, count: count * size)
+        return elementType.convertToFloat32(raw, count: count, into: out)
+    }
 
     /// Whether this buffer actually holds the cube `other` describes.
     ///
@@ -106,10 +112,12 @@ package nonisolated struct ResidentCube: @unchecked Sendable {
     }
 
     // Explicit so the memberwise initializer is `package` (synthesized ones are internal). // v2.5 step 2b
-    package nonisolated init(buffer: MTLBuffer, descriptor: DatasetDescriptor, specification: LoadSpecification) {
+    package nonisolated init(buffer: MTLBuffer, descriptor: DatasetDescriptor, specification: LoadSpecification,
+                             elementType: FormatoDataType = .float32) {
         self.buffer = buffer
         self.descriptor = descriptor
         self.specification = specification
+        self.elementType = elementType
     }
 }
 
@@ -140,19 +148,17 @@ package nonisolated enum ResidencyAdmission {
     /// Stays nil by decision (ADR 013): do not set it without the measured knee.
     package static let measuredWorkingSetFraction: Double? = nil
 
-    /// Whether `descriptor` fits `fraction` of `workingSetSize`.
-    ///
-    /// Reads return Float32 regardless of the on-disk dtype (see
-    /// `FourDDataSource`), so a uint16 file needs **twice** its file size here.
-    /// `byteCountAsFloat32` is already that number; the on-disk size would be
-    /// the more flattering figure and the wrong one.
+    /// Whether `descriptor` fits `fraction` of `workingSetSize`, at `byteCount`
+    /// bytes held (`FourDDataSource.residentByteCount(for:)`: the stored size
+    /// since #260; Float32 when not given, the conservative figure).
     package static func admits(
         _ descriptor: DatasetDescriptor,
+        byteCount: Int? = nil,
         workingSetSize: UInt64,
         fraction: Double
     ) -> Bool {
         guard descriptor.is4D, fraction > 0, workingSetSize > 0 else { return false }
-        let bytes = descriptor.byteCountAsFloat32
+        let bytes = byteCount ?? descriptor.byteCountAsFloat32
         guard bytes > 0 else { return false }
         return Double(bytes) <= Double(workingSetSize) * fraction
     }
@@ -178,13 +184,17 @@ package nonisolated enum ResidencyAdmission {
     /// (v2 S3): they fed only its threshold branch, and a dead parameter is a
     /// claim this function checks something it does not. A returning
     /// `.automatic` re-adds them and calls `admits`.
+    ///
+    /// `byteCount` is what the buffer will hold (the stored size since #260);
+    /// Float32 when not given.
     package static func shouldAdmit(
         _ requested: Residency,
         descriptor: DatasetDescriptor,
+        byteCount: Int? = nil,
         maximumBufferLength: Int
     ) -> Bool {
         guard descriptor.is4D else { return false }
-        let bytes = descriptor.byteCountAsFloat32
+        let bytes = byteCount ?? descriptor.byteCountAsFloat32
         guard bytes > 0, bytes <= maximumBufferLength else { return false }
         switch requested {
         case .streamed:

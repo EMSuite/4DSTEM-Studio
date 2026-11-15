@@ -54,14 +54,8 @@ package final class LoadedView {
     /// ambiguous — the same index now names a different physical position.
     package private(set) var scanIndexedResultsWereCleared = false
 
-    /// Detector rows and columns dropped as the binning edge remainder.
-    ///
-    /// **NOT YET SHOWN ANYWHERE.** Nothing in `UI/` reads this type's display
-    /// surface — not this, not `summary`, not `binningNotice`, not
-    /// `invalidatedCalibration`. The user asked for one extent and got a
-    /// slightly smaller one, and that difference turns up later as an
-    /// unexplained number if nobody says so; the wiring belongs with L5's
-    /// configurator, where all of it becomes visible in one Track B pass.
+    /// Detector rows and columns dropped as the binning edge remainder. The inspector shows them through `binningNotice` and
+    /// `summary` (`WorkspaceInspector`); the agent door reads `summary`.
     package private(set) var discardedDetectorRows = 0
     package private(set) var discardedDetectorColumns = 0
 

@@ -236,7 +236,8 @@ package nonisolated enum PhaseMapPresentation {
     /// first, so the user is not told "check your tolerances" when the real
     /// answer is "there were no peaks".
     package static func diagnosis(_ map: PhaseMap,
-                                  resolution: PhaseVectorResolution?) -> String? {
+                                  resolution: PhaseVectorResolution?,
+                                  distortionCorrected: Bool = false) -> String? {
         let total = map.results.count
         guard total > 0 else { return nil }
         let noData = map.count(of: .noData)
@@ -272,6 +273,25 @@ package nonisolated enum PhaseMapPresentation {
                 text += " Check the matrix phase and its zone axis: a matrix viewed "
                     + "down an axis it is not on presents no reflections to remove."
             }
+            return text
+        }
+        // The matrix found at under a third of the positions (#298, the AA6060 SPED scan: 2 577 of 160 000 at defaults, and
+        // 52 597 with the origin from the Bragg peaks alone; a scan near half matrix and half refused keeps the candidates'
+        // sentence below): the
+        // frame does not work either. On a spot pattern that is the geometry, the origin and the detector's distortion moving
+        // the matrix's spots out of the matching tolerance; measured there, the origin from the Bragg peaks and the distortion
+        // fitted on the matrix's spots took the matrix to 156 448. The steps are named, nothing is changed for the user.
+        if matrix * 3 < total {
+            var text = "Most of the scan is not indexed, the matrix included (\(matrix * 100 / total) % matrix). On a spot "
+                + "pattern the cause is usually the geometry, not the phases: the origin and the detector's distortion "
+                + "move the matrix spots out of the matching tolerance."
+            if let resolution, resolution.matrixRemovalPixels < 1 {
+                text += String(format: " That tolerance is %.2f of one detector pixel here.", resolution.matrixRemovalPixels)
+            }
+            text += distortionCorrected
+                ? " The distortion is corrected: check the origin (Origin from Bragg Peaks) and the matrix phase."
+                : " Run Origin from Bragg Peaks, then Fit Distortion from Spots with the matrix as the crystal, apply it, "
+                    + "and map again."
             return text
         }
         return "Almost nothing was indexed. The matrix was found, so the frame and "

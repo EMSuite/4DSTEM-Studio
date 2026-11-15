@@ -112,13 +112,14 @@ private struct DatasetWindow: View {
             }
             // "Ignore Session Sidecar…" / "Reopen Without This Session" ask before they act (owner card Q2 a).
             .reopenWithoutSessionDialog(appState)
+            // Closing the window, opening another file or quitting while an analysis runs asks first (#313).
+            .runInterruptionDialog(appState)
         .focusedSceneValue(\.appState, appState)
         // Info.plist declares CFBundleDocumentTypes, which puts mac4DSTEM in
         // Finder's "Open With" — this is the handler that requires.
         // `openFile` refuses a second load while one is in flight, so a
         // double-click during a load is declined with a reason rather than
-        // reaching HDF5 twice.
-        // UNVERIFIED ON SCREEN: not yet driven from Finder.
+        // reaching HDF5 twice. Driven from Finder on 2026-11-11 (`ExternalOpen`, drive check 3).
         .onOpenURL { url in
             // The file this window holds, opened again from Finder: the window comes forward and nothing reloads.
             if ExternalOpen.isHeld(url, heldPath: appState.descriptor?.filePath) {
@@ -152,7 +153,9 @@ private struct DatasetWindow: View {
         // The same event stops the window's running job (`windowClosed`): a closed window must not keep computing
         // for a dataset nobody can see. `onDisappear` fires when the hosting view leaves its window; a window
         // that merely hides, minimises or loses focus keeps its content in place and does not fire it.
+        .onAppear { RunGuard.enroll(appState) }
         .onDisappear {
+            RunGuard.withdraw(appState)
             OpenDatasetRegistry.withdraw(appState)
             Mac4DSTEMAgentDoor.withdraw(appState)
             appState.windowClosed()
@@ -460,6 +463,8 @@ private struct DatasetCommands: Commands {
 
 @main
 struct mac4DSTEMApp: App {
+    /// Quit asks before it stops a running analysis (#313, `RunGuard`).
+    @NSApplicationDelegateAdaptor(Mac4DSTEMAppDelegate.self) private var appDelegate
     // ONE instance for the whole process, shared by every dataset window and
     // the Settings scene — `UserDefaults` would make a second instance read
     // the same values, but only this one is `@Observable`-linked to what
@@ -501,7 +506,7 @@ struct mac4DSTEMApp: App {
             .windowToolbarStyle(.unified)
             .commands {
                 DatasetCommands(menuRelay: menuRelay, recents: recents)
-                ZoomCommands()   // View > Zoom In / Zoom Out / Zoom to Fit (lane H1, UI/ZoomCommands.swift)
+                ZoomCommands()   // View > Zoom In / Zoom Out / Zoom to Fit (MacEMUI ShellControls, ZoomCommands.swift)
                 #if SPARKLE
                 SoftwareUpdateCommands(update: softwareUpdate)   // mac4DSTEM > Check for Updates…
                 #endif

@@ -66,12 +66,13 @@ final class SavedResultRemovalTests: XCTestCase {
 
     /// The sidecar beside `cube`: one 4 × 4 map per kind, saved in order on the whole file, so the LAST kind is the
     /// file's current result and the open restores it onto the screen.
-    private func writeSidecar(beside cube: URL, kinds: [String]) throws {
+    private func writeSidecar(beside cube: URL, kinds: [String], comparable: Bool = false) throws {
         let url = BraggVectorEMDWriter.sessionSidecarURL(forSourcePath: cube.path)
         for kind in kinds {
             try BraggVectorEMDWriter.mergeResultMap(
                 ScalarResultMap(width: 4, height: 4, pixels: (0..<16).map { Float($0) }, kind: kind,
-                                displayName: "Map \(kind)", valueUnits: "a.u."),
+                                displayName: "Map \(kind)", valueUnits: "a.u.",
+                                provenance: comparable ? ["display_domain": "scan"] : [:]),
                 vectors: nil, qWidth: 64, qHeight: 64, calibration: PixelCalibration(), to: url,
                 loadSpecification: .fullExtent)
         }
@@ -168,6 +169,56 @@ final class SavedResultRemovalTests: XCTestCase {
 
     /// Mutation: the tail runs unconditionally (HEAD) -> red (it swaps the viewed saved result for the file's current
     /// one). Viewing a saved result and removing ANOTHER leaves the viewed one on screen AND marked as the current one.
+    // MARK: Two quick picks finishing out of order (mac4DSTEM#303)
+
+    /// The first pick's file read finishes after the second pick has landed: the second stays on screen and marked. Held
+    /// deterministically: the first pick waits after its read until the second has finished. Mutation: the pick check removed
+    /// (`epoch` only, as before) - red (the first lands over the second).
+    func testAnEarlierPickThatFinishesLaterDoesNotLandOverTheLaterOne() async throws {
+        let cube = try await writeCube("picks.h5")
+        try writeSidecar(beside: cube, kinds: ["first_map", "second_map"])
+        let a = try isolatedAppState()
+        try await hold(cube, in: a)
+        let first = try saved(a, kind: "first_map"), second = try saved(a, kind: "second_map")
+        let (released, release) = AsyncStream<Void>.makeStream()
+        let (reached, reach) = AsyncStream<Void>.makeStream()
+        a.savedResultReadForTesting = { picked in
+            guard picked.id == first.id else { return }
+            reach.yield()
+            for await _ in released { break }
+        }
+        let firstPick = Task { await a.selectSavedSessionResult(first) }
+        for await _ in reached { break }   // the first pick has read its file and waits
+        await a.selectSavedSessionResult(second)
+        XCTAssertEqual(a.resultPresentation.product?.displayName, "Map second_map", "precondition: the second pick landed")
+        release.yield(); release.finish()
+        await firstPick.value
+        XCTAssertEqual(a.resultPresentation.product?.displayName, "Map second_map", "the earlier pick landed over the later one")
+        XCTAssertEqual(a.sessionInventory.currentResultID, second.id)
+    }
+
+    /// The same for a comparison slot: the later pick into slot A stays. Mutation: the slot's pick check removed - red.
+    func testAnEarlierComparisonPickThatFinishesLaterDoesNotLandOverTheLaterOne() async throws {
+        let cube = try await writeCube("slots.h5")
+        try writeSidecar(beside: cube, kinds: ["first_map", "second_map"], comparable: true)
+        let a = try isolatedAppState()
+        try await hold(cube, in: a)
+        let first = try saved(a, kind: "first_map"), second = try saved(a, kind: "second_map")
+        let (released, release) = AsyncStream<Void>.makeStream()
+        let (reached, reach) = AsyncStream<Void>.makeStream()
+        a.savedResultReadForTesting = { picked in
+            guard picked.id == first.id else { return }
+            reach.yield()
+            for await _ in released { break }
+        }
+        let firstPick = Task { await a.loadSavedSessionResult(first, into: .a) }
+        for await _ in reached { break }
+        await a.loadSavedSessionResult(second, into: .a)
+        release.yield(); release.finish()
+        await firstPick.value
+        XCTAssertEqual(a.comparisonProductA?.displayName, "Map second_map")
+    }
+
     /// Mutation 2: the in-session selection is not kept after the inventory reread -> the mark assertion goes red.
     func testViewingOneSavedResultSurvivesRemovingAnother() async throws {
         let cube = try await writeCube("e.h5")

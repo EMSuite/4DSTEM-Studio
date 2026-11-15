@@ -1,5 +1,5 @@
 {
-  "originHash" : "5e6252f3cbe0226eca44a2789a01306c07e337cca3316bf7b6e5f4a00d736f51",
+  "originHash" : "f8c38ad133e4346be9f1b0df27fec7a4956dd920a8ab009e1f4315e2bf171c0e",
   "pins" : [
     {
       "identity" : "cubokit",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mac4DSTEM/FormatoKit",
       "state" : {
-        "revision" : "24f63c36eda72a7aacb167b218da7206aa1f8d01",
-        "version" : "0.15.0"
+        "revision" : "20c61674a4f1924b2fb98b6dda3d41572f6661b0",
+        "version" : "0.17.0"
       }
     },
     {

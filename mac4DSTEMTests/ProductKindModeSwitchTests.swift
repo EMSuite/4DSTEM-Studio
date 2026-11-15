@@ -69,6 +69,17 @@ final class ProductKindModeSwitchTests: XCTestCase {
         XCTAssertEqual(state.resultPresentation.product?.kind, "strain_exx")
     }
 
+    /// #266 (Paul, 15 Nov: keep Quantitative, say the ellipse is missing). Mutation: the note ignoring the publish snapshot - red.
+    func testAStrainMapWithoutTheEllipseSaysSoBesideItsStatus() {
+        let state = AppState()
+        state.strain.publish(strainMap(), withoutEllipse: true)
+        state.changeMode(.strain)
+        XCTAssertEqual(state.resultPresentation.product?.kind, "strain_exx", "precondition: the strain map is shown")
+        XCTAssertNotNil(state.strainWithoutEllipseNote)
+        state.strain.publish(strainMap(), withoutEllipse: false)
+        XCTAssertNil(state.strainWithoutEllipseNote, "a map computed with the ellipse correction carries no note")
+    }
+
     /// Strain computed, Orientation visited (no orientation map: the strain product is cleared), Strain again: the strain
     /// map is shown. The room returned early on an EMPTY pane ("No Result Yet", journey
     /// `CrystalMapsJourney.testStrainSurvivesAnOrientationVisit`), because its guard asked only "is another room's

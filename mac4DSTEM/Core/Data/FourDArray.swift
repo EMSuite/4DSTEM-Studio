@@ -1,3 +1,4 @@
+import FormatoCore
 import Foundation
 import Metal
 import ShellMetal
@@ -105,7 +106,7 @@ package actor FourDArray {
         // happening twice.
         if let residentCube,
            residentCube.matches(descriptor, specification: loadSpecification) {
-            return tile(yRange: yRange, from: residentCube)
+            return try tile(yRange: yRange, from: residentCube)
         }
         let tile = try await reader.readScanTile(view, yRange: yRange)
         let expected = yRange.count * descriptor.rx * descriptor.qy * descriptor.qx
@@ -171,30 +172,12 @@ package actor FourDArray {
     /// Bytes currently held resident (0 when streaming).
     package var residentByteCount: Int { residentCube?.byteCount ?? 0 }
 
-    /// How many tiles have been COPIED out of the resident cube into a Swift
-    /// `[Float]` by `scanTile`.
+    /// How many tiles have been converted out of the resident cube into a Swift
+    /// `[Float]` by `scanTile` (#260: every read of the resident cube converts per
+    /// tile from its stored bit depth; nothing binds the buffer on the GPU).
     ///
-    /// Observability, not policy. v2 S18 removed that copy from the four tiled
-    /// GPU reducers — they bind the cube's buffer at the tile's byte offset
-    /// instead (`TileGPUSource`).
-    ///
-    /// **This counter does NOT prove the copy is gone** (Gate B second read,
-    /// 2026-08-28). Reinstate a staging copy *inside*
-    /// `TileGPUSource.binding` — copy the tile's bytes into a fresh
-    /// `MTLBuffer`, return it at offset 0 — and every value stays bit-identical
-    /// while this counter reads 0 before and 0 after, because that copy never
-    /// routes through `tile(yRange:from:)` where the counter lives. What
-    /// actually catches it is the `bound.buffer === cube.buffer` identity
-    /// assertion in `tools/harnesses/virtual-detector-residency`, which fires
-    /// "TileGPUSource staged a COPY". This counter catches the narrower case:
-    /// a reducer going back through `tile(yRange:from:)`.
-    ///
-    /// (The counter's own positive control is real — deleting the increment
-    /// below fails the harness with "The counter is dead, and every 'zero
-    /// staging copies' claim below it is vacuous.")
-    ///
-    /// CPU-side consumers (parallax preprocessing, ptychography preparation,
-    /// the EMD writer) legitimately still copy and still increment it.
+    /// Observability, not policy: `tools/harnesses/virtual-detector-residency`
+    /// uses it to prove a pass was served from memory and not from disk.
     package private(set) var residentTileCopies = 0
 
     /// Bumped by anything that invalidates an in-flight preload. A preload
@@ -224,7 +207,14 @@ package actor FourDArray {
         if mode == .streamed { releaseResident() }
     }
 
-    /// Read the whole cube into one float32 buffer.
+    /// The element type a resident cube of this view holds (#260): the stored
+    /// type when the reader hands it out (and it is at most four bytes), else Float32.
+    package nonisolated var residentElementType: FormatoDataType { reader.residentElementType(for: view) }
+
+    /// Bytes a resident cube of this view holds, at `residentElementType`.
+    package nonisolated var residentByteCountIfHeld: Int { reader.residentByteCount(for: view) }
+
+    /// Read the whole cube into one buffer at its stored bit depth (#260).
     ///
     /// Returns `false` when the cube is not admitted or cannot be allocated —
     /// **not** an error. Invariant I6: every path degrades to streaming, so a
@@ -240,7 +230,8 @@ package actor FourDArray {
     /// `maximumRows` forces the fill tiling, exactly as `maximumTileRows` does
     /// for the parity paths. **It exists because without it the fill loop's
     /// destination offset was dead code in every test that existed**: the
-    /// default budget is a working-set eighth (~683 MB), so both test fixtures
+    /// default budget was then a working-set eighth (~683 MB; since #305 it is
+    /// `fillTileBytes`, 64 MiB), so both test fixtures
     /// preloaded in a single tile, `filled` was always 0, and rewriting line
     /// `base + filled * …` to `base + 0` left all 22 harness assertions and the
     /// whole unit suite green. On a real multi-gigabyte cube the fill is a dozen
@@ -255,48 +246,61 @@ package actor FourDArray {
         if let residentCube,
            residentCube.matches(descriptor, specification: loadSpecification) { return true }
         guard !preloadInFlight else { return false }
+        let elementType = residentElementType
+        let elementCount = descriptor.shape.reduce(1, *)
+        let byteCount = elementCount * elementType.byteSize
         guard ResidencyAdmission.shouldAdmit(
             residencyRequest,
             descriptor: descriptor,
+            byteCount: byteCount,
             maximumBufferLength: MetalEngine.shared.device.maxBufferLength
         ) else { return false }
 
-        let byteCount = descriptor.byteCountAsFloat32
-        let floatCount = byteCount / MemoryLayout<Float>.stride
-        guard byteCount > 0, floatCount > 0,
-              let buffer = MetalEngine.shared.device.makeBuffer(
-                length: byteCount, options: .storageModeShared
-              )
-        else { return false }
-        buffer.label = "Resident cube \(descriptor.fileName)"
-
+        guard byteCount > 0, elementCount > 0 else { return false }
+        // A cube held for another view goes BEFORE the new buffer is made (#305): holding both was two cubes at the peak,
+        // and the old one cannot serve this view anyway (`matches` above). Bumping the generation also stops its preload.
         residentCube = nil
         residencyGeneration &+= 1
         let generation = residencyGeneration
+        guard let buffer = MetalEngine.shared.device.makeBuffer(length: byteCount, options: .storageModeShared)
+        else { return false }
+        buffer.label = "Resident cube \(descriptor.fileName) \(elementType.rawValue)"
         preloadInFlight = true
         defer { preloadInFlight = false }
 
-        let floatsPerScanRow = descriptor.rx * descriptor.qy * descriptor.qx
-        let base = buffer.contents().bindMemory(to: Float.self, capacity: floatCount)
-        let rowsPerTile = max(1, min(descriptor.ry, maximumRows ?? scanTileRows()))
+        let elementsPerScanRow = descriptor.rx * descriptor.qy * descriptor.qx
+        let bytesPerScanRow = elementsPerScanRow * elementType.byteSize
+        let base = buffer.contents()
+        let rowsPerTile = max(1, min(descriptor.ry, maximumRows ?? fillTileRows()))
         var filled = 0
         while filled < descriptor.ry {
             guard cancellation?.isCancelled != true else { throw CancellationError() }
             let upper = min(descriptor.ry, filled + rowsPerTile)
             let range = filled..<upper
-            let tile = try await reader.readScanTile(view, yRange: range)
-            // Re-checked after every suspension, not just at the end: a release
-            // or a `.streamed` request that arrived while this read was in
-            // flight must win, and continuing to fill a buffer nobody wants
-            // wastes the memory the caller just asked us to give back.
-            guard generation == residencyGeneration else { return false }
-            guard tile.yRange == range,
-                  tile.pixels.count == range.count * floatsPerScanRow else {
-                throw FourDError.allocationFailed
-            }
-            tile.pixels.withUnsafeBufferPointer { source in
-                guard let start = source.baseAddress else { return }
-                (base + filled * floatsPerScanRow).update(from: start, count: source.count)
+            let target = base + filled * bytesPerScanRow
+            if elementType == .float32, reader.storedElementType(for: view) != .float32 {
+                // Float32 held from the reader's Float32 tiles: a binned view, an
+                // 8-byte type, or a reader without a stored read.
+                let tile = try await reader.readScanTile(view, yRange: range)
+                // Re-checked after every suspension, not just at the end: a release
+                // or a `.streamed` request that arrived while this read was in
+                // flight must win, and continuing to fill a buffer nobody wants
+                // wastes the memory the caller just asked us to give back.
+                guard generation == residencyGeneration else { return false }
+                guard tile.yRange == range,
+                      tile.pixels.count == range.count * elementsPerScanRow else {
+                    throw FourDError.allocationFailed
+                }
+                tile.pixels.withUnsafeBytes { target.copyMemory(from: $0.baseAddress!, byteCount: $0.count) }
+            } else {
+                // The stored bytes as the reader hands them out: no Float32 tile.
+                let tile = try await reader.readStoredScanTile(view, yRange: range)
+                guard generation == residencyGeneration else { return false }
+                guard tile.yRange == range, tile.dataType == elementType,
+                      tile.bytes.count == range.count * bytesPerScanRow else {
+                    throw FourDError.allocationFailed
+                }
+                tile.bytes.withUnsafeBytes { target.copyMemory(from: $0.baseAddress!, byteCount: $0.count) }
             }
             filled = upper
             progress?(Double(filled) / Double(descriptor.ry))
@@ -309,7 +313,7 @@ package actor FourDArray {
         guard generation == residencyGeneration else { return false }
         residentCube = ResidentCube(
             buffer: buffer, descriptor: descriptor,
-            specification: loadSpecification
+            specification: loadSpecification, elementType: elementType
         )
         return true
     }
@@ -332,31 +336,58 @@ package actor FourDArray {
     /// reader, which is the honest behaviour for a cube that is not what this
     /// array thinks it is.
     private func pattern(ry: Int, rx: Int, from cube: ResidentCube) -> DiffractionPattern? {
-        let patternFloats = descriptor.qy * descriptor.qx
-        let start = (ry * descriptor.rx + rx) * patternFloats
-        let floatCount = cube.byteCount / MemoryLayout<Float>.stride
-        guard patternFloats > 0, start >= 0, start + patternFloats <= floatCount else {
+        let patternElements = descriptor.qy * descriptor.qx
+        let start = (ry * descriptor.rx + rx) * patternElements
+        guard patternElements > 0, start >= 0, start + patternElements <= cube.elementCount else {
             return nil
         }
-        let base = cube.buffer.contents().bindMemory(to: Float.self, capacity: floatCount)
-        let pixels = Array(UnsafeBufferPointer(start: base + start, count: patternFloats))
+        var converted = true
+        let pixels = [Float](unsafeUninitializedCapacity: patternElements) { out, initialized in
+            converted = cube.convert(start, count: patternElements, into: out.baseAddress!)
+            initialized = patternElements
+        }
+        guard converted else { return nil }
         return DiffractionPattern(qy: descriptor.qy, qx: descriptor.qx, pixels: pixels)
     }
 
-    private func tile(yRange: Range<Int>, from cube: ResidentCube) -> FourDScanTile {
+    /// Scan rows `yRange` converted out of the resident cube, per tile, with the
+    /// conversion a streamed read uses (#260).
+    private func tile(yRange: Range<Int>, from cube: ResidentCube) throws -> FourDScanTile {
         residentTileCopies += 1
-        let floatsPerScanRow = descriptor.rx * descriptor.qy * descriptor.qx
-        let floatCount = cube.byteCount / MemoryLayout<Float>.stride
-        let base = cube.buffer.contents().bindMemory(to: Float.self, capacity: floatCount)
-        let pixels = Array(UnsafeBufferPointer(
-            start: base + yRange.lowerBound * floatsPerScanRow,
-            count: yRange.count * floatsPerScanRow
-        ))
+        let elementsPerScanRow = descriptor.rx * descriptor.qy * descriptor.qx
+        let count = yRange.count * elementsPerScanRow
+        var converted = true
+        let pixels = [Float](unsafeUninitializedCapacity: count) { out, initialized in
+            if let base = out.baseAddress {
+                converted = cube.convert(yRange.lowerBound * elementsPerScanRow, count: count, into: base)
+            }
+            initialized = count
+        }
+        guard converted else { throw FourDError.allocationFailed }
         return FourDScanTile(
             yRange: yRange, scanWidth: descriptor.rx,
             detectorHeight: descriptor.qy, detectorWidth: descriptor.qx,
             pixels: pixels
         )
+    }
+
+    /// The transient budget of one fill tile (#305): what the read of one tile may take beside the resident buffer.
+    /// 64 MiB, CuboKit's own `ScanTiling.automaticTileBytes`. The fill tiling carries no numbers (the buffer is flat and
+    /// `scanTile` slices any range out of it), so it is sized for memory alone. A large tile is also what macOS keeps
+    /// dirty after it is freed (#261: malloc keeps its largest freed blocks for reuse), so a small one is what makes
+    /// the memory after a fill the cube itself.
+    package static let fillTileBytes = 64 << 20
+
+    /// Rows per fill tile: as many as fit `fillTileBytes` of what the fill reads, at least one. A stored-type fill reads
+    /// the stored bytes of the view; a Float32 fill reads Float32 at the READ extent (pre-bin for a binned view).
+    package func fillTileRows() -> Int {
+        let readHeight = view.readDetectorCrop?.height ?? view.source.qy
+        let readWidth = view.readDetectorCrop?.width ?? view.source.qx
+        let held = residentElementType
+        let storedRead = reader.storedElementType(for: view) == held
+        let bytesPerRow = max(1, storedRead ? descriptor.rx * descriptor.qy * descriptor.qx * held.byteSize
+                                            : descriptor.rx * readHeight * readWidth * MemoryLayout<Float>.stride)
+        return max(1, min(descriptor.ry, Self.fillTileBytes / bytesPerRow))
     }
 
     /// Rows that fit within a conservative eighth of Metal's recommended

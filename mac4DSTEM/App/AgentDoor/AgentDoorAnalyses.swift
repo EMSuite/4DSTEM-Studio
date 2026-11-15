@@ -47,7 +47,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let strain = state.strain
             if let mode = named(call.arguments["reference"], StrainReferenceMode.self) { strain.referenceMode = mode }
             if let mode = named(call.arguments["basis"], StrainBasisMode.self) { strain.basisMode = mode }
@@ -74,7 +74,9 @@ extension Mac4DSTEMAgentDoor {
                       AgentParameter("scope", .choice(caseNames(ACOMRunScope.self)), summary: "preview, selectedRegion or fullScan."),
                       AgentParameter("region_radius", .integer(4...4096), summary: "selectedRegion: half-size in scan pixels."),
                       AgentParameter("quality", .choice(caseNames(ACOMQualityPreset.self)), summary: "fast, balanced or best."),
-                      AgentParameter("engine", .choice(caseNames(ACOMMatchingBackend.self)), summary: "automatic, cpu or metal."),
+                      AgentParameter("engine", .choice(caseNames(ACOMMatchingBackend.self)), summary: "automatic, cpu or metal. "
+                                     + "automatic is the CPU (Accelerate) at every size today, the engine checked on real data, as the "
+                                     + "room's note says; metal is the person's or agent's explicit choice (#266)."),
                       AgentParameter("refine_in_plane", .boolean, summary: "Refine the in-plane angle past the 128-bin step."),
                       AgentParameter("display", .choice(caseNames(ACOMDisplayMode.self)), summary: "The map shown."),
                       AgentParameter("reliability_threshold", .number(0...1), summary: "IPF map: positions below this are greyed."),
@@ -82,7 +84,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             if let path = call.arguments["phase_cif"] {
                 switch importCIF(path, into: state) {
                 case .success: break
@@ -117,7 +119,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             var settings = state.diffractionGroups.settings
             if let size = call.arguments["binned_size"].flatMap(Int.init) { settings.binnedSize = size }
             if let n = call.arguments["components"].flatMap(Int.init) { settings.components = n }
@@ -133,7 +135,7 @@ extension Mac4DSTEMAgentDoor {
                       + "Diffraction groups); get_result_image shows the map.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.diffractionGroups.result != nil else {
                 return .refusal(status: 409, message: "There is no grouping yet; run Diffraction groups first (run_task).")
             }

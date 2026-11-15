@@ -4,6 +4,7 @@ import SwiftUI
 import ShellMetal
 #if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
 import DSTEMCore
+import DiffractoCore
 import DSTEMSession
 #endif
 
@@ -87,6 +88,7 @@ struct DiffractionPane: View {
         .selectsPaneOnClick(.diffraction)
         // View > Zoom acts on the pane the reader last clicked (the default is this one).
         .zoomCommandTarget(zoomModel, isTarget: appState.activePane == .diffraction && appState.displayedPattern != nil)
+        .onAppear { appState.paneZooms.pattern = zoomModel }   // lent to the agent door's set_view (#297)
     }
 
     /// Everything here is single-line on purpose: a wrapping title or readout
@@ -811,6 +813,7 @@ struct RealSpacePane: View {
         .selectsPaneOnClick(.realSpace)
         // View > Zoom acts on the pane the reader last clicked; in Results this is the only image pane, so it always does.
         .zoomCommandTarget(zoomModel, isTarget: (!allowsScanSelection || appState.activePane == .realSpace) && resultSize != nil)
+        .onAppear { appState.paneZooms.result = zoomModel }   // lent to the agent door's set_view (#297)
         // Arrow-key scan stepping is NOT here. It has exactly one owner —
         // `WorkspaceView`, on the container holding both panes, which is where
         // the old window had it and which is what lets the keys work while
@@ -994,9 +997,10 @@ struct RealSpacePane: View {
                 .accessibilityLabel("Inspecting quality field \(field.name), units \(field.units)")
                 .accessibilityIdentifier("result.statusBadge")
         } else if let status = appState.displayedProduct?.quantitativeStatus {
-            badge(text: status.rawValue.capitalized, color: statusColor(status))
-                .help("Interpretation status of the displayed result")
-                .accessibilityLabel("Interpretation status: \(status.rawValue.capitalized)")
+            let note = appState.strainWithoutEllipseNote
+            badge(text: status.rawValue.capitalized + (note == nil ? "" : " · no ellipse"), color: statusColor(status))
+                .help(note ?? "Interpretation status of the displayed result")
+                .accessibilityLabel("Interpretation status: \(status.rawValue.capitalized)" + (note.map { ". " + $0 } ?? ""))
                 .accessibilityIdentifier("result.statusBadge")
         }
     }
@@ -1396,10 +1400,15 @@ struct RealSpacePane: View {
                     // it "001 / 111 / 101" renders in the ambient label colour
                     // over an arbitrary orientation map.
                     Group {
-                        switch IPFLegendKind.kind(for: appState.acomSession.orientationMap?.symmetry) {
+                        // A phase's orientation map (#293) is keyed by that phase's symmetry, an ACOM map by the ACOM crystal's.
+                        let legend = appState.displayedResultKind == PhaseResultPicture.orientation.productKind
+                            ? IPFLegendKind.kind(forLaueClass: appState.displayedProduct?.provenance["orientation_symmetry"].flatMap(LaueClass.init(rawValue:)))
+                            : IPFLegendKind.kind(for: appState.acomSession.orientationMap?.symmetry)
+                        switch legend {
                         case .hexagonal: HexagonalIPFLegend()
                         case .monoclinic: MonoclinicIPFLegend()
                         case .cubic: CubicIPFLegend()
+                        case .other(let laue): FundamentalZoneIPFLegend(laueClass: laue)
                         }
                     }
                     .padding(7)

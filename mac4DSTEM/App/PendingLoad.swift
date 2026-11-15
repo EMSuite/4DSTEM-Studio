@@ -23,6 +23,7 @@
 //
 
 import ShellLayout
+import FormatoCore
 import Foundation
 import Metal
 import ShellMetal
@@ -101,7 +102,25 @@ final class PendingLoad: Identifiable {
     /// "Keep in memory" for THIS open only (owner 2026-10-01: default off on
     /// every open, never remembered). Owner of the flag is this pending load;
     /// `commitPendingLoad` reads it once and hands it to `activate`.
-    var keepInMemory = false
+    var keepInMemory: Bool {
+        get { keepInMemoryChoice ?? keepsInMemoryByDefault }
+        set { keepInMemoryChoice = newValue }
+    }
+
+    /// The person's own setting of the switch, or nil while they have not touched it: the switch then follows
+    /// `keepsInMemoryByDefault` as the selection changes (#314).
+    var keepInMemoryChoice: Bool?
+
+    /// Whether this selection is kept in memory by default (#314): its held size fits
+    /// `KeepInMemoryDecision.defaultShareOfRAM`, counting what other windows already hold.
+    var keepsInMemoryByDefault: Bool {
+        guard let bytes = loadedByteCount, keepInMemoryDecision != .refused else { return false }
+        return KeepInMemoryDecision.keepsByDefault(cubeBytes: bytes, heldElsewhere: heldElsewhere,
+                                                   physicalMemory: ProcessInfo.processInfo.physicalMemory)
+    }
+
+    /// Bytes other windows hold resident, read once when the configurator opens (`AppState.openFileForConfiguration`).
+    var heldElsewhere = 0
 
     /// Non-nil when this pending open is the "Preprocess Raw Data…" sheet's
     /// (X3): the same previews and crop, written to a new file instead of
@@ -385,14 +404,36 @@ final class PendingLoad: Identifiable {
     /// would refuse.
     var view: LoadView? { configuration.view }
 
-    var loadedByteCount: Int? { configuration.byteCount }
+    /// Bytes the selection holds in memory with Keep in memory on: the stored
+    /// size when the reader hands out the view at its stored bit depth, else
+    /// Float32 (a binned view, an 8-byte type; #260).
+    var loadedByteCount: Int? { view.map { reader.residentByteCount(for: $0) } }
+
+    /// The element type Keep in memory holds the selection at, or nil when it is not loadable.
+    var loadedElementType: FormatoDataType? { view.map { reader.residentElementType(for: $0) } }
+
+    /// `loadedElementType`'s name ("uint16", "float32"), for the size row.
+    var loadedElementTypeName: String { loadedElementType?.rawValue ?? FormatoDataType.float32.rawValue }
+
+    /// Whether the selection is binned, so held as Float32 whatever the file
+    /// stores (a computed view; #260).
+    var loadedAsComputedFloat32: Bool { (view?.specification.detectorBin ?? 1) > 1 }
     var fullExtentByteCount: Int { configuration.fullExtentByteCount }
 
-    /// "42% of the full cube", or nil at full extent where there is nothing to
+    /// The whole cube as it would be held in memory: at the stored bit depth when the reader hands it out (#260), so it
+    /// sits beside `loadedByteCount` in the same unit.
+    var fullExtentHeldByteCount: Int { reader.residentByteCount(for: LoadView(fullExtentOf: source)) }
+
+    /// `fullExtentHeldByteCount`'s element type name ("uint16", "float32").
+    var fullExtentHeldTypeName: String { reader.residentElementType(for: LoadView(fullExtentOf: source)).rawValue }
+
+    /// "42% of the full cube's pixels", or nil at full extent where there is nothing to
     /// compare against.
     var reductionSummary: String? {
         guard let fraction = configuration.fractionOfFullExtent, fraction < 1 else { return nil }
-        return String(format: "%.0f%% of the full cube", fraction * 100)
+        // Of the pixels, not of the bytes: a binned selection is held as float32 while the whole cube is held at its stored
+        // bit depth, so the two byte counts beside it do not divide to this (#260).
+        return String(format: "%.0f%% of the full cube's pixels", fraction * 100)
     }
 
     /// The loaded shape, as the reader would see it.
@@ -433,6 +474,35 @@ enum KeepInMemoryDecision: Equatable {
     case refused
 
     static let warnFractionOfRAM = 0.5
+
+    /// The share of physical memory a cube may take to be kept in memory by default (#314), counting the cubes other
+    /// windows already hold. A quarter: the analyses' own working sets take up to about an eighth more
+    /// (`FourDArray.scanTileRows`, three tiles of a 24th), and the rest is the system's and other apps'. So a default
+    /// open never takes more than about 40% of the Mac. A fixed share of the machine, not a byte count tuned to a
+    /// dataset: a cube that fits on 64 GB streams on 8 GB, by one rule. The switch overrides it either way.
+    static let defaultShareOfRAM = 0.25
+
+    /// Whether `cubeBytes`, beside `heldElsewhere` already resident, fits `defaultShareOfRAM` of `physicalMemory`.
+    static func keepsByDefault(cubeBytes: Int, heldElsewhere: Int, physicalMemory: UInt64) -> Bool {
+        guard cubeBytes > 0 else { return false }
+        return Double(cubeBytes) + Double(max(0, heldElsewhere)) <= defaultShareOfRAM * Double(physicalMemory)
+    }
+
+    /// The inspector's sentence for an open that followed the rule (#314).
+    static func defaultReason(cubeBytes: Int, heldElsewhere: Int, physicalMemory: UInt64) -> String {
+        let share = displayByteString(Int(defaultShareOfRAM * Double(physicalMemory)))
+        let others = heldElsewhere > 0 ? ", with \(displayByteString(heldElsewhere)) held by other windows" : ""
+        return keepsByDefault(cubeBytes: cubeBytes, heldElsewhere: heldElsewhere, physicalMemory: physicalMemory)
+            ? "Kept in memory: \(displayByteString(cubeBytes)) fits a quarter of this Mac's memory (\(share))\(others)."
+            : "Streaming: \(displayByteString(cubeBytes)) is above a quarter of this Mac's memory (\(share))\(others). Turn on Keep in memory in Open with Options to hold it anyway."
+    }
+
+    /// `decide` with this Mac's GPU and memory limits, for callers outside the Metal-allowed files (`AppState+Open`).
+    static func decideOnThisMac(cubeBytes: Int) -> KeepInMemoryDecision {
+        decide(cubeBytes: cubeBytes, limitBytes: UInt64(MetalEngine.shared.device.recommendedMaxWorkingSetSize),
+               maxBufferBytes: UInt64(MetalEngine.shared.device.maxBufferLength),
+               physicalMemory: ProcessInfo.processInfo.physicalMemory)
+    }
 
     static func decide(
         cubeBytes: Int, limitBytes: UInt64, maxBufferBytes: UInt64, physicalMemory: UInt64

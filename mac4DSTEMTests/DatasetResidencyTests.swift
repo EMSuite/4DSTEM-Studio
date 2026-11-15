@@ -39,6 +39,49 @@ final class DatasetResidencyTests: XCTestCase {
 
     // MARK: What is published is what is held
 
+    // MARK: A dataset switch during an await publishes nothing (mac4DSTEM#303)
+
+    /// A `reset` (the dataset replaced) between reading the array and publishing it: the residency of the old array must not land on
+    /// the new dataset. Mutation: the generation check in `sync` removed - red (isResident true after the reset).
+    func testARequestDoesNotPublishOntoADatasetThatReplacedIt() async throws {
+        let (data, _) = try await demoArray()
+        let residency = DatasetResidency()
+        await residency.request(.resident, on: data)
+        _ = await residency.preload(data) { _ in }
+        XCTAssertTrue(residency.isResident, "precondition: the old cube is resident")
+
+        residency.willPublishForTesting = { [unowned residency] in residency.reset() }
+        await residency.request(.resident, on: data)
+        XCTAssertFalse(residency.isResident, "the old cube's residency landed on the dataset that replaced it")
+        XCTAssertEqual(residency.byteCount, 0)
+
+        await residency.release(data)
+        XCTAssertFalse(residency.isResident)
+    }
+
+    /// The same for a preload: the switch falls between its read and its publish. Mutation: `preload` publishing without the
+    /// generation check - red.
+    func testAPreloadDoesNotPublishOntoADatasetThatReplacedIt() async throws {
+        let (data, _) = try await demoArray()
+        let residency = DatasetResidency()
+        await residency.request(.resident, on: data)
+        residency.willPublishForTesting = { [unowned residency] in residency.reset() }
+        let held = await residency.preload(data) { _ in }
+        XCTAssertFalse(held)
+        XCTAssertFalse(residency.isResident)
+    }
+
+    /// The session's epoch moves when its reader is replaced, so work started on the previous dataset cannot pass its epoch
+    /// check against the new reader. Mutation: `prepare` without the bump - red.
+    func testPreparingANewReaderAdvancesTheEpoch() async throws {
+        let session = DatasetSession()
+        let source = DemoFourDDataSource()
+        let descriptor = try await source.discoverPrimaryDataset()
+        let before = session.epoch
+        session.prepare(reader: source, datasets: [descriptor])
+        XCTAssertNotEqual(session.epoch, before)
+    }
+
     func testPreloadPublishesTheBufferItActuallyHolds() async throws {
         let (data, descriptor) = try await demoArray()
         let residency = DatasetResidency()
@@ -255,16 +298,27 @@ final class DatasetResidencyTests: XCTestCase {
 
     // MARK: Opening a dataset leaves residency in a stated condition
 
-    func testOpeningTheDemoLeavesResidencyStreamingAndNotPreloading() async {
+    func testOpeningTheDemoHoldsItByDefaultAndClearsThePreload() async {
         let state = AppState()
         await state.openDemoFixture()
 
-        // Not an assertion that residency is useless — an assertion that the
-        // shipped default is streaming and that the open cleared its preload
-        // state either way.
+        // #314: the shipped default keeps a cube that fits a quarter of the RAM
+        // (the tiny demo always does), and the open clears its preload state
+        // either way.
         XCTAssertNil(state.residency.preloadFraction)
         XCTAssertFalse(state.residency.isPreloading)
+        XCTAssertTrue(state.residency.isResident)
+        XCTAssertTrue(state.residency.reason?.hasPrefix("Kept in memory: ") == true)
+    }
+
+    /// The inspector's reason follows a Release cube (#314): it no longer says the cube is kept.
+    func testReleasingTheCubeChangesTheReason() async {
+        let state = AppState()
+        await state.openDemoFixture()
+        XCTAssertTrue(state.residency.isResident)
+        await state.releaseResidentCube()
         XCTAssertFalse(state.residency.isResident)
+        XCTAssertEqual(state.residency.reason, "Streaming: the cube was released.")
     }
 }
 

@@ -25,7 +25,12 @@ The door itself (listener, token, Settings section, window list, MCP endpoint) i
 A window is `w1`, `w2`, ... (or none while one window is open). Pictures take `scale` 1...3; the pattern picture is drawn at
 2 or more, as a Retina screen shows the pane, so the disk rings stand out as they do there (#185).
 Every picture and number comes from the code that draws or exports it for the person, so the agent judges what the person sees.
-Text in the door's answers writes numbers with a point whatever the Mac's Region; settings carry the recipe's names (subpixel
+Text the door writes itself (the calibration items, the spot-distortion summary, its own notes) uses a point whatever the
+Mac's Region. The status line, the Output lines and `log_tail` are the window's own text, as the person reads it, so a Mac
+set to German writes "6,5 px" and "189.173 peaks" (189173) there: read numbers from the JSON fields, not from those lines
+(#323). Busy is one answer: `list_windows` and `get_window` both say busy while an operation runs, while a file opens (from
+`open_file`'s answer on, the open's whole-cube pass included) and while the EDS room works; a step that failed after it
+started puts its reason in `operation.error` until the next one begins (#266, #323). Settings carry the recipe's names (subpixel
 `pixel`, `poly`, `multicorr`) in `get_window` and `task_settings` alike; `session.sidecar_unreadable` says why a session file
 beside the dataset could not be read, where `has_sidecar` alone would say there is none (#233).
 
@@ -48,8 +53,8 @@ before each call (MCP marks them as not read-only). One run at a time; Stop in t
 Every one of these writes an Output line that starts "An agent", so the person can tell the agent's values from their own.
 When an action moves a setting the agent did not name, the Output says so: measuring the probe (Build Kernel, a probe radius,
 Calibrate Origin) sets `min_peak_spacing` to fit the probe when nobody has chosen one, and writes "Build Kernel also changed
-disk detection: min_peak_spacing 16 → 4". `get_probe_kernel` carries the disk settings too (#232). Numbers in the door's text use
-a point, whatever the Mac's Region.
+disk detection: min_peak_spacing 16 → 4". `get_probe_kernel` carries the disk settings too (#232). A name or path the agent
+gave stands in those lines in quotes (#310).
 
 ### The Agent folder (batches)
 
@@ -59,7 +64,7 @@ that lead out (`..`, links) are refused.
 | Tool | Does |
 |---|---|
 | `list_agent_folder` | the files in the folder and its subfolders (looks only) |
-| `open_file` | opens one in the window, as File > Open does (needs "Let agents run analyses") |
+| `open_file` | opens one in the window, as File > Open does (needs "Let agents run analyses"); as there, a spectrum image opened in a window that holds a 4D scan, or a 4D file in a window that holds only a spectrum image, opens in a new window, which `list_windows` then names (#323) |
 | `save_result_image` | saves the displayed result there as File > Export > Result Image does, with its provenance; needs "Let agents save results there" too, off by default; a name that exists is refused, so no file is ever replaced |
 
 A batch is a loop: `list_agent_folder`, then for each file `open_file`, the run tools, `save_result_image`.
@@ -160,3 +165,42 @@ to the room first.
 | `run_eds` | Auto ID, Quantify or Stop; answers at once, `get_eds` says busy until done; behind "Let agents run analyses" |
 
 `run_task` in the room presses Quantify, as the toolbar does, with or without a 4D scan.
+
+## Controls that were the person's (issue #297)
+
+| Tool | What it does |
+|---|---|
+| `get_settings` | Settings as the window shows them: General, Appearance, Analysis (with the model caches' sizes) and whether agents may run and save, with the Agent folder's name |
+| `set_settings` | the General, Appearance and Analysis pickers and switches, only the ones given; app-wide and kept |
+| `clear_calibration` | Clear Calibration: every calibration value back to Not set, the voltage kept, without reloading; needs `confirm` true |
+| `remove_learned_model` | Remove Fine-Tuned Model: the active fine-tuned detector model to the Trash, the bundled one active again; needs `confirm` true |
+| `reopen_without_session` | Reopen Without This Session: the window asks the person, as the button does, since results not saved to the session go with the reopen |
+| `release_cube` | Release cube: the dataset kept in memory is let go; the file is read from disk again |
+| `open_demo` | Try Demo Data; over an open dataset it needs `confirm` true |
+
+All but `get_settings` act, so they wait for "Let agents run analyses". What stays the person's, and why: the agents switches
+and the Agent folder (the door must not widen its own rights), Reset All Settings (it resets those switches too), Clear
+Recent Datasets (the person's own history), and API keys, which never pass through the door.
+
+A tool whose control asks the person first (Clear Calibration's dialog, Remove Fine-Tuned Model, Try Demo Data over an open
+dataset) refuses with HTTP 409 and says in words what would be lost. The agent asks the person in the chat and, only after a
+yes, calls again with `confirm` true.
+
+## Materials Project (issue #297)
+
+| Tool | What it does |
+|---|---|
+| `fetch_materials_project` | fetches a material by its id (`mp-…`), as the sheet's Fetch does, and checks it against an expected formula and space group; answers at once; behind "Let agents run analyses", since it goes online |
+| `get_materials_project` | whether the person has stored a key, and the last fetch: the material (formula, space group, cell, deprecated), the verdict and whether it may be imported, or why it failed |
+| `import_materials_project` | the sheet's Import: as a phase of Map Phases or as ACOM's phase model; refused on a mismatch |
+
+The request uses the key the person stored in Settings. The key never passes through the door: no tool reads, returns, sets
+or logs it, and saving or removing it stays the person's.
+
+## The view (issue #297)
+
+`set_view` (behind "Let agents run analyses") sets what the window shows, so an agent reads the screen as the person does:
+one pane's zoom (`pane` pattern, result or comparison; `zoom` fit, in or out, as View > Zoom does, about the centre), the
+result's display `orientation` (0, 90, 180, 270) and `mirrored` (display only, not the R–Q rotation), the pattern's
+`fit_overlay`, and the comparison's `same_scale`. Nothing computed changes. `get_window`'s `view.display` says each pane's zoom
+(null when the pane is not on screen) and the rest.

@@ -150,6 +150,7 @@ enum AgentDoorCoverage {
         "pattern.zoomBadge": .personOnly("view zoom"),
         "performance.releaseCube": .personOnly("memory housekeeping on the person's Mac"),
         "phaseMapping.addPhase": .tool("add_phase"),
+        "phaseMapping.addBuiltIn": .tool("add_phase"),
         "phaseMapping.classifierPicker": .tool("set_phase_mapping"),
         "phaseMapping.findZoneAxis": .tool("find_matrix_zone_axis"),
         "phaseMapping.matrix": .tool("set_phase"),

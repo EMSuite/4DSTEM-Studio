@@ -19,40 +19,57 @@ import DSTEMSession
 
 extension Mac4DSTEMAgentDoor {
     static let phaseTools: [AgentTool] = [
-        AgentTool(name: "add_phase", title: "Add phase from CIF",
-                  summary: "Adds a phase to Map Phases' phase list from a CIF file in the Agent folder, as Add Phase > From CIF file "
-                      + "does. The first phase in an empty list is the matrix; is_matrix true makes this one the matrix instead. "
-                      + "Answers the phase list (get_window's phase_mapping).",
+        AgentTool(name: "add_phase", title: "Add phase",
+                  summary: "Adds a phase to Map Phases' phase list, as Add Phase does: from a CIF file in the Agent folder (path, as "
+                      + "From CIF file) or a built-in material (material, as Built-in Material: "
+                      + CrystalModelLibrary.models.map { "\($0.id) \($0.displayName)" }.joined(separator: ", ") + "). Give "
+                      + "one of the two. The first phase in an empty list is the matrix; is_matrix true makes this one the matrix "
+                      + "instead. Answers the phase list (get_window's phase_mapping).",
                   input: .window,
                   parameters: [
-                      AgentParameter("path", .text, summary: "The CIF, relative to the Agent folder, as list_agent_folder names it.",
-                                     required: true),
+                      AgentParameter("path", .text, summary: "The CIF, relative to the Agent folder, as list_agent_folder names it."),
+                      AgentParameter("material", .choice(CrystalModelLibrary.models.map(\.id)),
+                                     summary: "A built-in material, by id (#297)."),
                       AgentParameter("is_matrix", .boolean, summary: "Make this phase the matrix (default false)."),
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
             guard !state.isBusy else { return busyRefusal }
-            let file: URL
-            switch folder.resolve(call.arguments["path"] ?? "") {
-            case .success(let url): file = url
-            case .failure(let refusal): return .refusal(status: 404, message: refusal.message)
-            }
-            var isFolder: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: file.path, isDirectory: &isFolder), !isFolder.boolValue else {
-                return .refusal(status: 404, message: noFileMessage(file))
-            }
             let model: CrystalModel
-            do {
-                model = try state.importCrystalModelOrThrow(from: file, selectsForOrientation: false)
-            } catch {
-                return .refusal(status: 422, message: "\(file.lastPathComponent) is not a usable CIF: "
-                    + ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription))
+            let from: String
+            switch (call.arguments["path"], call.arguments["material"]) {
+            case (nil, let id?):
+                guard let builtIn = CrystalModelLibrary.model(id: id) else {
+                    return .refusal(status: 404, message: "No built-in material \(id); they are "
+                        + CrystalModelLibrary.models.map(\.id).joined(separator: ", ") + ".")
+                }
+                model = builtIn
+                from = "the built-in materials"
+            case (let path?, nil):
+                let file: URL
+                switch folder.resolve(path) {
+                case .success(let url): file = url
+                case .failure(let refusal): return .refusal(status: 404, message: refusal.message)
+                }
+                var isFolder: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: file.path, isDirectory: &isFolder), !isFolder.boolValue else {
+                    return .refusal(status: 404, message: noFileMessage(file))
+                }
+                do {
+                    model = try state.importCrystalModelOrThrow(from: file, selectsForOrientation: false)
+                } catch {
+                    return .refusal(status: 422, message: "\(file.lastPathComponent) is not a usable CIF: "
+                        + ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription))
+                }
+                from = file.lastPathComponent
+            default:
+                return .refusal(status: 400, message: "Give path (a CIF in the Agent folder) or material (a built-in one), not both.")
             }
             state.addPhaseMappingSlot(model)
             let product = state.phaseMapping
             if call.arguments["is_matrix"] == "true" { markMatrix(product.phases.count - 1, in: product) }
             let role = product.phases.last?.isMatrix == true ? " as the matrix" : ""
-            state.statusText = "An agent added the phase \(model.displayName)\(role) from \(file.lastPathComponent)."
+            state.statusText = "An agent added the phase \(model.displayName)\(role) from \(from)."
             return .json(phaseMappingSettings(of: state))
         },
         AgentTool(name: "set_phase", title: "Change a phase",

@@ -7,6 +7,9 @@
 //  What stays the person's, on purpose: the agents switches and the Agent folder (the door must not widen its own rights), Reset
 //  All Settings (it would reset those switches too), and API keys (none passes through the door). Reopen Without This Session
 //  raises the window's own question, as the button does; the person answers it, because the reopen can lose unsaved results.
+//  The ones whose control asks first (Clear Calibration's dialog; Remove Fine-Tuned Model; Try Demo Data over an open dataset,
+//  which the window offers only with none open) refuse in words what would be lost until the call carries confirm true, given
+//  only after the person said yes in the chat (the dialog's question asked there, the standard confirm-to-proceed pattern).
 //
 
 import Foundation
@@ -18,6 +21,15 @@ import DSTEMSession
 #endif
 
 extension Mac4DSTEMAgentDoor {
+    /// The `confirm` a tool that throws work away takes: true only once the person said yes in the chat.
+    static let confirmParameter = AgentParameter("confirm", .boolean,
+        summary: "true only after the person said yes in the chat to what the refusal says will be lost.")
+
+    /// The refusal a tool that throws work away answers until the call confirms.
+    static func needsConfirmation(_ loss: String) -> AgentToolOutput {
+        .refusal(status: 409, message: loss + " Ask the person in the chat; if they say yes, call again with confirm true.")
+    }
+
     static let personTools: [AgentTool] = [
         AgentTool(name: "get_settings", title: "Settings",
                   summary: "mac4DSTEM's Settings as the window shows them: General (open behaviour, keep awake, figure size and "
@@ -48,12 +60,18 @@ extension Mac4DSTEMAgentDoor {
         AgentTool(name: "clear_calibration", title: "Clear Calibration",
                   summary: "Returns every calibration value (origin and probe, ellipse, R–Q rotation, Q and R pixel sizes) to Not "
                       + "set, as Clear Calibration does, without reloading; the voltage stays. The orientation map, parallax "
-                      + "alignment and ptychography made with them are discarded; strain and phase maps stay and should be rerun.",
-                  input: .window, acts: true) { call in
+                      + "alignment and ptychography made with them are discarded; strain and phase maps stay and should be rerun. "
+                      + "Clear Calibration asks the person first, so this needs confirm true after the person said yes.",
+                  input: .window, parameters: [confirmParameter], acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
             guard !state.isBusy else { return busyRefusal }
             guard state.calibrationSession.hasAnyCalibrationValue else {
                 return .refusal(status: 409, message: "There is no calibration value to clear.")
+            }
+            guard call.arguments["confirm"] == "true" else {
+                return needsConfirmation("Clear Calibration returns origin and probe, ellipse, R–Q rotation and the Q and R pixel "
+                    + "sizes to Not set, and discards the orientation map, parallax alignment and ptychography made with them; "
+                    + "it cannot be undone except by calibrating again.")
             }
             state.clearCalibrationAndRecord()
             state.statusText = "An agent cleared the calibration."
@@ -61,8 +79,9 @@ extension Mac4DSTEMAgentDoor {
         },
         AgentTool(name: "remove_learned_model", title: "Remove Fine-Tuned Model",
                   summary: "Moves the active fine-tuned detector model to the Trash and makes the bundled model active again, as "
-                      + "Remove Fine-Tuned Model does. Results made with it keep their record of which model made them.",
-                  input: .window, acts: true) { call in
+                      + "Remove Fine-Tuned Model does. Results made with it keep their record of which model made them. "
+                      + "Needs confirm true after the person said yes.",
+                  input: .window, parameters: [confirmParameter], acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
             guard !state.isBusy else { return busyRefusal }
             guard let model = state.learnedDetection.activeModel else {
@@ -70,6 +89,10 @@ extension Mac4DSTEMAgentDoor {
             }
             guard let sha = model.sha256 else {
                 return .refusal(status: 409, message: "No fine-tuned model is active; the bundled model is in use.")
+            }
+            guard call.arguments["confirm"] == "true" else {
+                return needsConfirmation("Remove Fine-Tuned Model moves the active fine-tuned model (\(sha.prefix(8))) to the Trash; "
+                    + "detection uses the bundled model from then on.")
             }
             state.removeActiveFineTunedModel()
             guard state.learnedDetection.activeModel?.sha256 != sha else {
@@ -111,10 +134,15 @@ extension Mac4DSTEMAgentDoor {
         },
         AgentTool(name: "open_demo", title: "Try Demo Data",
                   summary: "Opens the demo, a small synthetic 4D-STEM dataset on which every workspace works, as Try Demo Data does, "
-                      + "replacing the dataset the window shows. Nothing on disk is touched. get_window says when it is in.",
-                  input: .window, acts: true) { call in
+                      + "replacing the dataset the window shows. Nothing on disk is touched. get_window says when it is in. With a "
+                      + "dataset open it needs confirm true after the person said yes, since what is not saved goes with it.",
+                  input: .window, parameters: [confirmParameter], acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
             guard !state.isBusy, !state.datasetSession.isLoading else { return busyRefusal }
+            if let open = state.descriptor, call.arguments["confirm"] != "true" {
+                return needsConfirmation("The demo replaces \(open.fileName) in this window; results not saved to its session "
+                    + "are lost.")
+            }
             state.statusText = "An agent opened the demo data."
             Task { await state.openDemoFixture() }
             return .json(["opening": "demo"])

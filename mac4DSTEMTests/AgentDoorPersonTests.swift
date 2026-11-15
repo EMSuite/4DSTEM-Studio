@@ -83,7 +83,8 @@ final class AgentDoorPersonTests: XCTestCase {
         XCTAssertFalse(names.contains { $0.contains("agent") }, "the agents switches stay the person's: \(names)")
     }
 
-    /// Mutation: clear_calibration not calling Clear Calibration, or not refusing an empty calibration - red.
+    /// Mutation: clear_calibration not calling Clear Calibration, not refusing an empty calibration, or clearing without
+    /// confirm - red.
     func testClearCalibrationClearsAndRefusesWhenThereIsNothing() async throws {
         let state = window()
         door.runsAllowed = true
@@ -93,7 +94,11 @@ final class AgentDoorPersonTests: XCTestCase {
 
         await state.openDemoFixture()   // calibrated
         XCTAssertTrue(state.calibrationSession.hasAnyCalibrationValue)
-        let cleared = try await call("clear_calibration")
+        let unconfirmed = try await call("clear_calibration")
+        XCTAssertTrue(unconfirmed.refused, "Clear Calibration asks first, so the door needs confirm")
+        XCTAssertTrue(unconfirmed.text.contains("confirm true"), unconfirmed.text)
+        XCTAssertNotNil(state.calibrationSession.calibration.qPixelSize, "nothing cleared without confirm")
+        let cleared = try await call("clear_calibration", ["confirm": true])
         XCTAssertFalse(cleared.refused, cleared.text)
         XCTAssertFalse(state.calibrationSession.calibration.hasFittedOrigin)
         XCTAssertNil(state.calibrationSession.calibration.qPixelSize)
@@ -118,5 +123,26 @@ final class AgentDoorPersonTests: XCTestCase {
         if state.learnedDetection.activeModel == nil { XCTAssertTrue(model.text.contains("bundled"), model.text) }
         let reopen = try await call("reopen_without_session")
         XCTAssertTrue(reopen.refused, "the demo has no session to set aside: \(reopen.text)")
+    }
+
+    /// Mutation: open_demo replacing an open dataset without confirm - red.
+    func testTheDemoOverAnOpenDatasetNeedsConfirm() async throws {
+        let state = window()
+        door.runsAllowed = true
+        await state.openDemoFixture()
+        let path = try XCTUnwrap(state.descriptor?.filePath)
+        let unconfirmed = try await call("open_demo")
+        XCTAssertTrue(unconfirmed.refused, "replacing an open dataset loses what is not saved: \(unconfirmed.text)")
+        XCTAssertTrue(unconfirmed.text.contains("confirm true"), unconfirmed.text)
+        XCTAssertEqual(state.descriptor?.filePath, path)
+        XCTAssertFalse(state.activityLog.messages.contains { $0.contains("An agent opened the demo data.") })
+
+        let confirmed = try await call("open_demo", ["confirm": true])
+        XCTAssertFalse(confirmed.refused, confirmed.text)
+        let end = Date().addingTimeInterval(60)
+        while state.isBusy || state.datasetSession.isLoading {
+            if Date() > end { return XCTFail("the demo did not open again") }
+            try await Task.sleep(for: .milliseconds(20))
+        }
     }
 }

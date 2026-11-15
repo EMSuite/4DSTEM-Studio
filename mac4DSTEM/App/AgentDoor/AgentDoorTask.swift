@@ -31,7 +31,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let task = call.arguments["task"].flatMap(AnalysisMode.init(rawValue:))
             let named = call.arguments["workspace"].flatMap(WorkspaceArea.init(rawValue:))
             guard let area = task?.workspaceArea ?? named else {
@@ -68,7 +68,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let product = state.phaseMapping
             if let rule = call.arguments["classifier"].flatMap(PhaseVectorSettings.ClassificationRule.init(rawValue:)),
                rule != product.matching.classificationRule {
@@ -90,7 +90,7 @@ extension Mac4DSTEMAgentDoor {
                       + "three quarters of one, as Scale to This Detector does. Needs a physical Q pixel size (Prepare).",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.phaseVectorResolution != nil else {
                 return .refusal(status: 409, message: state.phaseMappingQScaleRefusal
                     ?? "The Q pixel size is not known, so a detector pixel has no size in Å⁻¹.")

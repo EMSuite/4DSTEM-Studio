@@ -46,7 +46,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.phaseMapping.map != nil else {
                 return .refusal(status: 409, message: "There is no phase map yet; precipitate objects come from Map Phases (run_task).")
             }
@@ -123,7 +123,7 @@ extension Mac4DSTEMAgentDoor {
                                                   + "the dataset's name followed by _objects.")],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let report = state.precipitateObjectReport else {
                 return .refusal(status: 409, message: "There are no precipitate objects yet; they come from Map Phases.")
             }

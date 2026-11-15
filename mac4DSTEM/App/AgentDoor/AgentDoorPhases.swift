@@ -31,7 +31,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let file: URL
             switch folder.resolve(call.arguments["path"] ?? "") {
             case .success(let url): file = url
@@ -75,7 +75,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let product = state.phaseMapping
             guard let index = call.arguments["index"].flatMap(Int.init), product.phases.indices.contains(index) else {
                 return .refusal(status: 404, message: noPhase(call.arguments["index"], product))
@@ -120,7 +120,7 @@ extension Mac4DSTEMAgentDoor {
                                                   + "phase_mapping.phases (from 0).", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let product = state.phaseMapping
             guard let index = call.arguments["index"].flatMap(Int.init), product.phases.indices.contains(index) else {
                 return .refusal(status: 404, message: noPhase(call.arguments["index"], product))

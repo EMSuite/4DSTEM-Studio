@@ -315,6 +315,7 @@ extension AppState {
             return
         }
         errorMessage = Self.errorDetail(error)
+        lastComputeFailure = Self.errorDetail(error)
         statusText = "Error: \(Self.errorDetail(error))"
     }
 

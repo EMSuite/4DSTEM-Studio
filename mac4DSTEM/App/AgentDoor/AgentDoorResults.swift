@@ -78,7 +78,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let descriptor = state.descriptor else { return .refusal(status: 404, message: "This window has no dataset open.") }
             let what = call.arguments["what"] ?? ""
             if what == "figure" {
@@ -164,7 +164,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             if call.arguments["clear"] == "true" { state.clearComparison() }
             let saved = state.sessionInventory.results
             let slots: [(String, ComparisonSlot)] = [("a", .a), ("b", .b)]
@@ -216,7 +216,7 @@ extension Mac4DSTEMAgentDoor {
                   parameters: [AgentParameter("step", .text, summary: "The step's id, from get_lineage.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let step = call.arguments["step"] ?? ""
             if case .failure(let refusal) = state.replay.lineage.rewindPlan(to: step) {
                 return .refusal(status: 404, message: refusal.description)
@@ -229,7 +229,7 @@ extension Mac4DSTEMAgentDoor {
                       + "Full Extent does. It answers at once; get_window says busy until the replay is done.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             state.statusText = "An agent pressed Reopen at Full Extent."
             Task { await state.promoteAndReplayRecipe() }

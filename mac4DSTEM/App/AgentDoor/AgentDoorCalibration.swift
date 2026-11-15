@@ -61,13 +61,14 @@ extension Mac4DSTEMAgentDoor {
             // The R–Q rotation (#275), in py4DSTEM's convention as Prepare's typed rotation. Checked before anything is written.
             let typedRotation = arguments["qr_rotation_deg"].flatMap(Double.init)
             let typedFlip = arguments["qr_flip"].map { $0 == "true" }
-            let rotationInForce = state.calibrationSession.calibration.rotationRad
+            let rotationInForce = state.calibrationSession.calibration.rotationRad.flatMap { $0.isFinite ? $0 : nil }
             if typedFlip != nil, typedRotation == nil, rotationInForce == nil {
                 return .refusal(status: 409, message: "There is no R–Q rotation to transpose: give qr_rotation_deg with qr_flip, or "
                     + "measure one (run_calibration step rotation).")
             }
             if let originX, let originY { state.setManualOrigin(x: Float(originX), y: Float(originY)) }
             if typedRotation != nil || typedFlip != nil {
+                // Finite by the parameter's range or by the guard above, so the session takes it (nothing refused after a write).
                 let degrees = typedRotation ?? RQRotationConvention.displayDegrees(fromApp: rotationInForce ?? 0)
                 let transpose = typedFlip ?? state.calibrationSession.calibration.transposeQR ?? false
                 state.applyManualRotation(py4DSTEMDegrees: degrees, transpose: transpose)

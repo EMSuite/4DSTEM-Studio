@@ -752,4 +752,32 @@ for (type, name) in [(FormatoDataType.uint16, "uint16"), (.uint8, "uint8")] {
     pass("[\(name)] all patterns served from the resident cube, identical, zero reader reads")
 }
 
+// MARK: - The fill reads in small tiles (#305)
+
+// The default fill tile is `FourDArray.fillTileBytes` (64 MiB of what the fill reads), whatever the machine: the
+// transient a fill adds beside the buffer, and what macOS keeps cached after it (#261). An 80-row uint8 cube of 32 x 256 x
+// 256 is 168 MB stored, 2.1 MB per row, so the stored fill takes ceil(80 / 32) = 3 tiles of 32 rows.
+do {
+    let big = DatasetDescriptor(filePath: "synthetic-big", datasetPath: "/synthetic", shape: [80, 32, 256, 256],
+                                dtypeDescription: "uint8", chunkShape: nil)
+    let count = big.shape.reduce(1, *)
+    var raw = Data(count: count)
+    raw.withUnsafeMutableBytes { p in for k in stride(from: 0, to: count, by: 4093) { p[k] = UInt8(truncatingIfNeeded: k >> 5) } }
+    let source = StoredCountingSource(descriptor: big, type: .uint8, bytes: raw)
+    let data = FourDArray(reader: source, descriptor: big)
+    await data.setResidencyRequest(.resident)
+    let rows = await data.fillTileRows()
+    guard rows == FourDArray.fillTileBytes / (32 * 256 * 256), rows == 32 else {
+        fail("the fill tile is \(rows) rows, not the 64 MiB budget")
+    }
+    guard try await data.makeResident(), await data.isResident else { fail("the 168 MB uint8 cube did not go resident") }
+    let tiles = await source.storedTileReads
+    guard tiles == (80 + rows - 1) / rows else { fail("the fill read \(tiles) tiles, expected \((80 + rows - 1) / rows)") }
+    let tile = try await data.scanTile(yRange: 63..<65)
+    let n = 32 * 256 * 256
+    let expected = try! FormatoArray(dataType: .uint8, shape: [2 * n], bytes: raw.subdata(in: (63 * n)..<(65 * n))).float32Values()!
+    guard tile.pixels == expected else { fail("rows 63..<65 (across a tile boundary) out of the small-tile fill differ from the source") }
+    pass("the fill reads \(tiles) tiles of \(rows) rows (64 MiB budget), and the rows land where they belong")
+}
+
 print("virtual-detector-residency: all passed")

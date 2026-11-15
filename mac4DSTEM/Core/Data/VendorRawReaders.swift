@@ -55,6 +55,17 @@ private nonisolated func vendorSlab(
     _ array: any FormatoLazyArray, view: LoadView, viewRows: Range<Int>, viewColumns: Range<Int>,
     detector: (height: Int, width: Int), hasScanY: Bool = true, hasScanX: Bool = true, path: String
 ) throws -> [Float] {
+    let slab = try vendorStoredSlab(array, view: view, viewRows: viewRows, viewColumns: viewColumns, detector: detector,
+                                    hasScanY: hasScanY, hasScanX: hasScanX, path: path)
+    guard let values = slab.float32Values() else { throw VendorRawError.malformed("pixels are not numeric.") }
+    return values
+}
+
+/// The same slab as `vendorSlab`, at the kit array's element type (#260).
+private nonisolated func vendorStoredSlab(
+    _ array: any FormatoLazyArray, view: LoadView, viewRows: Range<Int>, viewColumns: Range<Int>,
+    detector: (height: Int, width: Int), hasScanY: Bool = true, hasScanX: Bool = true, path: String
+) throws -> FormatoArray {
     let cropY = view.readDetectorCrop?.yOffset ?? 0
     let cropX = view.readDetectorCrop?.xOffset ?? 0
     let height = view.readDetectorCrop?.height ?? detector.height
@@ -66,13 +77,16 @@ private nonisolated func vendorSlab(
     else if view.sourceScanX(viewColumns.lowerBound) != 0 || viewColumns.count != 1 { throw VendorRawError.malformed("scan column is out of bounds.") }
     start += [cropY, cropX]; count += [height, width]
     do {
-        guard let values = try array.read(start: start, count: count).float32Values() else {
-            throw VendorRawError.malformed("pixels are not numeric.")
-        }
-        return values
+        return try array.read(start: start, count: count)
     } catch {
         throw VendorRawError.from(error, path: path)
     }
+}
+
+/// An unbinned view's element type from a kit array, as every reader here answers `storedElementType(for:)`.
+private nonisolated func vendorStoredType(_ type: FormatoDataType?, view: LoadView) -> FormatoDataType? {
+    guard view.specification.detectorBin == 1, let type, type.convertsToFloat32 else { return nil }
+    return type
 }
 
 /// The mapped file's disk watch: opened BEFORE the kit maps the file, so it can only belong to the disk the mapping comes from.
@@ -235,6 +249,25 @@ package actor EMPADReader: FourDDataSource {
     package func readDoubleAttribute(_ name: String, onObjectPath path: String) -> Double? { nil }
     package func pixelCalibration() -> PixelCalibration? { nil }
 
+    /// Float32 as stored (EMPAD frames are float32), for an unbinned view.
+    package nonisolated func storedElementType(for view: LoadView) -> FormatoDataType? {
+        vendorStoredType(array.dataType, view: view)
+    }
+
+    package func readStoredScanTile(_ view: LoadView, yRange: Range<Int>) throws -> FourDStoredTile {
+        guard let type = storedElementType(for: view) else { throw FourDDataSourceError.noStoredRead }
+        try view.requireSource(shape: [scanHeight, scanWidth, Self.imageHeight, Self.width])
+        guard yRange.lowerBound >= 0, yRange.upperBound <= view.descriptor.ry, !yRange.isEmpty else {
+            throw VendorRawError.malformed("EMPAD tile is out of bounds.")
+        }
+        try requireDiskAlive()
+        let slab = try vendorStoredSlab(array, view: view, viewRows: yRange, viewColumns: 0..<view.descriptor.rx,
+                                        detector: (Self.imageHeight, Self.width), hasScanY: hasScanY, hasScanX: hasScanX,
+                                        path: rawPath)
+        guard slab.dataType == type else { throw VendorRawError.malformed("pixels are not \(type.rawValue).") }
+        return FourDStoredTile(yRange: yRange, dataType: type, bytes: slab.bytes)
+    }
+
     /// The `filename` attribute of the XML's `raw_file` element, as written.
     private static func rawFileAttribute(_ url: URL) throws -> String {
         let data = try Data(contentsOf: url)
@@ -307,6 +340,8 @@ package actor MIBReader: FourDDataSource {
     private let detectorWidth: Int
     private let dtype: String
     private let source: Source
+    /// The kit array's element type (the stored integer type, `keepStoredType`, #260).
+    private nonisolated let storedType: FormatoDataType
     /// THE LATCH (as `DM4Reader`): set by the first read that finds the disk gone, never cleared.
     private var diskGone = false
 
@@ -318,7 +353,7 @@ package actor MIBReader: FourDDataSource {
             self.path = set.parts[0]
             let watch = try vendorLiveness(path: set.parts[0])
             let kit: FormatoMIB.MIBReader
-            do { kit = try FormatoMIB.MIBReader(set: set) } catch {
+            do { kit = try FormatoMIB.MIBReader(set: set, keepStoredType: true) } catch {
                 let name = URL(fileURLWithPath: set.header).lastPathComponent
                 throw VendorRawError.malformed("This Merlin acquisition (\(set.parts.count) files with \(name)) cannot be read as one scan: \(mibMessage(error)).")
             }
@@ -327,6 +362,7 @@ package actor MIBReader: FourDDataSource {
             (scanHeight, scanWidth, detectorHeight, detectorWidth) = (shape[0], shape[1], shape[2], shape[3])
             dtype = kit.pixelCode
             source = .kit(array: kit.signal.array, liveness: watch)
+            storedType = kit.signal.array.dataType
             return
         }
         self.path = path
@@ -348,7 +384,7 @@ package actor MIBReader: FourDDataSource {
         }
         let kit: FormatoMIB.MIBReader
         // The kit's refusal keeps its kind (unsupported layout, malformed header, unreadable file), as the app's reader gave it.
-        do { kit = try FormatoMIB.MIBReader(path: path, convention: .appScanXY) } catch {
+        do { kit = try FormatoMIB.MIBReader(path: path, convention: .appScanXY, keepStoredType: true) } catch {
             throw VendorRawError.from(error, path: path)
         }
         let shape = kit.signal.array.shape
@@ -356,6 +392,29 @@ package actor MIBReader: FourDDataSource {
         (scanHeight, scanWidth, detectorHeight, detectorWidth) = (shape[0], shape[1], shape[2], shape[3])
         dtype = kit.pixelCode
         source = .kit(array: kit.signal.array, liveness: watch)
+        storedType = kit.signal.array.dataType
+    }
+
+    /// The stored integer type (little-endian, `keepStoredType`) for an unbinned view.
+    package nonisolated func storedElementType(for view: LoadView) -> FormatoDataType? {
+        vendorStoredType(storedType, view: view)
+    }
+
+    package func readStoredScanTile(_ view: LoadView, yRange: Range<Int>) throws -> FourDStoredTile {
+        guard let type = storedElementType(for: view) else { throw FourDDataSourceError.noStoredRead }
+        try view.requireSource(shape: [scanHeight, scanWidth, detectorHeight, detectorWidth])
+        guard yRange.lowerBound >= 0, yRange.upperBound <= view.descriptor.ry, !yRange.isEmpty else {
+            throw VendorRawError.malformed("MIB tile is out of bounds.")
+        }
+        try requireDiskAlive()
+        let slab: FormatoArray
+        switch source {
+        case .kit(let array, _):
+            slab = try vendorStoredSlab(array, view: view, viewRows: yRange, viewColumns: 0..<view.descriptor.rx,
+                                        detector: (detectorHeight, detectorWidth), path: path)
+        }
+        guard slab.dataType == type else { throw VendorRawError.malformed("pixels are not \(type.rawValue).") }
+        return FourDStoredTile(yRange: yRange, dataType: type, bytes: slab.bytes)
     }
 
     package func discoverPrimaryDataset() throws -> DatasetDescriptor {

@@ -106,7 +106,7 @@ func check(round: String, reversed: Bool) {
     for (name, text) in seen { print("[\(label)] \(name) : \(text)") }
 
     for (name, text) in seen {
-        if !text.contains("opening the session sidecar") {
+        if !text.contains("opening the session file") {
             failures.append("[\(label)] \(name): lost the operation name")
         }
         if !text.contains("HDF5 reported:") {

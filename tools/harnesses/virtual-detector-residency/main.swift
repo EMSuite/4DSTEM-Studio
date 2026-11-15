@@ -762,7 +762,9 @@ do {
                                 dtypeDescription: "uint8", chunkShape: nil)
     let count = big.shape.reduce(1, *)
     var raw = Data(count: count)
-    raw.withUnsafeMutableBytes { p in for k in stride(from: 0, to: count, by: 4093) { p[k] = UInt8(truncatingIfNeeded: k >> 5) } }
+    raw.withUnsafeMutableBytes { (p: UnsafeMutableRawBufferPointer) in
+        for k in stride(from: 0, to: count, by: 4093) { p[k] = UInt8(truncatingIfNeeded: k >> 5) }
+    }
     let source = StoredCountingSource(descriptor: big, type: .uint8, bytes: raw)
     let data = FourDArray(reader: source, descriptor: big)
     await data.setResidencyRequest(.resident)

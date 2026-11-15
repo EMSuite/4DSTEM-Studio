@@ -28,8 +28,9 @@ rc=0
 # previous tile), `fast` hands back one ready array (built so the prefetch
 # is finished before the loop awaits it; whether that await then suspends was not
 # separately observed). Both measured flat in S16 (2026-09-30).
-for path in image aperture dp diffraction origins com; do
-  ./harness "$path" || rc=1
-  ./harness "$path" fast || rc=1
+# Not `path`: in zsh that is the array tied to PATH, and the loop left the EXIT trap with no `rm`.
+for pass in image aperture dp diffraction origins com; do
+  ./harness "$pass" || rc=1
+  ./harness "$pass" fast || rc=1
 done
 exit $rc

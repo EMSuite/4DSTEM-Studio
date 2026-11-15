@@ -159,21 +159,25 @@ package enum DPC {
     /// (saturation fixed at 1). Magnitude is normalized to its 99th percentile
     /// so a few hot pixels don't dim the whole map. Returns packed RGBA8.
     package nonisolated static func colorWheelRGBA(com: [Float], width: Int, height: Int) -> RGBAImage {
+        // An empty scan, or a centre-of-mass field shorter than it, draws nothing (`sorted[n - 1]` indexed -1, mac4DSTEM#300).
+        guard width > 0, height > 0, com.count >= 2 * width * height else { return RGBAImage(width: 0, height: 0, rgba: []) }
         let n = width * height
         var rgba = [UInt8](repeating: 255, count: n * 4)
 
-        // Robust magnitude scale.
+        // Robust magnitude scale, over the finite positions only: a NaN centre of mass has no direction and no magnitude.
         var mags = [Float](repeating: 0, count: n)
         for i in 0..<n {
             let cx = com[2 * i], cy = com[2 * i + 1]
             mags[i] = (cx * cx + cy * cy).squareRoot()
         }
-        let sorted = mags.sorted()
-        let p99 = sorted[min(n - 1, Int(Double(n - 1) * 0.99))]
+        let sorted = mags.filter(\.isFinite).sorted()
+        let p99 = sorted.isEmpty ? 0 : sorted[min(sorted.count - 1, Int(Double(sorted.count - 1) * 0.99))]
         let scale = p99 > 0 ? 1 / p99 : 0
 
         for i in 0..<n {
             let cx = com[2 * i], cy = com[2 * i + 1]
+            // A non-finite centre of mass is drawn black (mac4DSTEM#300: its NaN hue trapped in `Int(h6)` and `UInt8`).
+            guard mags[i].isFinite else { rgba[4 * i] = 0; rgba[4 * i + 1] = 0; rgba[4 * i + 2] = 0; continue }
             let hue = atan2(cy, cx) / (2 * .pi) + 0.5      // [0, 1)
             let value = min(mags[i] * scale, 1)
             let (r, g, b) = hsvToRGB(h: hue, s: 1, v: value)
@@ -186,6 +190,7 @@ package enum DPC {
 
     /// Standard HSV→RGB, all components in [0, 1].
     package nonisolated static func hsvToRGB(h: Float, s: Float, v: Float) -> (Float, Float, Float) {
+        guard h.isFinite, s.isFinite, v.isFinite else { return (0, 0, 0) }   // black, not a trap in `Int(h6)` (mac4DSTEM#300)
         let h6 = (h - h.rounded(.down)) * 6            // wrap hue into [0,6)
         let i = Int(h6) % 6
         let f = h6 - Float(Int(h6))

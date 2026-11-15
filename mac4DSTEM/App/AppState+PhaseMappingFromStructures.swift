@@ -75,18 +75,15 @@ extension AppState {
 
         let cancellation = beginCancellableOperation(
             "Phase mapping",
-            status: "Finding the matrix orientation of \(calibrated.vectors.peaks.count) patterns…",
+            status: StructurePhaseMappingStage.matrix.status,
             totalUnits: calibrated.vectors.peaks.count
         )
         defer { finishCancellableOperation(cancellation) }
         let epoch = datasetSession.epoch
+        let stages = StructurePhaseMappingStageLog(starting: .matrix)   // the begin status above named it
         let progress: @Sendable (Double) -> Void = { [weak self] fraction in
             Task { @MainActor [weak self] in
-                guard let self, self.isCurrentOperation(cancellation) else { return }
-                // The kit reports the matrix step up to 0.6; the search and the classification follow.
-                self.updateCancellableOperation(
-                    cancellation, progress: fraction,
-                    status: fraction < 0.6 ? "Finding the matrix orientation…" : "Searching the phases' orientations…")
+                self?.reportStructurePhaseMappingProgress(fraction, cancellation: cancellation, stages: stages)
             }
         }
 
@@ -151,5 +148,59 @@ extension AppState {
         await publishPrecipitateClassificationFromPhaseMap()
         statusText = Self.phaseMapStatusLine(map)
         return .published
+    }
+}
+
+extension AppState {
+    /// One progress report of `mapFromStructures` (mac4DSTEM#333): the bar's fraction, and the stage's name in the status line. A
+    /// new stage is said once through `statusText`, which the Output records, so the bar and the Output always name the same stage.
+    func reportStructurePhaseMappingProgress(
+        _ fraction: Double, cancellation: AnalysisCancellationToken, stages: StructurePhaseMappingStageLog
+    ) {
+        guard isCurrentOperation(cancellation) else { return }
+        let stage = StructurePhaseMappingStage(fraction: fraction)
+        if stages.enter(stage) { statusText = stage.status }
+        updateCancellableOperation(cancellation, progress: fraction, status: stage.status)
+    }
+}
+
+/// The stages of DiffractoKit's `mapFromStructures` by the fraction it reports (DiffractoKit 0.17.0): the matrix orientation up to 0.6,
+/// its regularisation and the removal of the matrix reflections to 0.75, then the two passes, the phases' orientation search to 0.95 and
+/// the variant pass to 1. Before 0.17.0 nothing came between 0.75 and 1, and the bar sat at 49,152 of 65,536 for minutes (#333).
+enum StructurePhaseMappingStage: Equatable, CaseIterable {
+    case matrix, refining, searching, variants
+
+    init(fraction: Double) {
+        switch fraction {
+        case ..<0.6: self = .matrix
+        case ..<0.75: self = .refining
+        case ..<0.95: self = .searching
+        default: self = .variants
+        }
+    }
+
+    var status: String {
+        switch self {
+        case .matrix: "Finding the matrix orientation…"
+        case .refining: "Refining the matrix orientations…"
+        case .searching: "Searching the phases' orientations…"
+        case .variants: "Classifying the phases' variants…"
+        }
+    }
+}
+
+/// The stage a run last named; the kit's reports arrive out of order across workers, so a stage is never named twice or named backwards.
+@MainActor
+final class StructurePhaseMappingStageLog: Sendable {
+    private var current: StructurePhaseMappingStage?
+
+    init(starting: StructurePhaseMappingStage? = nil) { current = starting }
+
+    /// True when `stage` comes after the one last named (and makes it the current one).
+    func enter(_ stage: StructurePhaseMappingStage) -> Bool {
+        let order = StructurePhaseMappingStage.allCases
+        if let current, let now = order.firstIndex(of: current), let next = order.firstIndex(of: stage), next <= now { return false }
+        current = stage
+        return true
     }
 }

@@ -149,9 +149,11 @@ package nonisolated struct LoadPushdown: Equatable, Sendable, Codable {
 nonisolated extension AxisCrop {
     /// Whether this crop fits inside a `height` x `width` source plane.
     package func fits(height: Int, width: Int) -> Bool {
+        // Compared by subtraction: offsets and sizes come from a sidecar JSON, and `yOffset + self.height` overflowed (and trapped)
+        // on a crafted one (mac4DSTEM#300); with every term non-negative, `height - self.height` cannot.
         yOffset >= 0 && xOffset >= 0 && self.height > 0 && self.width > 0
-            && yOffset + self.height <= height
-            && xOffset + self.width <= width
+            && self.height <= height && yOffset <= height - self.height
+            && self.width <= width && xOffset <= width - self.width
     }
 }
 

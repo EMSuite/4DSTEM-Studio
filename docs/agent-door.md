@@ -25,7 +25,12 @@ The door itself (listener, token, Settings section, window list, MCP endpoint) i
 A window is `w1`, `w2`, ... (or none while one window is open). Pictures take `scale` 1...3; the pattern picture is drawn at
 2 or more, as a Retina screen shows the pane, so the disk rings stand out as they do there (#185).
 Every picture and number comes from the code that draws or exports it for the person, so the agent judges what the person sees.
-Text in the door's answers writes numbers with a point whatever the Mac's Region; settings carry the recipe's names (subpixel
+Text the door writes itself (the calibration items, the spot-distortion summary, its own notes) uses a point whatever the
+Mac's Region. The status line, the Output lines and `log_tail` are the window's own text, as the person reads it, so a Mac
+set to German writes "6,5 px" and "189.173 peaks" (189173) there: read numbers from the JSON fields, not from those lines
+(#323). Busy is one answer: `list_windows` and `get_window` both say busy while an operation runs, while a file opens (from
+`open_file`'s answer on, the open's whole-cube pass included) and while the EDS room works; a step that failed after it
+started puts its reason in `operation.error` until the next one begins (#266, #323). Settings carry the recipe's names (subpixel
 `pixel`, `poly`, `multicorr`) in `get_window` and `task_settings` alike; `session.sidecar_unreadable` says why a session file
 beside the dataset could not be read, where `has_sidecar` alone would say there is none (#233).
 
@@ -48,8 +53,8 @@ before each call (MCP marks them as not read-only). One run at a time; Stop in t
 Every one of these writes an Output line that starts "An agent", so the person can tell the agent's values from their own.
 When an action moves a setting the agent did not name, the Output says so: measuring the probe (Build Kernel, a probe radius,
 Calibrate Origin) sets `min_peak_spacing` to fit the probe when nobody has chosen one, and writes "Build Kernel also changed
-disk detection: min_peak_spacing 16 → 4". `get_probe_kernel` carries the disk settings too (#232). Numbers in the door's text use
-a point, whatever the Mac's Region.
+disk detection: min_peak_spacing 16 → 4". `get_probe_kernel` carries the disk settings too (#232). A name or path the agent
+gave stands in those lines in quotes (#310).
 
 ### The Agent folder (batches)
 
@@ -59,7 +64,7 @@ that lead out (`..`, links) are refused.
 | Tool | Does |
 |---|---|
 | `list_agent_folder` | the files in the folder and its subfolders (looks only) |
-| `open_file` | opens one in the window, as File > Open does (needs "Let agents run analyses") |
+| `open_file` | opens one in the window, as File > Open does (needs "Let agents run analyses"); as there, a spectrum image opened in a window that holds a 4D scan, or a 4D file in a window that holds only a spectrum image, opens in a new window, which `list_windows` then names (#323) |
 | `save_result_image` | saves the displayed result there as File > Export > Result Image does, with its provenance; needs "Let agents save results there" too, off by default; a name that exists is refused, so no file is ever replaced |
 
 A batch is a loop: `list_agent_folder`, then for each file `open_file`, the run tools, `save_result_image`.
@@ -146,6 +151,20 @@ Behind "Let agents run analyses", like every tool that acts:
 | `run_calibration` | starts Calibrate Origin, Origin from Bragg Peaks, Fit Ellipse (in the fit annulus given) or Measure R–Q Rotation |
 
 Each answers with the calibration as `get_window` shows it, or says the step started. Clear Calibration stays with the person.
+
+## EDS in the Spectroscopy room (issue #254)
+
+The room is MacEMUI's, shared with macEM, and so are its tools (`EDXAgentTools`, written once and registered by both apps).
+They work on a spectrum image opened alone or beside a 4D scan. `select_task` with workspace `spectroscopy` moves the window
+to the room first.
+
+| Tool | What it does |
+|---|---|
+| `get_eds` | what the room holds: the file, the picked elements and their roles, the region, the kept regions, each line window's net counts with σ, Auto ID's suggestions and, once Quantify has run, the results table (the room's CSV: k-factors, wt% and at% with their uncertainties) or why the fit failed |
+| `set_eds` | picks and removes elements, sets an element's role (quantify or fit only) and chooses the region: the whole map, a rectangle or ellipse in scan pixels, or a kept region by name; behind "Let agents run analyses" |
+| `run_eds` | Auto ID, Quantify or Stop; answers at once, `get_eds` says busy until done; behind "Let agents run analyses" |
+
+`run_task` in the room presses Quantify, as the toolbar does, with or without a 4D scan.
 
 ## Materials Project (issue #297)
 

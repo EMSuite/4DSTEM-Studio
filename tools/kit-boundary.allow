@@ -19,6 +19,7 @@ mac4DSTEM/Core/Data/ResidentCube.swift	Metal	LEFTOVER?: GPU residency / Metal vi
 mac4DSTEM/Core/ML/LearnedDiskDetection.swift	Metal	learned detector (training + refine), stays in the app by decision (D13, ADR 071)
 mac4DSTEM/Core/ML/LearnedDiskDetector.swift	Metal	learned detector (training + refine), stays in the app by decision (D13, ADR 071)
 mac4DSTEM/Session/PhaseMappingProduct.swift	simd	crystal / orientation vectors in SIMD3 and SIMD4 (types shared with DiffractoKit); no own numerics
+mac4DSTEM/Session/PhaseOrientationField.swift	simd	crystal / orientation matrices in simd_double3x3 (types shared with DiffractoKit); the kit colours them, no own numerics
 mac4DSTEM/Session/SystemMonitor.swift	Metal	reads the GPU name and memory for the status line
 mac4DSTEM/Training/DetectorGraph.swift	MetalPerformanceShadersGraph,+symbols	learned detector (training + refine), stays in the app by decision (D13, ADR 071)
 mac4DSTEM/Training/DetectorTrainer.swift	Metal,MetalPerformanceShadersGraph,+symbols	learned detector (training + refine), stays in the app by decision (D13, ADR 071)
@@ -46,6 +47,7 @@ mac4DSTEMTests/MonoclinicOrientationTests.swift	simd	test of display, residency 
 mac4DSTEMTests/PhaseDiskClaimsTests.swift	simd	test of display, residency or detector GPU path, or of simd-typed kit calls
 mac4DSTEMTests/PhaseMapAppTests.swift	simd	test of display, residency or detector GPU path, or of simd-typed kit calls
 mac4DSTEMTests/PhaseMappingReproductionTests.swift	simd	test of display, residency or detector GPU path, or of simd-typed kit calls
+mac4DSTEMTests/PhaseOrientationMapTests.swift	simd	test of the per-position orientation field and its picture on kit orientation matrices; no own numerics
 mac4DSTEMTests/ProbeSizeTests.swift	Metal	test of display, residency or detector GPU path, or of simd-typed kit calls
 tools/harnesses/resident-cropped-view/main.swift	Metal	harness: GPU or simd types for the check it runs
 tools/harnesses/tiled-detection-memory-test/main.swift	Metal	harness: GPU or simd types for the check it runs

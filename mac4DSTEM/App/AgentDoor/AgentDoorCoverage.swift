@@ -161,6 +161,8 @@ enum AgentDoorCoverage {
         "phaseMapping.savedRun": .seen,
         "phaseMapping.scaleToDetector": .tool("scale_phase_matching_to_detector"),
         "phaseMapping.showDistance": .tool("set_precipitates"),
+        "phaseMapping.showOrientation": .gap(391),
+        "phaseMapping.orientationPhase": .gap(391),
         "phaseMapping.typedZones": .tool("set_phase_mapping"),
         "phaseMapping.zoneAxisStale": .seen,
         "precipitates.compositionCoverage": .seen,
@@ -269,7 +271,7 @@ enum AgentDoorCoverage {
         "sidebar.session.explainer": .seen,
         "sidebar.session.result": .seen,
         "sidebar.session.sidecar": .seen,
-        "spectroscopy.tool.\\(tool.rawValue)": .personOnly("Spectroscopy room: macEM's EDS tools, not this door yet"),
+        "spectroscopy.tool.\\(tool.rawValue)": .tool("select_task"),   // the EDS room's own controls: get_eds, set_eds, run_eds (#254)
         "strain.basis": .tool("set_strain"),
         "strain.component": .tool("set_strain"),
         "strain.diagnostics.basisFit": .seen,

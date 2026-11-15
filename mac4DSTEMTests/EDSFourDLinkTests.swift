@@ -141,7 +141,7 @@ final class EDSFourDLinkTests: XCTestCase {
 
         var labels = [Int32](repeating: 0, count: 32 * 32)
         for y in 1...6 { for x in 1...6 { labels[y * 32 + x] = 1 } }          // 36 px of matrix, clear of the blob
-        let objects = PrecipitateSegmentation.classObjects(labels: labels, width: 32, height: 32,
+        let objects = try PrecipitateSegmentation.classObjects(labels: labels, width: 32, height: 32,
                                                            roles: .init(precipitateClasses: [1], matrix: [0], notIndexed: [9]), pixelSize: nil, pixelUnit: nil)
         let id = try XCTUnwrap(objects.classes.first?.objects.first?.id)
         let registration = PoolCatalogue.identityRegistration(width: 32, height: 32)

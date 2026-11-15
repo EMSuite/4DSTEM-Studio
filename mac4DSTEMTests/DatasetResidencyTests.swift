@@ -21,6 +21,16 @@ import DSTEMSession
 @MainActor
 final class DatasetResidencyTests: XCTestCase {
 
+    /// A crafted HDF5 shape whose float32 byte count overflows an Int reads as `Int.max`, never a trap (mac4DSTEM#300).
+    func testAShapeThatOverflowsCountsAsTooLargeInsteadOfTrapping() {
+        let huge = DatasetDescriptor(filePath: "/nonexistent/crafted.h5", datasetPath: "/data",
+                                     shape: [1 << 20, 1 << 20, 1 << 20, 1 << 20], dtypeDescription: "uint16", chunkShape: nil)
+        XCTAssertEqual(huge.byteCountAsFloat32, Int.max)
+        let ordinary = DatasetDescriptor(filePath: "/nonexistent/ok.h5", datasetPath: "/data",
+                                         shape: [2, 3, 4, 5], dtypeDescription: "uint16", chunkShape: nil)
+        XCTAssertEqual(ordinary.byteCountAsFloat32, 2 * 3 * 4 * 5 * 4)
+    }
+
     private func demoArray() async throws -> (FourDArray, DatasetDescriptor) {
         let source = DemoFourDDataSource()
         let descriptor = try await source.discoverPrimaryDataset()

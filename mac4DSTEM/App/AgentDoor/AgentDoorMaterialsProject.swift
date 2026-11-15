@@ -81,7 +81,7 @@ extension Mac4DSTEMAgentDoor {
                   parameters: [AgentParameter("as", .choice(["phase", "acom"]), summary: "Where the model goes (default phase).")],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard case .done(_, let outcome)? = materialsProjectFetches[ObjectIdentifier(state)] else {
                 return .refusal(status: 409, message: "No finished fetch: fetch_materials_project, then wait for "
                     + "get_materials_project.")

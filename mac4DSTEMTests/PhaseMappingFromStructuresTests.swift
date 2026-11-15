@@ -118,8 +118,14 @@ final class PhaseMappingFromStructuresTests: XCTestCase {
         state.phaseMapping.add(beta)
         XCTAssertEqual(state.phaseMapping.orientationSource, .structures)
         state.navigation.analysisMode = .phaseMapping
+        let logged = state.activityLog.messages.count
         let outcome = await state.runPhaseMapping()
         XCTAssertEqual(outcome, .published, state.statusText)
+        // mac4DSTEM#333: the kit reports through its two passes (DiffractoKit 0.17.0), so the Output names every stage in order,
+        // the two after 0.75 included. Before, the run went silent at 0.75 (49,152 of 65,536) until it finished.
+        let stagesSaid = state.activityLog.messages.dropFirst(logged)
+            .compactMap { line in StructurePhaseMappingStage.allCases.first { line.hasSuffix($0.status) }?.status }
+        XCTAssertEqual(stagesSaid, StructurePhaseMappingStage.allCases.map(\.status))
         let map = try XCTUnwrap(state.phaseMapping.map, state.statusText)
         let run = try XCTUnwrap(state.phaseMapping.lastRun)
         XCTAssertEqual(run.orientationSource, .structures)

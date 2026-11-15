@@ -1030,7 +1030,8 @@ extension AppState {
     /// What a finished map says about itself when it found nothing, or nil.
     var phaseMappingDiagnosis: String? {
         guard let map = phaseMapping.map else { return nil }
-        return PhaseMapPresentation.diagnosis(map, resolution: phaseVectorResolution)
+        return PhaseMapPresentation.diagnosis(map, resolution: phaseVectorResolution,
+                                             distortionCorrected: calibrationSession.calibration.hasEllipse)
     }
 
     /// The evidence for the scan position the user is looking at, in one line.

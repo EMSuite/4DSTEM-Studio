@@ -239,6 +239,7 @@
 				Session/PhaseContrastProduct.swift,
 				Session/PhaseMapObjectsBridge.swift,
 				Session/PhaseMappingProduct.swift,
+				Session/PhaseOrientationField.swift,
 				Session/PhaseSetupRecord.swift,
 				Session/PoolCatalogue.swift,
 				Session/PrecipitateClassificationProduct.swift,

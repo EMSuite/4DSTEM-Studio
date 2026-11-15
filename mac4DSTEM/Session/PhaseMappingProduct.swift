@@ -202,12 +202,25 @@ extension PhaseMappingSlot {
 /// Map Phases again (drive 2026-09-30).
 package enum PhaseResultPicture: Sendable, Equatable {
     case phaseMap, objects, distance
+    /// The orientation map of one phase (IPF-Z), from a run from the structures (#293).
+    case orientation
+
+    /// The product kind of each picture.
+    package var productKind: String {
+        switch self {
+        case .phaseMap: "phase_map"
+        case .objects: "precipitate_objects"
+        case .distance: "phase_match_distance"
+        case .orientation: "phase_orientation_ipf_z"
+        }
+    }
 
     package init?(productKind: String?) {
         switch productKind {
         case "phase_map": self = .phaseMap
         case "precipitate_objects": self = .objects
         case "phase_match_distance": self = .distance
+        case "phase_orientation_ipf_z": self = .orientation
         default: return nil
         }
     }
@@ -234,6 +247,8 @@ package enum PhaseResultPicture: Sendable, Equatable {
                                       systemImage: "circle.hexagongrid", target: .objects)
         case .distance: return Control(title: "Show Match Distance",
                                        systemImage: "ruler", target: .distance)
+        case .orientation: return Control(title: "Show Orientation",
+                                          systemImage: "cube.transparent", target: .orientation)
         }
     }
 }
@@ -362,6 +377,10 @@ package final class PhaseMappingProduct {
     /// What a run from the structures found beside the map: the matrix orientations, the learned relationships, the
     /// free-search verdicts. nil for a typed-zones run. It dies with the run, as the library does.
     package private(set) var lastStructureRun: StructurePhaseMapping?
+    /// The phase whose orientation map "Show Orientation" draws (an index into the phase list); nil is the first candidate.
+    /// A display choice, not a setting of the run: it is not part of the run's identity and survives a new run while the
+    /// phase stays in the list.
+    package var orientationPhase: Int?
 
     package struct RunRecord: Sendable, Equatable {
         package init(phaseSignature: String, reference: PhaseReferenceSettings,

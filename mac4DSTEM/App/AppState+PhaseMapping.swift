@@ -575,7 +575,70 @@ extension AppState {
         case .phaseMap: publishPhaseMapProduct()
         case .objects: publishPrecipitateObjectsProduct()
         case .distance: publishPhaseDistanceProduct()
+        case .orientation: publishPhaseOrientationProduct()
         }
+    }
+
+    /// Phase and orientation at every position of the run on screen (#293): from a run from the structures whose phase list
+    /// is still the run's; nil for a typed-zones run, a stale list, or none.
+    var phaseOrientationField: PhaseOrientationField? {
+        guard let run = phaseMapping.lastStructureRun, let map = phaseMapping.map, !phaseMapping.isStale,
+              phaseMapping.phases.count == map.phaseNames.count else { return nil }
+        var next = 0
+        let candidateIndex: [Int?] = phaseMapping.phases.map { slot in
+            if slot.isMatrix { return nil }
+            defer { next += 1 }
+            return next
+        }
+        return PhaseOrientationField.make(structureRun: run, map: map, candidateIndex: candidateIndex)
+    }
+
+    /// The phase "Show Orientation" draws: the chosen one while it is in the map, else the first candidate, else the matrix.
+    var resolvedOrientationPhase: Int? {
+        guard let map = phaseMapping.map, !map.phaseNames.isEmpty else { return nil }
+        if let chosen = phaseMapping.orientationPhase, map.phaseNames.indices.contains(chosen) { return chosen }
+        return map.phaseNames.indices.first { $0 != map.matrixPhaseIndex } ?? map.matrixPhaseIndex
+    }
+
+    /// Why there is no orientation map for the run on screen, or nil when there is one.
+    var phaseOrientationBlocker: String? {
+        guard phaseMapping.map != nil, let run = phaseMapping.lastRun else { return "Map Phases first." }
+        guard run.orientationSource == .structures else {
+            return "Orientations per position come from a run with the orientations found from the structures."
+        }
+        return phaseOrientationField == nil ? "The phase list changed since the run: map the phases again." : nil
+    }
+
+    /// Choose the phase whose orientation map is drawn, and redraw it when it is on screen.
+    func selectOrientationPhase(_ phase: Int) {
+        phaseMapping.orientationPhase = phase
+        if displayedProduct?.kind == PhaseResultPicture.orientation.productKind { publishPhaseOrientationProduct() }
+    }
+
+    /// The orientation map of one phase (IPF-Z: the beam direction in the crystal, the phase's own key), every other phase's
+    /// positions grey and hatched. Categorical: the colours are directions, not quantities.
+    func publishPhaseOrientationProduct() {
+        guard let map = phaseMapping.map, let run = phaseMapping.lastRun, let field = phaseOrientationField,
+              let phase = resolvedOrientationPhase, field.phaseNames.indices.contains(phase) else { return }
+        let own = scanMapPersistenceMetadata(for: .phaseMapping)
+        let symmetry = field.symmetries[phase]
+        var extra = phaseProvenance(map: map, run: run)
+        extra["quantitative_status"] = "categorical"
+        extra["orientation_phase"] = field.phaseNames[phase]
+        extra["orientation_symmetry"] = symmetry.laueClass.symbol
+        extra["orientation_positions"] = String(field.count(of: phase))
+        extra["ipf_direction"] = "beam (z)"
+        publishProduct(
+            kind: PhaseResultPicture.orientation.productKind,
+            displayName: "Orientation of \(field.phaseNames[phase]) (IPF-Z)",
+            valueUnits: "orientation",
+            payload: .rgba(field.ipfZImage(phase: phase)),
+            validityMask: field.validity(phase: phase),
+            domain: .scan,
+            sampling: ProductSampling(row: own.row, column: own.column, units: own.units),
+            extraProvenance: own.provenance.merging(extra) { _, new in new },
+            ownProvenanceOnly: true
+        )
     }
 
     /// The distance companion: how far, in Å⁻¹, the winning phase's reference

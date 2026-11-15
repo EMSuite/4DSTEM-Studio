@@ -161,6 +161,8 @@ enum AgentDoorCoverage {
         "phaseMapping.savedRun": .seen,
         "phaseMapping.scaleToDetector": .tool("scale_phase_matching_to_detector"),
         "phaseMapping.showDistance": .tool("set_precipitates"),
+        "phaseMapping.showOrientation": .gap(391),
+        "phaseMapping.orientationPhase": .gap(391),
         "phaseMapping.typedZones": .tool("set_phase_mapping"),
         "phaseMapping.zoneAxisStale": .seen,
         "precipitates.compositionCoverage": .seen,

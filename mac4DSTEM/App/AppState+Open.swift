@@ -1,5 +1,7 @@
 import ShellLayout
 import Foundation
+import Metal
+import ShellMetal
 #if canImport(DSTEMCore)
 import DSTEMCore
 import DSTEMSession
@@ -64,6 +66,7 @@ extension AppState {
                     accessedSecurityScope: accessed,
                     fileByteCount: size?.intValue
                 )
+                pending.heldElsewhere = residency.bytesHeldElsewhere()
                 let pendingEpoch = datasetSession.epoch
                 // Sample the full source through the pending array's shared cache.
                 // Both open paths report determinate progress for the same epoch.
@@ -444,7 +447,7 @@ extension AppState {
         reader: any FourDDataSource,
         specification: LoadSpecification = .fullExtent,
         runInitialAnalysis: Bool = true,
-        keepInMemory: Bool = false,
+        keepInMemory: Bool? = nil,
         initialScan: ScanPos? = nil
     ) async {
         guard sourceDescriptor.is4D else {
@@ -940,10 +943,31 @@ extension AppState {
     /// Does nothing visible when the cube is not admitted, which today is
     /// always — the shipped default request is `.streamed` (`.automatic` was
     /// dropped, v2 S3), and nothing in the UI requests `.resident` yet.
-    private func preloadResidentCube(keepInMemory: Bool = false) async {
+    /// `keepInMemory` nil: the default rule decides (#314), a cube whose held size fits a quarter of the RAM beside what
+    /// other windows hold is kept; true or false: the configurator's switch, as the person set it.
+    private func preloadResidentCube(keepInMemory choice: Bool? = nil) async {
         guard let fourD = datasetSession.fourD, let d = descriptor else { return }
         let totalPatterns = d.ry * d.rx
         guard totalPatterns > 0 else { return }
+        let cubeBytes = fourD.residentByteCountIfHeld
+        let elsewhere = residency.bytesHeldElsewhere()
+        let physical = ProcessInfo.processInfo.physicalMemory
+        let refused = KeepInMemoryDecision.decide(
+            cubeBytes: cubeBytes, limitBytes: UInt64(MetalEngine.shared.device.recommendedMaxWorkingSetSize),
+            maxBufferBytes: UInt64(MetalEngine.shared.device.maxBufferLength), physicalMemory: physical
+        ) == .refused
+        let keepInMemory: Bool
+        if refused {
+            keepInMemory = false
+            residency.explain("Streaming: \(displayByteString(cubeBytes)) is above what this Mac's GPU can hold in one buffer.")
+        } else if let choice {
+            keepInMemory = choice
+            residency.explain(choice ? "Kept in memory: Keep in memory was on when it was opened."
+                                     : "Streaming: Keep in memory was off when it was opened.")
+        } else {
+            keepInMemory = KeepInMemoryDecision.keepsByDefault(cubeBytes: cubeBytes, heldElsewhere: elsewhere, physicalMemory: physical)
+            residency.explain(KeepInMemoryDecision.defaultReason(cubeBytes: cubeBytes, heldElsewhere: elsewhere, physicalMemory: physical))
+        }
         // What one position takes in memory: the stored bit depth (#260), not Float32.
         let heldBytesPerPattern = fourD.residentByteCountIfHeld / totalPatterns
         // The per-open "Keep in memory" switch is the only caller that asks

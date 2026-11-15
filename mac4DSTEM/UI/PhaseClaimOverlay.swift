@@ -324,10 +324,23 @@ struct PhaseClaimLayer: View {
         let scan = y * map.width + x
         guard appState.fitOverlays.storedPeaksAtSelection.count == raw.peaks[scan].count else { return }
 
-        // A map made from the structures has no reference-library entry per position to replay (mac4DSTEM#184); which
-        // phase claims which disk is not drawn for it yet, and saying "run again" would send the user in a circle.
-        guard run.orientationSource == .typedZones else {
-            note = "Claimed disks are drawn for typed zone axes only"
+        // A map made from the structures has no reference-library entry per position to replay (mac4DSTEM#184): the kit
+        // replays the run from the orientations it found and what its removal took (`StructurePhaseMapping.claims`, #295).
+        if run.orientationSource == .structures {
+            let slots = phaseMapping.phases
+            guard let structureRun = phaseMapping.lastStructureRun,
+                  let matrixSlot = slots.firstIndex(where: \.isMatrix) else {
+                note = "The run's orientations are not kept for this map — run again"
+                return
+            }
+            let calibrated = appState.calibratedBraggVectors(raw, descriptor: descriptor, positions: [scan])
+            // The peaks exactly as the run was handed them (`runPhaseMappingFromStructures`: the calibrated phase scan).
+            let peaks = calibrated.vectors.peaks[scan].map(\.phaseScanPosition)
+            guard let listed = PhaseMappingProduct.claimsInListOrder(
+                structureRun.claims(at: scan, peaks: peaks), matrixSlot: matrixSlot,
+                candidateSlots: slots.indices.filter { !slots[$0].isMatrix }) else { return }
+            claims = listed
+            claimedPeakCount = peaks.count
             return
         }
         // The run's own library, kept by the product when it published: nothing

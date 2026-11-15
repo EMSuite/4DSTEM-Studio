@@ -41,8 +41,18 @@ package nonisolated struct DatasetDescriptor: Identifiable, Hashable {
     package nonisolated var qy: Int { is4D ? shape[2] : 0 }
     package nonisolated var qx: Int { is4D ? shape[3] : 0 }
 
-    /// Bytes if the full cube were resident as float32.
-    package nonisolated var byteCountAsFloat32: Int { shape.reduce(1, *) * 4 }
+    /// Bytes if the full cube were resident as float32; `Int.max` when that does not fit an Int (a crafted HDF5 shape, mac4DSTEM#300),
+    /// which every admission check reads as "does not fit".
+    package nonisolated var byteCountAsFloat32: Int {
+        var bytes = 4
+        for extent in shape {
+            guard extent >= 0 else { return Int.max }
+            let (next, overflow) = bytes.multipliedReportingOverflow(by: extent)
+            if overflow { return Int.max }
+            bytes = next
+        }
+        return bytes
+    }
 
     package nonisolated var shapeString: String { shape.map(String.init).joined(separator: " x ") }
 

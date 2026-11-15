@@ -23,7 +23,7 @@ extension Mac4DSTEMAgentDoor {
             return .failure(ToolRefusal(status: 403, message: "Saving is off. Ask the person to turn on \"Let agents save results "
                 + "there\" in mac4DSTEM's Settings > Agents."))
         }
-        guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: AgentFolder.noFolder)) }
+        guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: folder.missingMessage)) }
         switch fileName(given, default: fallback, extension: ext) {
         case .failure(let refusal): return .failure(ToolRefusal(status: 400, message: refusal.message))
         case .success(let name):
@@ -32,6 +32,24 @@ extension Mac4DSTEMAgentDoor {
                 return .failure(ToolRefusal(status: 409, message: "\(name) exists in the Agent folder and is never replaced: choose another name."))
             }
             return .success(target)
+        }
+    }
+
+    /// Writes a new file of the Agent folder that a writer makes by path (HDF5), as exclusively as `Data.write(.withoutOverwriting)`
+    /// writes the PNGs (#310): the writer fills a file in a scratch folder on the same volume, which then takes `target`'s name
+    /// with `renamex_np(RENAME_EXCL)`, so a file or link that appeared at `target` after the check is never replaced or followed.
+    nonisolated static func writeNewFile(at target: URL, _ write: (URL) throws -> Void) throws {
+        let scratchFolder = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask,
+                                                        appropriateFor: target.deletingLastPathComponent(), create: true)
+        defer { try? FileManager.default.removeItem(at: scratchFolder) }   // try? OK: a leftover scratch folder holds no result
+        let scratch = scratchFolder.appendingPathComponent(target.lastPathComponent)
+        try write(scratch)
+        guard renamex_np(scratch.path, target.path, UInt32(RENAME_EXCL)) == 0 else {
+            let code = errno
+            if code == EEXIST {
+                throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: target.path])
+            }
+            throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
         }
     }
 
@@ -139,8 +157,10 @@ extension Mac4DSTEMAgentDoor {
                 defer { state.finishCancellableOperation(token) }
                 do {
                     try await Task.detached(priority: .userInitiated) {
-                        try BraggVectorEMDWriter.writeScientificBundle(maps: maps, calibration: calibration, to: target,
-                                                                       sourcePath: source, cancellation: token)
+                        try Mac4DSTEMAgentDoor.writeNewFile(at: target) { scratch in
+                            try BraggVectorEMDWriter.writeScientificBundle(maps: maps, calibration: calibration, to: scratch,
+                                                                           sourcePath: source, cancellation: token)
+                        }
                     }.value
                     guard state.isCurrentOperation(token) else { return }
                     state.recordExportRun(format: what == "bundle" ? "emd_scientific_bundle" : "emd_realslice",

@@ -12,6 +12,7 @@
 
 import Foundation
 import ShellAgentDoor
+import ShellEDXModel
 #if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
 import DSTEMCore
 import DSTEMSession
@@ -72,6 +73,17 @@ extension Mac4DSTEMAgentDoor {
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
             guard !state.agentBusy else { return busyRefusal }
+            // The Spectroscopy room's Quantify runs on a spectrum image alone (#254), as the toolbar's does.
+            if state.navigation.workspaceArea == .spectroscopy {
+                guard state.hasSpectrumImage else {
+                    return .refusal(status: 404, message: "No spectrum image is open in the EDS room; open one first.")
+                }
+                guard !state.edx.isBusy else { return busyRefusal }
+                if let blocker = state.edx.quantifyBlocker { return .refusal(status: 409, message: blocker) }
+                state.statusText = "An agent started Run (Quantify)."
+                Task { await state.runPrimaryWorkspaceTask() }
+                return .json(["started": "Quantify"])
+            }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             guard state.hasPrimaryWorkspaceTask else {
                 return .refusal(status: 409, message: "The current task has nothing to run (\(state.navigation.analysisMode.rawValue)).")

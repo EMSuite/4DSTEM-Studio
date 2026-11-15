@@ -23,23 +23,48 @@ final class AgentFolder {
         url = Self.canonical(folder)
     }
 
-    /// The folder a bookmark names, opened for this app until it changes; none when the bookmark is nil or stale.
-    func use(bookmark: Data?) {
+    /// Why a chosen folder is not open (its bookmark no longer resolves, or macOS refused its access); nil while it is, or none
+    /// is chosen.
+    private(set) var unavailableReason: String?
+
+    /// The folder a bookmark names, opened for this app until it changes; none when the bookmark is nil or no longer resolves
+    /// (`unavailableReason` says so). A bookmark that resolves but is stale (the folder moved or was renamed) is made again
+    /// and answered, for the caller to keep in place of the old one, as `CompanionFolderAccess` does (#310).
+    @discardableResult
+    func use(bookmark: Data?) -> Data? {
         if scoped { url?.stopAccessingSecurityScopedResource() }
         scoped = false
         url = nil
-        guard let bookmark else { return }
+        unavailableReason = nil
+        guard let bookmark else { return nil }
         var stale = false
-        guard let resolved = try? URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope],
-                                      relativeTo: nil, bookmarkDataIsStale: &stale) else { return }
+        let resolved: URL
+        do {
+            resolved = try URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope, .withoutUI],
+                               relativeTo: nil, bookmarkDataIsStale: &stale)
+        } catch {
+            unavailableReason = "The Agent folder chosen in Settings > Agents can no longer be found (\(error.localizedDescription)). "
+                + "Ask the person to choose it again."
+            return nil
+        }
         scoped = resolved.startAccessingSecurityScopedResource()
+        // Outside the sandbox (tests, tools) there is no scope to start; what matters is that the folder can be reached.
+        guard scoped || (try? resolved.checkResourceIsReachable()) == true else {
+            unavailableReason = "macOS no longer lets mac4DSTEM open the Agent folder \(resolved.lastPathComponent). Ask the person "
+                + "to choose it again in Settings > Agents."
+            return nil
+        }
         url = Self.canonical(resolved)
+        guard stale else { return nil }
+        // try? OK: without a fresh bookmark the stale one still resolves this launch; Settings asks again once it stops.
+        return try? resolved.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
     }
 
     /// A folder already open to the app, without a bookmark (tests).
     func use(folder: URL?) {
         if scoped { url?.stopAccessingSecurityScopedResource() }
         scoped = false
+        unavailableReason = nil
         url = folder.map(Self.canonical)
     }
 
@@ -61,9 +86,12 @@ final class AgentFolder {
 
     static let noFolder = "No Agent folder is chosen. Ask the person to choose one in mac4DSTEM's Settings > Agents > Agent folder."
 
+    /// What a tool answers while no folder is open: none chosen, or the reason the chosen one is not open.
+    var missingMessage: String { unavailableReason ?? Self.noFolder }
+
     /// `path`, relative to the folder, as a URL inside it; or the sentence that says why not.
     func resolve(_ path: String) -> Result<URL, AgentFolderRefusal> {
-        guard let url else { return .failure(AgentFolderRefusal(Self.noFolder)) }
+        guard let url else { return .failure(AgentFolderRefusal(missingMessage)) }
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.hasPrefix("/"), !trimmed.hasPrefix("~") else {
             return .failure(AgentFolderRefusal("Name the file relative to the Agent folder, as list_agent_folder shows it."))

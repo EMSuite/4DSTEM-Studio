@@ -137,11 +137,18 @@ extension Mac4DSTEMAgentDoor {
         },
     ]
 
-    /// A text file of the Agent folder, read whole.
+    /// The largest text file an agent may hand the app (a CIF, a thickness table): read on the main actor, so bounded (#310).
+    static let agentTextByteLimit = 8 * 1024 * 1024
+
+    /// A text file of the Agent folder, read whole; one larger than `agentTextByteLimit` is refused unread.
     static func readAgentText(_ path: String) -> Result<String, ToolRefusal> {
         switch folder.resolve(path) {
         case .failure(let refusal): return .failure(ToolRefusal(status: 404, message: refusal.message))
         case .success(let url):
+            if let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize, size > agentTextByteLimit {
+                return .failure(ToolRefusal(status: 413, message: "\(path) is \(size / 1_048_576) MB; a text file the door reads is "
+                    + "at most \(agentTextByteLimit / 1_048_576) MB."))
+            }
             guard let text = try? String(contentsOf: url, encoding: .utf8) else {
                 return .failure(ToolRefusal(status: 404, message: "There is no readable text file \(path) in the Agent folder."))
             }

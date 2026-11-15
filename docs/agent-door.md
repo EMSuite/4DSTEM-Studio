@@ -151,3 +151,17 @@ Behind "Let agents run analyses", like every tool that acts:
 | `run_calibration` | starts Calibrate Origin, Origin from Bragg Peaks, Fit Ellipse (in the fit annulus given) or Measure R–Q Rotation |
 
 Each answers with the calibration as `get_window` shows it, or says the step started. Clear Calibration stays with the person.
+
+## EDS in the Spectroscopy room (issue #254)
+
+The room is MacEMUI's, shared with macEM, and so are its tools (`EDXAgentTools`, written once and registered by both apps).
+They work on a spectrum image opened alone or beside a 4D scan. `select_task` with workspace `spectroscopy` moves the window
+to the room first.
+
+| Tool | What it does |
+|---|---|
+| `get_eds` | what the room holds: the file, the picked elements and their roles, the region, the kept regions, each line window's net counts with σ, Auto ID's suggestions and, once Quantify has run, the results table (the room's CSV: k-factors, wt% and at% with their uncertainties) or why the fit failed |
+| `set_eds` | picks and removes elements, sets an element's role (quantify or fit only) and chooses the region: the whole map, a rectangle or ellipse in scan pixels, or a kept region by name; behind "Let agents run analyses" |
+| `run_eds` | Auto ID, Quantify or Stop; answers at once, `get_eds` says busy until done; behind "Let agents run analyses" |
+
+`run_task` in the room presses Quantify, as the toolbar does, with or without a 4D scan.

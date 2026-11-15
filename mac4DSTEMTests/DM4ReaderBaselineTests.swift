@@ -294,6 +294,23 @@ final class DM4ReaderBaselineTests: XCTestCase {
         try check(frozen, fixture: "synthetic")
     }
 
+    /// A rank-3 object whose "Scan shape X/Y" tags are not finite whole numbers is refused as having no datacube, never a trap
+    /// (mac4DSTEM#300: the app's own tag read did `Int(value)`, which traps on NaN and infinity).
+    func testARank3ObjectWithANonFiniteScanShapeIsRefused() async throws {
+        for (name, shape) in [("nan", (x: Float.nan, y: Float(3))), ("infinite", (x: Float.infinity, y: Float(3))),
+                              ("fractional", (x: Float(2.5), y: Float(4.8)))] {
+            let url = directory.appendingPathComponent("rank3-\(name).dm4")
+            try Self.build(Case(name: name, type: "uint16", dims: [3, 2, 12], scanShape: shape)).write(to: url)
+            do {
+                _ = try await DM4Reader(path: url.path)
+                XCTFail("\(name): a rank-3 object with a \(name) scan shape opened")
+            } catch DM4Error.noDatacube {
+            } catch {
+                XCTFail("\(name): refused with \(error), not as having no datacube")
+            }
+        }
+    }
+
     func testRefusalsKeepTheirKinds() async throws {
         var results = [String: [String: Any]]()
         func kind(_ name: String, _ data: Data) async throws {

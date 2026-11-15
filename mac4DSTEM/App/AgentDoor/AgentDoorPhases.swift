@@ -52,7 +52,7 @@ extension Mac4DSTEMAgentDoor {
             let product = state.phaseMapping
             if call.arguments["is_matrix"] == "true" { markMatrix(product.phases.count - 1, in: product) }
             let role = product.phases.last?.isMatrix == true ? " as the matrix" : ""
-            state.statusText = "An agent added the phase \(model.displayName)\(role) from \(file.lastPathComponent)."
+            state.statusText = "An agent added the phase \(quotedAgentText(model.displayName))\(role) from \(quotedAgentText(file.lastPathComponent))."
             return .json(phaseMappingSettings(of: state))
         },
         AgentTool(name: "set_phase", title: "Change a phase",
@@ -127,7 +127,7 @@ extension Mac4DSTEMAgentDoor {
             }
             let slot = product.phases[index]
             state.removePhaseMappingSlot(slotID: slot.slotID)
-            state.statusText = "An agent removed the phase \(slot.model.displayName)."
+            state.statusText = "An agent removed the phase \(quotedAgentText(slot.model.displayName))."
             return .json(phaseMappingSettings(of: state))
         },
     ]

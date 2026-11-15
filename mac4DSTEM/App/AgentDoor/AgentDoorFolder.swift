@@ -26,6 +26,12 @@ extension Mac4DSTEMAgentDoor {
     /// Whether the person lets agents write into the Agent folder (Settings > Agents).
     static var savesAllowed = false
 
+    /// The windows an agent's `open_file` is opening, from the tool's answer until the open returns.
+    static var opening: Set<ObjectIdentifier> = []
+
+    /// Whether an agent's open of `state` is in flight (`AppState.agentBusy`).
+    static func isOpening(_ state: AppState) -> Bool { opening.contains(ObjectIdentifier(state)) }
+
     /// What a file tool answers when its path names no file; an empty path is the folder itself, never "no file <folder name>".
     static func noFileMessage(_ url: URL) -> String {
         guard let root = folder.url, url.standardizedFileURL.path != root.standardizedFileURL.path else {
@@ -43,14 +49,16 @@ extension Mac4DSTEMAgentDoor {
             return .json(["folder": folder.url?.lastPathComponent ?? "", "files": listed.files, "truncated": listed.truncated])
         },
         AgentTool(name: "open_file", title: "Open file",
-                  summary: "Opens a file of the Agent folder in the window, as File > Open does, replacing the dataset it shows. It "
+                  summary: "Opens a file of the Agent folder in the window, as File > Open does, replacing the dataset it shows. As "
+                      + "there, one window holds one kind: a spectrum image opened in a window with a 4D scan, or a 4D file in a "
+                      + "window with only a spectrum image, opens in a NEW window: list_windows then names it. It "
                       + "starts the open and answers at once; get_window says busy until the dataset is in, and get_log says if it failed.",
                   input: .window,
                   parameters: [AgentParameter("path", .text, summary: "The file, relative to the Agent folder, as list_agent_folder "
                                                   + "names it.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let file: URL
             switch folder.resolve(call.arguments["path"] ?? "") {
             case .success(let url): file = url
@@ -61,7 +69,12 @@ extension Mac4DSTEMAgentDoor {
                 return .refusal(status: 404, message: noFileMessage(file))
             }
             state.statusText = "An agent opened \(quotedAgentText(file.lastPathComponent))."
-            Task { await state.openFileAsync(url: file) }
+            // Busy from this answer on, not from the moment the open's own loading stage begins (#266: about a second later).
+            opening.insert(ObjectIdentifier(state))
+            Task {
+                await state.openFileAsync(url: file)
+                opening.remove(ObjectIdentifier(state))
+            }
             return .json(["opening": folder.relativePath(of: file)])
         },
         AgentTool(name: "save_result_image", title: "Save result picture",
@@ -77,7 +90,7 @@ extension Mac4DSTEMAgentDoor {
                 return .refusal(status: 403, message: "Saving is off. Ask the person to turn on \"Let agents save results there\" in "
                     + "mac4DSTEM's Settings > Agents.")
             }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let root = folder.url else { return .refusal(status: 404, message: folder.missingMessage) }
             let name: String
             switch fileName(call.arguments["name"], default: state.exportBaseName + "_result") {

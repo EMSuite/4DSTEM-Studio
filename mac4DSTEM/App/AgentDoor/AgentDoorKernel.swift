@@ -34,7 +34,7 @@ extension Mac4DSTEMAgentDoor {
                                                   + "detector's smaller side.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             guard let typed = Double(call.arguments["radius"] ?? ""),
                   let radius = ProbeRadiusEntry.radius(typed: typed, descriptor: state.descriptor) else {
@@ -61,7 +61,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             guard let source = KernelChoice(rawValue: call.arguments["source"] ?? "") else {
                 return .refusal(status: 400, message: "source is synthetic, current_pattern or file_probe.")
@@ -80,7 +80,12 @@ extension Mac4DSTEMAgentDoor {
                     }
                 }
             }
-            return .json(["building": source.rawValue, "mode": source == .synthetic ? "sigmoid_trench" : ModeChoice(mode).rawValue])
+            var answer: [String: Any] = ["building": source.rawValue,
+                                         "mode": source == .synthetic ? "sigmoid_trench" : ModeChoice(mode).rawValue]
+            if source == .synthetic, call.arguments["mode"] != nil {   // said, not ignored silently (#266)
+                answer["note"] = "mode applies to current_pattern and file_probe only; a synthetic kernel is always sigmoid_trench."
+            }
+            return .json(answer)
         },
         AgentTool(name: "set_detector", title: "Choose detector",
                   summary: "Chooses the Disks task's detector, as the Detector picker does: classical (correlation with the probe "
@@ -93,7 +98,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let learned = call.arguments["detector"] == "neural_net"
             if learned, !state.preferences.offerLearnedDetector {
                 return .refusal(status: 403, message: "The neural net is not offered: the person turned it off in Settings > Analysis.")

@@ -1066,6 +1066,9 @@ final class AppState {
         didSet { activityLog.record(statusText) }
     }
     var errorMessage: String?
+    /// Why the last compute step failed (`presentComputeFailure`), until the next operation begins: the agent door's
+    /// `operation.error` for a step that failed after it started (mac4DSTEM#266, #323). The person reads it in the status line.
+    var lastComputeFailure: String?
 
     private(set) var openDatasetRequest = 0
     private(set) var preprocessingExportRequest = 0
@@ -1223,6 +1226,7 @@ final class AppState {
             return refused
         }
         let token = operationCenter.begin(name: name, totalUnits: totalUnits)
+        lastComputeFailure = nil
         statusText = status
         return token
     }

@@ -7,6 +7,7 @@
 
 import XCTest
 import ShellAgentDoor
+import DSTEMSession
 @testable import mac4DSTEM
 
 @MainActor

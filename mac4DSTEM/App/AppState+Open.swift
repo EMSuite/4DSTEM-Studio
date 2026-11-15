@@ -1,7 +1,5 @@
 import ShellLayout
 import Foundation
-import Metal
-import ShellMetal
 #if canImport(DSTEMCore)
 import DSTEMCore
 import DSTEMSession
@@ -952,10 +950,7 @@ extension AppState {
         let cubeBytes = fourD.residentByteCountIfHeld
         let elsewhere = residency.bytesHeldElsewhere()
         let physical = ProcessInfo.processInfo.physicalMemory
-        let refused = KeepInMemoryDecision.decide(
-            cubeBytes: cubeBytes, limitBytes: UInt64(MetalEngine.shared.device.recommendedMaxWorkingSetSize),
-            maxBufferBytes: UInt64(MetalEngine.shared.device.maxBufferLength), physicalMemory: physical
-        ) == .refused
+        let refused = KeepInMemoryDecision.decideOnThisMac(cubeBytes: cubeBytes) == .refused
         let keepInMemory: Bool
         if refused {
             keepInMemory = false

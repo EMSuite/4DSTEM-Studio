@@ -497,6 +497,13 @@ enum KeepInMemoryDecision: Equatable {
             : "Streaming: \(displayByteString(cubeBytes)) is above a quarter of this Mac's memory (\(share))\(others). Turn on Keep in memory in Open with Options to hold it anyway."
     }
 
+    /// `decide` with this Mac's GPU and memory limits, for callers outside the Metal-allowed files (`AppState+Open`).
+    static func decideOnThisMac(cubeBytes: Int) -> KeepInMemoryDecision {
+        decide(cubeBytes: cubeBytes, limitBytes: UInt64(MetalEngine.shared.device.recommendedMaxWorkingSetSize),
+               maxBufferBytes: UInt64(MetalEngine.shared.device.maxBufferLength),
+               physicalMemory: ProcessInfo.processInfo.physicalMemory)
+    }
+
     static func decide(
         cubeBytes: Int, limitBytes: UInt64, maxBufferBytes: UInt64, physicalMemory: UInt64
     ) -> KeepInMemoryDecision {

@@ -1083,6 +1083,11 @@ final class AppState {
     /// it returns: the one-load guard. `datasetSession.isLoading` starts only after the open's first awaits, so two opens (a drop and
     /// ⌘O, a double Finder open, an agent's open_file) both passed a guard on it alone.
     private(set) var openInFlight = false
+    /// Owner: the run guard (`AppState+RunGuard.swift`, #313). The question asked before closing the window, opening another file
+    /// or quitting stops a running analysis; nil when none is asked.
+    var pendingRunInterruption: RunInterruption?
+    /// Closes this window without asking again, set by the window (`WindowCloseGuard`); the run guard calls it once confirmed.
+    @ObservationIgnored var closeWindowWithoutAsking: (() -> Void)?
     /// Why the last compute step failed (`presentComputeFailure`), until the next operation begins: the agent door's
     /// `operation.error` for a step that failed after it started (mac4DSTEM#266, #323). The person reads it in the status line.
     var lastComputeFailure: String?
@@ -1497,6 +1502,7 @@ final class AppState {
         if isBusy, SessionSidecarLocator.isSaveInFlight(activeOperation) {
             statusText = "Still saving the session file — open \(url.lastPathComponent) when the save finishes"; return
         }
+        if askBeforeInterruptingRun(.open(url, configure: false)) { return }   // a running analysis is asked about first (#313)
         guard claimOpen() else { return }
         Task { await openFileAsync(url: url, claimed: true) }
     }

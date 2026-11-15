@@ -230,7 +230,8 @@ package actor FourDArray {
     /// `maximumRows` forces the fill tiling, exactly as `maximumTileRows` does
     /// for the parity paths. **It exists because without it the fill loop's
     /// destination offset was dead code in every test that existed**: the
-    /// default budget is a working-set eighth (~683 MB), so both test fixtures
+    /// default budget was then a working-set eighth (~683 MB; since #305 it is
+    /// `fillTileBytes`, 64 MiB), so both test fixtures
     /// preloaded in a single tile, `filled` was always 0, and rewriting line
     /// `base + filled * …` to `base + 0` left all 22 harness assertions and the
     /// whole unit suite green. On a real multi-gigabyte cube the fill is a dozen
@@ -255,23 +256,22 @@ package actor FourDArray {
             maximumBufferLength: MetalEngine.shared.device.maxBufferLength
         ) else { return false }
 
-        guard byteCount > 0, elementCount > 0,
-              let buffer = MetalEngine.shared.device.makeBuffer(
-                length: byteCount, options: .storageModeShared
-              )
-        else { return false }
-        buffer.label = "Resident cube \(descriptor.fileName) \(elementType.rawValue)"
-
+        guard byteCount > 0, elementCount > 0 else { return false }
+        // A cube held for another view goes BEFORE the new buffer is made (#305): holding both was two cubes at the peak,
+        // and the old one cannot serve this view anyway (`matches` above). Bumping the generation also stops its preload.
         residentCube = nil
         residencyGeneration &+= 1
         let generation = residencyGeneration
+        guard let buffer = MetalEngine.shared.device.makeBuffer(length: byteCount, options: .storageModeShared)
+        else { return false }
+        buffer.label = "Resident cube \(descriptor.fileName) \(elementType.rawValue)"
         preloadInFlight = true
         defer { preloadInFlight = false }
 
         let elementsPerScanRow = descriptor.rx * descriptor.qy * descriptor.qx
         let bytesPerScanRow = elementsPerScanRow * elementType.byteSize
         let base = buffer.contents()
-        let rowsPerTile = max(1, min(descriptor.ry, maximumRows ?? scanTileRows()))
+        let rowsPerTile = max(1, min(descriptor.ry, maximumRows ?? fillTileRows()))
         var filled = 0
         while filled < descriptor.ry {
             guard cancellation?.isCancelled != true else { throw CancellationError() }
@@ -369,6 +369,25 @@ package actor FourDArray {
             detectorHeight: descriptor.qy, detectorWidth: descriptor.qx,
             pixels: pixels
         )
+    }
+
+    /// The transient budget of one fill tile (#305): what the read of one tile may take beside the resident buffer.
+    /// 64 MiB, CuboKit's own `ScanTiling.automaticTileBytes`. The fill tiling carries no numbers (the buffer is flat and
+    /// `scanTile` slices any range out of it), so it is sized for memory alone. A large tile is also what macOS keeps
+    /// dirty after it is freed (#261: malloc keeps its largest freed blocks for reuse), so a small one is what makes
+    /// the memory after a fill the cube itself.
+    package static let fillTileBytes = 64 << 20
+
+    /// Rows per fill tile: as many as fit `fillTileBytes` of what the fill reads, at least one. A stored-type fill reads
+    /// the stored bytes of the view; a Float32 fill reads Float32 at the READ extent (pre-bin for a binned view).
+    package func fillTileRows() -> Int {
+        let readHeight = view.readDetectorCrop?.height ?? view.source.qy
+        let readWidth = view.readDetectorCrop?.width ?? view.source.qx
+        let held = residentElementType
+        let storedRead = reader.storedElementType(for: view) == held
+        let bytesPerRow = max(1, storedRead ? descriptor.rx * descriptor.qy * descriptor.qx * held.byteSize
+                                            : descriptor.rx * readHeight * readWidth * MemoryLayout<Float>.stride)
+        return max(1, min(descriptor.ry, Self.fillTileBytes / bytesPerRow))
     }
 
     /// Rows that fit within a conservative eighth of Metal's recommended

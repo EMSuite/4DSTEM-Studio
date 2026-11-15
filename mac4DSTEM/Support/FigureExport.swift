@@ -2,8 +2,8 @@
 //  FigureExport.swift
 //  Role: What the window can put in an exported image, and the figure export itself (tier 2, 2026-10-14). The result
 //        image, the diffraction pattern and the EDX maps, each as the pixels the screen shows, with the outlines and
-//        scale bar the screen draws; the same rasters feed the single-image exports (`ResultExport.swift`), the
-//        Maps export (`MapsExport.swift`) and the multi-panel figure here, so the pictures cannot disagree.
+//        scale bar the screen draws; the same rasters feed the single-image exports (`ResultExport.swift`) and the
+//        multi-panel figure here, so the pictures cannot disagree.
 //        Drawing is `FigureRendering`; this file only chooses what to draw. The figure leaves the app through SwiftUI's own
 //        export panel (`fileExporter` over a `FileDocument`, with `fileDialogMessage`): no AppKit save panel.
 //

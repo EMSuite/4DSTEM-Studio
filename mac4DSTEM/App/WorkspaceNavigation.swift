@@ -5,7 +5,7 @@ import DSTEMCore
 import DSTEMSession
 #endif
 
-/// The navigation/selection seam (S22c; archived the archived notes §7).
+/// The navigation/selection seam.
 /// Owns which workspace and task the user is in and which panes are
 /// visible: pure view-state, no science. `AppState` holds it as
 /// `navigation` without forwarding properties — the same contract

@@ -20,6 +20,7 @@ extension AppState {
     func openFileForConfiguration(url: URL, preprocess: Bool = false) {
         // A Preprocess source is only read into a sheet, never opened as this window's document.
         if !preprocess, routesOpenToNewWindow(url, configure: true) { return }
+        if !preprocess, askBeforeInterruptingRun(.open(url, configure: true)) { return }   // a running analysis is asked about first (#313)
         // Review a6 / owner card D2 (a): a dataset another window holds is refused before this window changes, and
         // the open claims its file while in flight. A Preprocess source is only read — never a session, never its
         // sidecar — so it is neither refused nor claimed.

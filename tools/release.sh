@@ -85,7 +85,7 @@ echo "== Notarize the DMG"
 cp "$DMG" "$OUT/mac4DSTEM.dmg"
 
 echo "== Update feed (Sparkle, #122)"
-"$ROOT/tools/release/appcast.sh" "$DMG" "$VERSION" "$OUT/mac4dstem.xml"
+"$ROOT/tools/release/appcast.sh" "$DMG" "$VERSION" "$OUT/mac4dstem.xml" "$ROOT/docs/app-store/whats-new.txt"
 
 echo
 echo "Done: $DMG"

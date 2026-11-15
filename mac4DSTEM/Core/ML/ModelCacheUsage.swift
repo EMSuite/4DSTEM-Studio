@@ -64,10 +64,10 @@ package nonisolated struct ModelCacheUsage: Sendable, Equatable {
         return Folder(entries: entries, bytes: bytes)
     }
 
-    /// "48,160 entries, 26 GB", or "None" for an absent folder. Finder's byte style.
+    /// "48160 entries, 26 GB", or "None" for an absent folder. Finder's byte style.
     package static func text(_ folder: Folder?) -> String {
         guard let folder else { return "None" }
-        let count = folder.entries.formatted() + (folder.entries == 1 ? " entry" : " entries")
+        let count = folder.entries.formatted(.number.grouping(.never)) + (folder.entries == 1 ? " entry" : " entries")
         return count + ", " + folder.bytes.formatted(.byteCount(style: .file))
     }
 }

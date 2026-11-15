@@ -43,4 +43,9 @@ final class ModelCacheUsageTests: XCTestCase {
         XCTAssertEqual(ModelCacheUsage.text(nil), "None")
         XCTAssertTrue(ModelCacheUsage.text(.init(entries: 1, bytes: 0)).hasPrefix("1 entry, "))
     }
+
+    /// Whole counts carry no grouping separator (#422). Mutation: `.formatted()` back - red ("48,160 entries" in en_US).
+    func testTheEntryCountIsUngrouped() {
+        XCTAssertTrue(ModelCacheUsage.text(.init(entries: 48_160, bytes: 0)).hasPrefix("48160 entries, "))
+    }
 }

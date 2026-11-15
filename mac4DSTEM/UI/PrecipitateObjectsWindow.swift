@@ -243,7 +243,7 @@ struct PrecipitateObjectsWindow: View {
             }
             Group {
                 TableColumn("Area (\(areaUnit))", value: \PrecipitateObjectReport.Row.areaPx) { row in
-                    Text(row.area.map { format($0) } ?? row.areaPx.formatted()).monospacedDigit()
+                    Text(row.area.map { format($0) } ?? row.areaPx.formatted(.number.grouping(.never))).monospacedDigit()
                 }
                 .width(min: 56, ideal: 80)
                 .alignment(.numeric)

@@ -439,7 +439,11 @@ package struct CalibrationReadinessReport: Equatable, Sendable {
             originDetail += " · Friedel fit over the 1\u{00A0}px limit (not for quantitative use)"
         }
         if provenance.suggestsOriginFromBraggPeaks {
-            originDetail += " · Spot pattern: after Detect All Disks use Origin from Bragg Peaks (advanced correction)"
+            // Two reasons set it (`AppState.calibrateOrigin`): a spot pattern, or a centre of mass scattered over 1 px (#324).
+            let scattered = (originResidual ?? 0) > Calibration.centreOfMassScatterHintPixels
+            originDetail += scattered
+                ? " · Centre of mass scattered: after Detect All Disks use Origin from Bragg Peaks (advanced correction)"
+                : " · Spot pattern: after Detect All Disks use Origin from Bragg Peaks (advanced correction)"
         }
 
         let validEllipse = calibration.hasEllipse
@@ -862,6 +866,14 @@ package nonisolated struct Calibration: Sendable {
     /// and its 2 px floor are binned pixels too, so a 1.5 px fit refused at
     /// bin 1 reads 0.75 px at bin 2 and passes there.
     package static let friedelFallbackResidualLimitPixels: Float = 1
+
+    /// Above this RMS residual (detector pixels) a centre-of-mass origin run points to Origin from Bragg Peaks (#324). The
+    /// app's centre of mass is py4DSTEM's `get_origin` (CuboKit `OriginMeasurement`: the CoM within 1.2 r of the filtered
+    /// argmax), so a scattered fit is not a port error: on Paul's GMS cubes it read 1.4 to 21.6 px where the origin from the
+    /// Bragg peaks read 0.17 to 0.64, and only the two worst crossed the probe radius, the one limit that said anything.
+    /// The same 1 px as the Friedel limit and for the same reason (above about 2 px the beam can pass for the innermost
+    /// reflection, half that as a scatter); a hint, never a refusal: the probe-radius test still decides `originFitIsSane`.
+    package static let centreOfMassScatterHintPixels: Float = 1
 
     /// A Friedel run (`OriginMaps.measuredByFriedel`) is judged by the same
     /// 1 px limit the refusal applies to the fallback, not only by the probe

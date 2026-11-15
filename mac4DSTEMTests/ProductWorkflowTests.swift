@@ -247,6 +247,20 @@ final class ProductWorkflowTests: XCTestCase {
         XCTAssertNil(WorkspaceArea.results.defaultAnalysisMode)
     }
 
+    /// #365: a hand-set origin with no probe is an origin; DPC's guidance must not ask for it. Mutation: the `.dpc` branch back on
+    /// `hasOriginProbe` alone (red: "add origin, …").
+    func testDPCGuidanceDoesNotAskForAnOriginThatIsSet() {
+        var readiness = ProductWorkflowReadiness()
+        readiness.hasOrigin = true
+        let line = ProductWorkflow.guidance(for: .dpc, readiness: readiness).first ?? ""
+        XCTAssertTrue(line.contains("qualitative units"), line)
+        XCTAssertFalse(line.contains("origin"), line)
+        readiness.hasRotation = true; readiness.hasQScale = true; readiness.hasRScale = true; readiness.hasVoltage = true
+        XCTAssertTrue(ProductWorkflow.guidance(for: .dpc, readiness: readiness).isEmpty,
+                      "an origin without a probe and the rest calibrated is quantitative DPC")
+        XCTAssertTrue((ProductWorkflow.guidance(for: .dpc, readiness: ProductWorkflowReadiness()).first ?? "").contains("add origin"))
+    }
+
     func testPrerequisitesAreActionableAndTaskSpecific() {
         let empty = ProductWorkflowReadiness()
         XCTAssertTrue(ProductWorkflow.prerequisites(

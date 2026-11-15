@@ -50,7 +50,7 @@ notarizes and staples the DMG. It needs a clean working tree, the
 **Developer ID Application** certificate in the login keychain
 (`DEVELOPER_ID_APPLICATION` overrides the name), a `notarytool` keychain
 profile (default `macem-notary`, `NOTARY_PROFILE` overrides it) and `dmgbuild`
-in `build/dmg-venv`. Each run writes a new folder
+in `build/dmg-venv` (the first run in a fresh checkout creates it). Each run writes a new folder
 `build/release/<date-time>/` holding the archive, `mac4DSTEM-<version>.dmg`
 and a byte-identical `mac4DSTEM.dmg` for the
 `releases/latest/download/mac4DSTEM.dmg` link, and prints the DMG's SHA-256

@@ -178,7 +178,6 @@ struct QCalibrationGateTest {
         // MARK: - 2. One derivation of the reference origin
 
         let detectorQX = 128, detectorQY = 128
-        let aperture = (x: Float(70), y: Float(75))
 
         var fitted = Calibration()
         fitted.origin = OriginMaps(
@@ -188,8 +187,7 @@ struct QCalibrationGateTest {
             excludedFraction: trimmed.excludedFraction,
             robustResidual: trimmed.keptResidual
         )
-        require(fitted.referenceOrigin(detectorQX: detectorQX, detectorQY: detectorQY,
-                                       apertureCentre: aperture).kind == .fittedMaps,
+        require(fitted.referenceOrigin(detectorQX: detectorQX, detectorQY: detectorQY).kind == .fittedMaps,
                 "fitted maps must win over everything else")
 
         var recorded = Calibration()
@@ -197,8 +195,7 @@ struct QCalibrationGateTest {
         recorded.recordedOriginY = 66.25
         recorded.originProvenance = .fileMean
         let recordedOrigin = recorded.referenceOrigin(
-            detectorQX: detectorQX, detectorQY: detectorQY, apertureCentre: aperture
-        )
+            detectorQX: detectorQX, detectorQY: detectorQY)
         require(recordedOrigin.kind == .recordedMean,
                 "a file/session mean must be used, not fallen through — got \(recordedOrigin.kind)")
         requireClose(Double(recordedOrigin.x), 61.5, 1e-6, "recorded origin x")
@@ -209,18 +206,21 @@ struct QCalibrationGateTest {
         require(abs(recordedOrigin.x - 64) > 1 || abs(recordedOrigin.y - 64) > 1,
                 "a recorded origin must NOT collapse to the detector's geometric middle")
 
-        let apertureOnly = Calibration()
-        require(apertureOnly.referenceOrigin(detectorQX: detectorQX, detectorQY: detectorQY,
-                                             apertureCentre: aperture).kind == .apertureCentre,
-                "with nothing measured, the aperture the user placed is the best available centre")
-        require(apertureOnly.referenceOrigin(detectorQX: detectorQX, detectorQY: detectorQY,
-                                             apertureCentre: nil).kind == .geometricMiddle,
-                "and with no aperture either, the geometric middle — named as such")
+        // #348/#360: the aperture is no longer an origin. A centre set on purpose in Prepare is the manual kind, and with
+        // nothing set at all the geometric middle, named as such.
+        var manual = Calibration()
+        manual.recordedOriginX = 70
+        manual.recordedOriginY = 75
+        manual.originProvenance = .manual
+        require(manual.referenceOrigin(detectorQX: detectorQX, detectorQY: detectorQY).kind == .manualCentre,
+                "a centre set by hand is named as one, not as a recorded beam centre")
+        require(Calibration().referenceOrigin(detectorQX: detectorQX, detectorQY: detectorQY).kind == .geometricMiddle,
+                "and with nothing set, the geometric middle — named as such")
 
         require(Calibration.ReferenceOriginKind.fittedMaps.isMeasuredBeamCentre
                 && Calibration.ReferenceOriginKind.recordedMean.isMeasuredBeamCentre,
                 "both measured kinds must count as measured")
-        require(!Calibration.ReferenceOriginKind.apertureCentre.isMeasuredBeamCentre
+        require(!Calibration.ReferenceOriginKind.manualCentre.isMeasuredBeamCentre
                 && !Calibration.ReferenceOriginKind.geometricMiddle.isMeasuredBeamCentre,
                 "neither stand-in may count as a measured beam centre — this is the predicate the "
                 + "metrology gate refuses on")
@@ -254,7 +254,7 @@ struct QCalibrationGateTest {
                      Double(contaminated.origin?.rmsResidual ?? .nan), 1e-9,
                      "and the number quoted must be the number judged")
         require(!contaminated.originSupportsReciprocalMetrology(
-                    detectorQX: detectorQX, detectorQY: detectorQY, apertureCentre: aperture),
+                    detectorQX: detectorQX, detectorQY: detectorQY),
                 "so reciprocal metrology is refused too")
 
         // The counter-half: the gate has not simply been disabled. A genuinely
@@ -276,7 +276,7 @@ struct QCalibrationGateTest {
         )
         require(sane.originFitIsSane, "a clean fit must still pass")
         require(sane.originSupportsReciprocalMetrology(
-                    detectorQX: detectorQX, detectorQY: detectorQY, apertureCentre: aperture),
+                    detectorQX: detectorQX, detectorQY: detectorQY),
                 "and still support reciprocal metrology")
         require((sane.origin?.excludedFraction ?? 1) <= 0.02,
                 "a clean fit must not trip the disclosure floor — the trim's own false-positive "
@@ -287,11 +287,11 @@ struct QCalibrationGateTest {
         require(saneButGuessed.originFitIsSane,
                 "no residual to judge means the LOOSER question passes — unchanged behaviour")
         require(!saneButGuessed.originSupportsReciprocalMetrology(
-                    detectorQX: detectorQX, detectorQY: detectorQY, apertureCentre: aperture),
+                    detectorQX: detectorQX, detectorQY: detectorQY),
                 "but the STRICTER one must refuse: there is no measured beam centre. Before S13 one "
                 + "predicate answered both and this case was admitted, stamped `.measuredInApp`")
         require(recorded.originSupportsReciprocalMetrology(
-                    detectorQX: detectorQX, detectorQY: detectorQY, apertureCentre: aperture),
+                    detectorQX: detectorQX, detectorQY: detectorQY),
                 "a file's recorded mean IS a measured beam centre and must be admitted")
 
         // The refusal text must lead with the remedy that works. S12 measured that all
@@ -740,11 +740,10 @@ struct QCalibrationGateTest {
         require(nanCalibration.meanOrigin == nil,
                 "a NaN fitted map is not a mean origin")
         require(nanCalibration.referenceOrigin(
-                    detectorQX: detectorQX, detectorQY: detectorQY,
-                    apertureCentre: aperture).kind != .fittedMaps,
+                    detectorQX: detectorQX, detectorQY: detectorQY).kind != .fittedMaps,
                 "and must not be reported as a measured beam centre")
         require(!nanCalibration.originSupportsReciprocalMetrology(
-                    detectorQX: detectorQX, detectorQY: detectorQY, apertureCentre: aperture),
+                    detectorQX: detectorQX, detectorQY: detectorQY),
                 "and must not clear the metrology gate")
         // A single NaN measurement poisons the whole fit through the normal
         // equations, so the trim silently never runs. It must not then be
@@ -781,7 +780,7 @@ struct QCalibrationGateTest {
         both.recordedOriginX = 11
         both.recordedOriginY = 12
         let resolvedBoth = both.referenceOrigin(
-            detectorQX: detectorQX, detectorQY: detectorQY, apertureCentre: aperture)
+            detectorQX: detectorQX, detectorQY: detectorQY)
         require(resolvedBoth.kind == .fittedMaps,
                 "fitted maps outrank a recorded mean — swapping the two branches passed every "
                 + "earlier assertion")
@@ -789,7 +788,7 @@ struct QCalibrationGateTest {
                 "and the VALUE must come from the maps, not the recorded scalars")
         // The geometric middle's coordinates, not merely its label.
         let middle = Calibration().referenceOrigin(
-            detectorQX: detectorQX, detectorQY: detectorQY, apertureCentre: nil)
+            detectorQX: detectorQX, detectorQY: detectorQY)
         requireClose(Double(middle.x), Double(detectorQX) / 2, 1e-6, "geometric middle x")
         requireClose(Double(middle.y), Double(detectorQY) / 2, 1e-6, "geometric middle y")
 

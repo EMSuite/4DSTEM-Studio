@@ -33,6 +33,12 @@ package nonisolated struct ParallaxAberrationCorrectionResult: Sendable {
     package let qHighpassInvAngstrom: Double?
     package let butterworthOrder: Int
 
+    /// Bytes this product keeps while published: the padded and corrected phase, both χ planes and the transfer function (#413).
+    package var heldByteCount: Int {
+        (paddedPhase.count + correctedPhase.pixels.count + chiEven.count + chiOdd.count
+            + transferReal.count + transferImaginary.count) * MemoryLayout<Float>.stride
+    }
+
     // Explicit so the memberwise initializer is `package` (synthesized ones are internal). // v2.5 step 2b
     package nonisolated init(paddedPhase: [Float], correctedPhase: FloatImage, chiEven: [Float], chiOdd: [Float], transferReal: [Float], transferImaginary: [Float], samplingAngstrom: Double, usedFullFit: Bool, qLowpassInvAngstrom: Double?, qHighpassInvAngstrom: Double?, butterworthOrder: Int) {
         self.paddedPhase = paddedPhase

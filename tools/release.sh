@@ -11,7 +11,8 @@
 # the package and stops. Output: build/release/<stamp>/store/mac4DSTEM.pkg.
 #
 # Needs the "Developer ID Application" certificate in the login keychain, a notarytool keychain profile (default
-# macem-notary; override with NOTARY_PROFILE) and dmgbuild in build/dmg-venv (make-dmg.sh says how to create it).
+# macem-notary; override with NOTARY_PROFILE). dmgbuild lives in build/dmg-venv; the first run in a fresh checkout creates
+# it (tools/release/ensure-dmgbuild.sh, needs python3 and PyPI).
 # Output: build/release/<stamp>/mac4DSTEM-<version>.dmg, a copy named mac4DSTEM.dmg for the
 # releases/latest/download/mac4DSTEM.dmg link, and mac4dstem.xml, the website's update feed (tools/release/appcast.sh).
 # The steps are tools/release/{build-developer-id,notarize,make-dmg,appcast}.sh.
@@ -35,7 +36,7 @@ OUT="$ROOT/build/release/$(date +%Y%m%d-%H%M%S)"   # a new folder per run, so a 
 [[ -z "$(git -C "$ROOT" status --porcelain)" ]] || { echo "The working tree is not clean; commit first so the build has a commit." >&2; exit 1; }
 if (( STORE == 0 )); then
   security find-identity -v -p codesigning | grep -q "$DEVELOPER_ID_APPLICATION" || { echo "No certificate \"$DEVELOPER_ID_APPLICATION\" in the keychain." >&2; exit 1; }
-  [[ -x "$ROOT/build/dmg-venv/bin/dmgbuild" ]] || { echo "No dmgbuild; run: python3 -m venv build/dmg-venv && build/dmg-venv/bin/pip install dmgbuild==1.6.1" >&2; exit 1; }
+  "$ROOT/tools/release/ensure-dmgbuild.sh" "$ROOT" >/dev/null   # a fresh tag worktree creates its dmgbuild venv here (#373)
 fi
 # A download is built from a release tag, and the app must carry that tag's version (Config/Version.xcconfig, which
 # release-please bumps): checked here before the archive and again on the built app.

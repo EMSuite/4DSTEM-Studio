@@ -715,9 +715,9 @@ extension AppState {
                     productKind: scalarMap?.kind ?? rgbaMap?.kind ?? metadata.kind)
                 let recipe = replay.recordForSaving
                 let sourceStamp = SessionSourceStamp(sourcePath: descriptor.filePath, shape: descriptor.shape)
-                try await Task.detached(priority: .userInitiated) {
+                let lineageOmission = try await Task.detached(priority: .userInitiated) { () -> String? in
                     if let scalarMap {
-                        try BraggVectorEMDWriter.mergeResultMap(
+                        return try BraggVectorEMDWriter.mergeResultMap(
                             scalarMap, vectors: vectors,
                             qWidth: descriptor.qx, qHeight: descriptor.qy,
                             calibration: pixelCalibration, to: url,
@@ -726,7 +726,7 @@ extension AppState {
                             cancellation: token, progress: progressUpdate
                         )
                     } else if let rgbaMap {
-                        try BraggVectorEMDWriter.mergeRGBAResultMap(
+                        return try BraggVectorEMDWriter.mergeRGBAResultMap(
                             rgbaMap, vectors: vectors,
                             qWidth: descriptor.qx, qHeight: descriptor.qy,
                             calibration: pixelCalibration, to: url,
@@ -735,8 +735,9 @@ extension AppState {
                             cancellation: token, progress: progressUpdate
                         )
                     }
+                    return nil
                 }.value
-                self.reportLineageOmission()
+                self.reportLineageOmission(lineageOmission)
                 guard self.isCurrentOperation(token), self.datasetSession.epoch == epoch else { return }
                 self.sessionSidecar.noteWritten()
                 self.sessionLoadSpecification = specification   // the file now records this view (review a5)
@@ -982,7 +983,7 @@ extension AppState {
             let specification = loadedView.specification
             let recipe = replay.recordForSaving
             let sourceStamp = SessionSourceStamp(sourcePath: descriptor.filePath, shape: descriptor.shape)
-            try await Task.detached(priority: .userInitiated) {
+            let lineageOmission = try await Task.detached(priority: .userInitiated) {
                 try BraggVectorEMDWriter.removeResult(
                     kind: saved.kind, qWidth: descriptor.qx, qHeight: descriptor.qy,
                     calibration: calibration, from: url,
@@ -990,7 +991,7 @@ extension AppState {
                     cancellation: token
                 )
             }.value
-            reportLineageOmission()
+            reportLineageOmission(lineageOmission)
             guard isCurrentOperation(token), epoch == datasetSession.epoch else { return }
             sessionSidecar.noteWritten()
             sessionLoadSpecification = specification   // the file now records this view (review a5)
@@ -1238,7 +1239,7 @@ extension AppState {
             guard let self else { return }
             defer { self.finishCancellableOperation(token) }
             do {
-                try await Task.detached(priority: .userInitiated) {
+                let lineageOmission = try await Task.detached(priority: .userInitiated) {
                     try BraggVectorEMDWriter.mergeCalibration(
                         snapshot, qWidth: descriptor.qx, qHeight: descriptor.qy,
                         to: url, loadSpecification: specification,
@@ -1246,7 +1247,7 @@ extension AppState {
                         cancellation: token
                     )
                 }.value
-                self.reportLineageOmission()
+                self.reportLineageOmission(lineageOmission)
                 guard self.isCurrentOperation(token), self.datasetSession.epoch == epoch else { return }
                 self.sessionSidecar.noteWritten()
                 self.sessionLoadSpecification = specification   // the file now records this view (review a5)

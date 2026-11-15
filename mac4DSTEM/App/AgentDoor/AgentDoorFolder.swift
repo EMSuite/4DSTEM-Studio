@@ -46,13 +46,14 @@ extension Mac4DSTEMAgentDoor {
                   summary: "Opens a file of the Agent folder in the window, as File > Open does, replacing the dataset it shows. As "
                       + "there, one window holds one kind: a spectrum image opened in a window with a 4D scan, or a 4D file in a "
                       + "window with only a spectrum image, opens in a NEW window: list_windows then names it. It "
-                      + "starts the open and answers at once; get_window says busy until the dataset is in, and get_log says if it failed.",
+                      + "starts the open and answers at once; get_window says busy until the dataset is in, and get_log says if it failed. "
+                      + "Refused while an analysis runs, since opening would stop it.",
                   input: .window,
                   parameters: [AgentParameter("path", .text, summary: "The file, relative to the Agent folder, as list_agent_folder "
                                                   + "names it.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.agentBusy else { return busyRefusal }
+            if let refusal = openRefusal(state) { return refusal }
             let file: URL
             switch folder.resolve(call.arguments["path"] ?? "") {
             case .success(let url): file = url

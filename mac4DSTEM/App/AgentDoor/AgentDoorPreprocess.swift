@@ -78,7 +78,7 @@ extension Mac4DSTEMAgentDoor {
                   parameters: [AgentParameter("path", .text, summary: "The file, relative to the Agent folder.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.agentBusy else { return busyRefusal }
+            if let refusal = openRefusal(state) { return refusal }
             switch folder.resolve(call.arguments["path"] ?? "") {
             case .failure(let refusal): return .refusal(status: 404, message: refusal.message)
             case .success(let url):

@@ -15,8 +15,9 @@ import SwiftUI
 
 /// When the updater runs, outside `#if SPARKLE` so the unit tests (whose target has no such condition) reach it.
 nonisolated enum SoftwareUpdatePolicy {
-    /// The Info-Direct.plist placeholder until the release key is in: with it Sparkle would refuse every update and say so
-    /// at launch, so the updater stays off, and tools/release.sh refuses to build a download that carries it.
+    /// The placeholder Info-Direct.plist carried before the release key (the key is in since 5.0): a key equal to it would make
+    /// Sparkle refuse every update and say so at launch, so the updater stays off, and tools/release.sh refuses to build a
+    /// download that carries it.
     static let placeholderKey = "SET-BEFORE-RELEASE"
 
     static let isDebugBuild: Bool = {

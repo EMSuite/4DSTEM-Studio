@@ -623,14 +623,7 @@ extension AppState {
         let metadata: (kind: String, displayName: String, valueUnits: String) =
             resultPresentation.product.map { ($0.kind, $0.displayName, $0.valueUnits) }
             ?? currentScalarResultMetadata
-        let persistence: (
-            row: Double?, column: Double?, units: String?, provenance: [String: String]
-        )
-        if resultPresentation.product != nil {
-            persistence = currentResultPersistenceMetadata
-        } else {
-            persistence = currentResultPersistenceMetadata
-        }
+        let persistence = currentResultPersistenceMetadata
         return ScalarResultMap(
             width: image.width, height: image.height, pixels: image.pixels,
             kind: metadata.kind, displayName: metadata.displayName,

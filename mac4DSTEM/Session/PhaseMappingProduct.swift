@@ -202,8 +202,10 @@ extension PhaseMappingSlot {
 /// Map Phases again (drive 2026-09-30).
 package enum PhaseResultPicture: Sendable, Equatable {
     case phaseMap, objects, distance
-    /// The orientation map of one phase (IPF-Z), from a run from the structures (#293).
+    /// The orientation map of one phase (IPF-Z), from a run from the structures (#293) or a grains run (#252).
     case orientation
+    /// A grains run's reliability map (#252): how far each position's winner is ahead of the best other phase.
+    case reliability
 
     /// The product kind of each picture.
     package var productKind: String {
@@ -212,6 +214,7 @@ package enum PhaseResultPicture: Sendable, Equatable {
         case .objects: "precipitate_objects"
         case .distance: "phase_match_distance"
         case .orientation: "phase_orientation_ipf_z"
+        case .reliability: "phase_reliability"
         }
     }
 
@@ -221,6 +224,7 @@ package enum PhaseResultPicture: Sendable, Equatable {
         case "precipitate_objects": self = .objects
         case "phase_match_distance": self = .distance
         case "phase_orientation_ipf_z": self = .orientation
+        case "phase_reliability": self = .reliability
         default: return nil
         }
     }
@@ -249,6 +253,8 @@ package enum PhaseResultPicture: Sendable, Equatable {
                                        systemImage: "ruler", target: .distance)
         case .orientation: return Control(title: "Show Orientation",
                                           systemImage: "cube.transparent", target: .orientation)
+        case .reliability: return Control(title: "Show Reliability",
+                                          systemImage: "checkmark.seal", target: .reliability)
         }
     }
 }
@@ -305,6 +311,25 @@ package enum PhaseOrientationSource: String, Sendable, Equatable, CaseIterable, 
     case structures
     /// The zone axes typed in the phase list (Thronsen et al.'s vector matching against a reference library).
     case typedZones
+    /// "Grains and phases (no matrix)" (mac4DSTEM#252): every position matched against each phase's templates, the best phase
+    /// wins with ASTAR's reliability (DiffractoKit `BestPhaseMatching`). No phase is a matrix; for grains of several phases.
+    case grains
+
+    /// Whether the run treats one phase as the matrix (the two "Matrix with precipitates" sources).
+    package var hasMatrix: Bool { self != .grains }
+}
+
+/// The method the Phases section offers (mac4DSTEM#252): a matrix with precipitates in it, or grains of several phases.
+package enum PhaseMappingMethod: String, Sendable, Equatable, CaseIterable {
+    case matrixWithPrecipitates
+    case grainsAndPhases
+
+    package var title: String {
+        switch self {
+        case .matrixWithPrecipitates: "Matrix with precipitates"
+        case .grainsAndPhases: "Grains and phases (no matrix)"
+        }
+    }
 }
 
 @Observable
@@ -324,6 +349,22 @@ package final class PhaseMappingProduct {
     package var matching = PhaseVectorSettings()
     /// Where the orientations come from. Found from the structures unless the user types zone axes.
     package var orientationSource: PhaseOrientationSource = .structures
+    /// The method the Phases section shows: grains for the grains source, else a matrix with precipitates. Choosing the matrix
+    /// method from grains goes back to the orientations found from the structures (the typed zones are its Advanced switch).
+    package var method: PhaseMappingMethod {
+        get { orientationSource == .grains ? .grainsAndPhases : .matrixWithPrecipitates }
+        set {
+            switch newValue {
+            case .grainsAndPhases: orientationSource = .grains
+            case .matrixWithPrecipitates: if orientationSource == .grains { orientationSource = .structures }
+            }
+        }
+    }
+    /// A grains run: the reliability (0 to 100, ASTAR's) a position's winner needs to be drawn as that phase; below it the
+    /// position is not indexed. A reading of the held run, not a setting of it: moving it redraws without matching again.
+    package var grainsReliableAbove: Double = GrainsPhaseRun.defaultReliableAbove {
+        didSet { if grainsReliableAbove != oldValue { applyGrainsReliability() } }
+    }
     /// A structures run: the excitation slab (Å⁻¹) of a candidate phase that has none of its own. One default for every
     /// phase; a thin plate or needle needs more, and that is the phase's own field (the measurements behind the
     /// value are on mac4DSTEM#184).
@@ -377,6 +418,9 @@ package final class PhaseMappingProduct {
     /// What a run from the structures found beside the map: the matrix orientations, the learned relationships, the
     /// free-search verdicts. nil for a typed-zones run. It dies with the run, as the library does.
     package private(set) var lastStructureRun: StructurePhaseMapping?
+    /// What a grains run found (#252): every position's best phase, its reliability and orientation. The map is read from it at
+    /// `grainsReliableAbove`. nil for the other sources; it dies with the run.
+    package private(set) var lastGrainsRun: GrainsPhaseRun?
     /// The phase whose orientation map "Show Orientation" draws (an index into the phase list); nil is the first candidate.
     /// A display choice, not a setting of the run: it is not part of the run's identity and survives a new run while the
     /// phase stays in the list.
@@ -565,7 +609,12 @@ package final class PhaseMappingProduct {
     /// truthful state: the list no longer reads as the legend.
     package var phaseSignature: String {
         // Typed zones keep the signature they always had; a structures run is told apart by its prefix.
-        (orientationSource == .structures ? "structures;" : "") + phases.map(\.signature).joined(separator: ";")
+        // A grains run has no matrix: the slots' matrix marks are not part of what it ran with.
+        switch orientationSource {
+        case .typedZones: phases.map(\.signature).joined(separator: ";")
+        case .structures: "structures;" + phases.map(\.signature).joined(separator: ";")
+        case .grains: "grains;" + phases.map { "\($0.model.id)|\($0.model.contentFingerprint)" }.joined(separator: ";")
+        }
     }
 
     package var isStale: Bool {
@@ -579,6 +628,7 @@ package final class PhaseMappingProduct {
     /// Stated here rather than in the view so the same words reach the
     /// keyboard path and the toolbar button.
     package var runRefusal: String? {
+        if orientationSource == .grains { return grainsRunRefusal }
         let matrices = phases.filter(\.isMatrix).count
         if phases.isEmpty { return "Add the matrix phase and at least one precipitate phase." }
         if matrices == 0 { return "Mark one phase as the matrix." }
@@ -606,6 +656,21 @@ package final class PhaseMappingProduct {
             if phases[..<i].contains(where: { $0.model.id == slot.model.id
                 && $0.model.contentFingerprint == slot.model.contentFingerprint && $0.zoneAxis == slot.zoneAxis }) {
                 return "\(slot.model.displayName) is in the list twice at \(slot.zoneAxisText); give each copy its own zone axis."
+            }
+        }
+        return nil
+    }
+
+    /// A grains run's refusal: two phases or more, each usable and each structure once. A matrix mark is ignored.
+    private var grainsRunRefusal: String? {
+        if phases.count < 2 { return "Add at least two phases; with one, the Orientation room maps its grains." }
+        for slot in phases where !slot.model.isUsable {
+            return "\(slot.model.displayName) has validation issues and cannot be used."
+        }
+        for (i, slot) in phases.enumerated() {
+            if phases[..<i].contains(where: { $0.model.id == slot.model.id
+                && $0.model.contentFingerprint == slot.model.contentFingerprint }) {
+                return "\(slot.model.displayName) is in the list twice; every orientation of a phase is matched, so one copy is enough."
             }
         }
         return nil
@@ -748,6 +813,26 @@ package final class PhaseMappingProduct {
         lastRun = record
         lastLibrary = library
         lastStructureRun = structureRun
+        lastGrainsRun = nil
+        generation += 1
+        onChange?()
+    }
+
+    /// A grains run (#252): its map is read at the current `grainsReliableAbove`.
+    package func publish(grains run: GrainsPhaseRun, ranWith record: RunRecord) {
+        map = run.phaseMap(reliableAbove: grainsReliableAbove)
+        lastRun = record
+        lastLibrary = nil
+        lastStructureRun = nil
+        lastGrainsRun = run
+        generation += 1
+        onChange?()
+    }
+
+    /// The held grains run read again at a moved threshold: a new map, nothing matched again.
+    private func applyGrainsReliability() {
+        guard let lastGrainsRun, map != nil else { return }
+        map = lastGrainsRun.phaseMap(reliableAbove: grainsReliableAbove)
         generation += 1
         onChange?()
     }
@@ -802,6 +887,7 @@ package final class PhaseMappingProduct {
     }
 
     package nonisolated static let distanceDisplayName = "Phase match distance"
+    package nonisolated static let reliabilityDisplayName = "Phase reliability"
 
     /// What the Phases section says when a reopened session carries a phase-mapping run but this window holds no map (#128): a
     /// session keeps the map's picture and the run's words, not the per-position map or the phase structures, so the panel
@@ -832,6 +918,7 @@ package final class PhaseMappingProduct {
         lastRun = nil
         lastLibrary = nil
         lastStructureRun = nil
+        lastGrainsRun = nil
         zoneAxisFits = []
         zoneAxisRun = nil
         if hadMap { generation += 1; onChange?() }

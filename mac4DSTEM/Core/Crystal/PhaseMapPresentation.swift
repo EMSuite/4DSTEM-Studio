@@ -124,7 +124,8 @@ package nonisolated enum PhaseMapPresentation {
         if phaseIndex == matrixPhaseIndex { return matrixColor }
         // Candidates are numbered among themselves, so phase 0 as matrix and
         // phase 2 as matrix both give the first candidate the first hue.
-        let rank = phaseIndex < matrixPhaseIndex ? phaseIndex : phaseIndex - 1
+        // A map without a matrix (-1, a grains run) numbers every phase from the first hue.
+        let rank = matrixPhaseIndex < 0 || phaseIndex < matrixPhaseIndex ? phaseIndex : phaseIndex - 1
         return palette[rank % palette.count]
     }
 

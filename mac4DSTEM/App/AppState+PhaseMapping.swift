@@ -177,6 +177,10 @@ extension AppState {
         if phaseMapping.orientationSource == .structures {
             return await runPhaseMappingFromStructures()
         }
+        // Grains and phases, no matrix (#252): the same refusals above, the best phase per position below.
+        if phaseMapping.orientationSource == .grains {
+            return await runPhaseMappingGrains()
+        }
         guard let definitions = phaseDefinitions() else {
             return .failed(phaseMapping.runRefusal ?? "The phase list is not runnable.")
         }
@@ -599,12 +603,18 @@ extension AppState {
         case .objects: publishPrecipitateObjectsProduct()
         case .distance: publishPhaseDistanceProduct()
         case .orientation: publishPhaseOrientationProduct()
+        case .reliability: publishPhaseReliabilityProduct()
         }
     }
 
-    /// Phase and orientation at every position of the run on screen (#293): from a run from the structures whose phase list
-    /// is still the run's; nil for a typed-zones run, a stale list, or none.
+    /// Phase and orientation at every position of the run on screen (#293): from a run from the structures or a grains run
+    /// (#252, at the current reliability threshold) whose phase list is still the run's; nil for a typed-zones run, a stale
+    /// list, or none.
     var phaseOrientationField: PhaseOrientationField? {
+        if let grains = phaseMapping.lastGrainsRun {
+            guard phaseMapping.map != nil, !phaseMapping.isStale, phaseMapping.phases.count == grains.phaseNames.count else { return nil }
+            return grains.orientationField(reliableAbove: phaseMapping.grainsReliableAbove)
+        }
         guard let run = phaseMapping.lastStructureRun, let map = phaseMapping.map, !phaseMapping.isStale,
               phaseMapping.phases.count == map.phaseNames.count else { return nil }
         var next = 0
@@ -626,7 +636,7 @@ extension AppState {
     /// Why there is no orientation map for the run on screen, or nil when there is one.
     var phaseOrientationBlocker: String? {
         guard phaseMapping.map != nil, let run = phaseMapping.lastRun else { return "Map Phases first." }
-        guard run.orientationSource == .structures else {
+        guard run.orientationSource != .typedZones else {
             return "Orientations per position come from a run with the orientations found from the structures."
         }
         return phaseOrientationField == nil ? "The phase list changed since the run: map the phases again." : nil
@@ -682,7 +692,7 @@ extension AppState {
     }
 
     /// Provenance both phase products share: the method and its citation first.
-    private func phaseProvenance(map: PhaseMap,
+    func phaseProvenance(map: PhaseMap,
                                  run: PhaseMappingProduct.RunRecord) -> [String: String] {
         var out: [String: String] = [
             "method": "vector_matching",
@@ -725,6 +735,18 @@ extension AppState {
             if !run.excitationSlabs.isEmpty {
                 out["excitation_slab_inv_angstrom"] = run.excitationSlabs.joined(separator: " | ")
             }
+        }
+        if run.orientationSource == .grains {
+            // No matrix and no vector matching: the best phase per position by template matching, ASTAR's reliability.
+            out["method"] = "template_matching_best_phase"
+            out["method_citation"] = "Rauch & Dupuy, Arch. Metall. Mater. 50 (2005) 87 (best phase, phase reliability); "
+                + "Ophus et al., Microsc. Microanal. 28 (2022) 390 (template matching)"
+            for key in ["library_entries", "in_plane_step_deg", "max_vectors_per_entry", "not_indexed_above_inv_angstrom",
+                        "worst_chance_match_percent_at_k_max", "matrix_phase", "pair_radius_inv_angstrom",
+                        "matrix_tolerance_inv_angstrom"] { out[key] = nil }
+            out["direct_beam_radius_inv_angstrom"] = String(format: "%.4g", run.matching.directBeamRadiusInvAngstrom)
+            out["reliable_above"] = String(format: "%.4g", phaseMapping.grainsReliableAbove)
+            return out
         }
         // Additive, and empty for `.search` — see `PhaseMappingRuleDefaults
         // .provenanceAdditions`'s own doc comment for why the shipped
@@ -1029,7 +1051,7 @@ extension AppState {
 
     /// What a finished map says about itself when it found nothing, or nil.
     var phaseMappingDiagnosis: String? {
-        guard let map = phaseMapping.map else { return nil }
+        guard let map = phaseMapping.map, phaseMapping.lastGrainsRun == nil else { return nil }
         return PhaseMapPresentation.diagnosis(map, resolution: phaseVectorResolution,
                                              distortionCorrected: calibrationSession.calibration.hasEllipse)
     }
@@ -1040,6 +1062,9 @@ extension AppState {
         guard let map = phaseMapping.map else { return nil }
         let x = selectedScan.x, y = selectedScan.y
         guard x >= 0, y >= 0, x < map.width, y < map.height else { return nil }
+        if let grains = phaseMapping.lastGrainsRun {
+            return grains.evidenceLine(at: y * map.width + x, reliableAbove: phaseMapping.grainsReliableAbove)
+        }
         return PhaseMapPresentation.evidenceLine(map.results[y * map.width + x], map: map)
     }
 }

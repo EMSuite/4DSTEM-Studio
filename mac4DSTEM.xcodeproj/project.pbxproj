@@ -227,6 +227,7 @@
 				Session/DPCProduct.swift,
 				Session/EDXSession.swift,
 				Session/FitOverlayPresentation.swift,
+				Session/GrainsPhaseRun.swift,
 				Session/LearnedDetection.swift,
 				Session/LoadedView.swift,
 				Session/MaterialsProjectKeyStore.swift,

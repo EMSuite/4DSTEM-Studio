@@ -1477,12 +1477,12 @@ final class AppState {
     func openFile(url: URL) {
         if routesOpenToNewWindow(url, configure: false) { return }   // a spectrum-only window (v5.0 WP2)
         if datasetSession.isLoading { statusText = "Already opening a dataset — wait for that one to finish, or cancel it."; return }
-        if askBeforeInterruptingRun(.open(url, configure: false)) { return }   // a running analysis is asked about first (#313)
         // Every open path funnels here (menus, toolbar, welcome, sidebar, Recents, Finder); opening would cancel an
         // in-flight sidecar save unwritten (review 2026-10-02 c4).
         if isBusy, SessionSidecarLocator.isSaveInFlight(activeOperation) {
             statusText = "Still saving the session file — open \(url.lastPathComponent) when the save finishes"; return
         }
+        if askBeforeInterruptingRun(.open(url, configure: false)) { return }   // a running analysis is asked about first (#313)
         Task { await openFileAsync(url: url) }
     }
 

@@ -17,9 +17,10 @@ enum RunInterruption: Equatable {
 }
 
 extension AppState {
-    /// An analysis whose work would be lost: a cancellable run that is not the dataset's own load.
+    /// An analysis whose work would be lost: a cancellable run that is not the dataset's own load, and not a session-file save
+    /// (an open during a save keeps its own refusal, "Still saving the session file").
     var analysisIsRunning: Bool {
-        isBusy && activeOperation != nil && !datasetSession.isLoading
+        isBusy && activeOperation != nil && !datasetSession.isLoading && !SessionSidecarLocator.isSaveInFlight(activeOperation)
     }
 
     /// True when the action waits for the question (an analysis runs); false when it may go ahead now.
@@ -30,9 +31,18 @@ extension AppState {
         return true
     }
 
-    /// The window's close button or ⌘W (`WindowCloseGuard`): true closes now.
+    /// A session-file save is in flight: closing or quitting would cancel it unwritten, so both wait for it, as an open does.
+    var sessionSaveIsInFlight: Bool {
+        isBusy && SessionSidecarLocator.isSaveInFlight(activeOperation)
+    }
+
+    /// The window's close button or ⌘W (`WindowCloseGuard`): true closes now. Refused during a session-file save.
     func windowShouldClose() -> Bool {
-        !askBeforeInterruptingRun(.close)
+        if sessionSaveIsInFlight {
+            statusText = "Still saving the session file — close the window when the save finishes"
+            return false
+        }
+        return !askBeforeInterruptingRun(.close)
     }
 
     /// "Stop and …": the run stops, as the window's own close always stopped it (`windowClosed`), then the action goes ahead.
@@ -103,6 +113,11 @@ enum RunGuard {
 
     /// `applicationShouldTerminate`: quit now, or ask the first window that runs an analysis and quit on its answer (`reply`).
     static func shouldTerminate(reply: @escaping (Bool) -> Void) -> NSApplication.TerminateReply {
+        // A session-file save in flight: quitting would cancel it unwritten. Refused, as an open or a close is.
+        if let saving = windows.compactMap(\.state).first(where: \.sessionSaveIsInFlight) {
+            saving.statusText = "Still saving the session file — quit when the save finishes"
+            return .terminateCancel
+        }
         guard let running = windows.compactMap(\.state).first(where: \.analysisIsRunning) else { return .terminateNow }
         quitReply = reply
         running.pendingRunInterruption = .quit

@@ -90,6 +90,29 @@ final class RunInterruptionTests: XCTestCase {
         XCTAssertEqual(RunGuard.shouldTerminate { replies.append($0) }, .terminateNow, "nothing runs: quit at once")
     }
 
+    /// A session-file save is not an analysis: closing or quitting during it is refused with the save's own sentence (as an open
+    /// is), never asked as "Stop …?" and never cancelling the write. Mutation: the save check removed - red (the question, or a
+    /// close that cancels the save).
+    func testClosingOrQuittingDuringASessionSaveWaitsForIt() throws {
+        let saveName = try XCTUnwrap(SessionSidecarLocator.saveOperationNames.first)
+        let state = AppState()
+        let token = state.beginCancellableOperation(saveName, status: "Saving…")
+        var closed = 0
+        state.closeWindowWithoutAsking = { closed += 1 }
+        XCTAssertFalse(state.windowShouldClose())
+        XCTAssertNil(state.pendingRunInterruption, "a save is not asked about as an analysis")
+        XCTAssertTrue(state.statusText.hasPrefix("Still saving the session file"), state.statusText)
+        XCTAssertFalse(token.isCancelled)
+        XCTAssertEqual(closed, 0)
+
+        RunGuard.enroll(state)
+        defer { RunGuard.withdraw(state) }
+        var replies: [Bool] = []
+        XCTAssertEqual(RunGuard.shouldTerminate { replies.append($0) }, .terminateCancel)
+        XCTAssertTrue(replies.isEmpty)
+        XCTAssertFalse(token.isCancelled)
+    }
+
     func testTheButtonsNameWhatTheyDo() {
         XCTAssertEqual(RunInterruptionWording.confirmButton(.close), "Stop and Close")
         XCTAssertEqual(RunInterruptionWording.confirmButton(.quit), "Stop and Quit")

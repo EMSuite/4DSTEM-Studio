@@ -60,8 +60,8 @@ final class PhaseMapObjectsTests: XCTestCase {
 
     private func classMap(
         classes: Set<Int32> = [1, 2], pixelSize: Double? = nil, pixelUnit: String? = nil
-    ) -> PrecipitateSegmentation.ClassMapObjects {
-        return PrecipitateSegmentation.classObjects(
+    ) throws -> PrecipitateSegmentation.ClassMapObjects {
+        return try PrecipitateSegmentation.classObjects(
             labels: fixtureLabels(), width: width, height: height,
             roles: roles(classes: classes), pixelSize: pixelSize, pixelUnit: pixelUnit
         )
@@ -77,7 +77,7 @@ final class PhaseMapObjectsTests: XCTestCase {
     // MARK: - 1. Objects per class, pixel counts, centroids, the edge flag
 
     func testTwoClassOneObjectsAndOneClassTwoObjectWithEdgeFlag() throws {
-        let result = classMap()
+        let result = try classMap()
         XCTAssertEqual(result.width, 12)
         XCTAssertEqual(result.height, 9)
         XCTAssertEqual(result.classes.map(\.label), [1, 2], "classes come back in ascending label order")
@@ -140,7 +140,7 @@ final class PhaseMapObjectsTests: XCTestCase {
         labels[0 * 4 + 0] = 1; labels[1 * 4 + 1] = 1
         labels[3 * 4 + 0] = 1; labels[3 * 4 + 2] = 1
         labels[1 * 4 + 2] = 2
-        let result = PrecipitateSegmentation.classObjects(
+        let result = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 4, height: 4,
             roles: .init(precipitateClasses: [1, 2], matrix: [0], notIndexed: [notIndexed]),
             pixelSize: nil, pixelUnit: nil
@@ -158,7 +158,7 @@ final class PhaseMapObjectsTests: XCTestCase {
     // MARK: - 3. Not-indexed holes leave the analysed area; area fraction is per analysed pixel
 
     func testNotIndexedHolesReduceTheAnalysedAreaByTheirCount() throws {
-        let result = classMap()
+        let result = try classMap()
         XCTAssertEqual(result.notIndexedPixels, 3)
         XCTAssertEqual(result.analysedPixels, 105, "108 − 3 holes")
         XCTAssertEqual(result.matrixPixels, 87)
@@ -177,7 +177,7 @@ final class PhaseMapObjectsTests: XCTestCase {
 
         // A phase that is indexed but marked neither precipitate nor matrix
         // still received a verdict: it stays in the analysed area, as "other".
-        let onlyOne = classMap(classes: [1])
+        let onlyOne = try classMap(classes: [1])
         XCTAssertEqual(onlyOne.classes.map(\.label), [1])
         XCTAssertEqual(onlyOne.otherPixels, 8, "class 2's pixels, no longer a precipitate class")
         XCTAssertEqual(onlyOne.analysedPixels, 105, "unchanged — a verdict is a verdict")
@@ -187,7 +187,7 @@ final class PhaseMapObjectsTests: XCTestCase {
 
     func testArealDensityAtKnownPixelSizeAndRefusalWithout() throws {
         let px = 7.4829 // nm
-        let result = classMap(pixelSize: px, pixelUnit: "nm")
+        let result = try classMap(pixelSize: px, pixelUnit: "nm")
         let one = try cls(1, in: result), two = try cls(2, in: result)
 
         // One counted object per class, edge-weighted in the 12 × 9 frame
@@ -205,7 +205,7 @@ final class PhaseMapObjectsTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(one.density.meanWidth), 2, accuracy: 1e-6)
         XCTAssertEqual(try XCTUnwrap(two.density.medianLength), 4, accuracy: 1e-6)
 
-        let refused = classMap(pixelSize: nil, pixelUnit: nil)
+        let refused = try classMap(pixelSize: nil, pixelUnit: nil)
         for c in refused.classes {
             XCTAssertNil(c.density.arealDensity, "class \(c.label): no pixel size, no density — never a number")
             XCTAssertNil(c.density.pixelSize)
@@ -215,7 +215,7 @@ final class PhaseMapObjectsTests: XCTestCase {
     // MARK: - 5. A class with no objects is reported, count 0, density 0 when calibrated
 
     func testAbsentClassReportsZeroCountAndZeroDensityWhenCalibrated() throws {
-        let result = classMap(classes: [1, 2, 3], pixelSize: 7.4829, pixelUnit: "nm")
+        let result = try classMap(classes: [1, 2, 3], pixelSize: 7.4829, pixelUnit: "nm")
         XCTAssertEqual(result.classes.map(\.label), [1, 2, 3], "an absent class is still a row")
         let three = try cls(3, in: result)
         XCTAssertTrue(three.objects.isEmpty)
@@ -226,7 +226,7 @@ final class PhaseMapObjectsTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(three.areaFraction), 0)
         XCTAssertNil(three.density.meanLength)
 
-        let uncalibrated = classMap(classes: [3])
+        let uncalibrated = try classMap(classes: [3])
         XCTAssertNil(try cls(3, in: uncalibrated).density.arealDensity, "and without a pixel size it is still a refusal")
     }
 }

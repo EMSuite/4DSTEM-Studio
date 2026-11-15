@@ -66,7 +66,7 @@ final class ObjectVariantsTests: XCTestCase {
                 }
             }
         }
-        let objects = PrecipitateSegmentation.classObjects(
+        let objects = try PrecipitateSegmentation.classObjects(
             labels: labels, width: w, height: h,
             roles: .init(precipitateClasses: [1], matrix: [0], notIndexed: []), pixelSize: 1, pixelUnit: "nm")
         var idAt: [String: Int] = [:]
@@ -165,7 +165,7 @@ final class ObjectVariantsTests: XCTestCase {
         let settings = VariantSettings()
         let run = ObjectVariantAssigner.run(objects: s.objects, results: s.results, orientations: s.orientations, precipitatePhaseIndex: 1,
                                             setup: try setup, settings: settings)
-        let report = PrecipitateObjectReport.make(objects: s.objects, phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: 1, pixelUnit: "nm",
+        let report = try PrecipitateObjectReport.make(objects: s.objects, phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: 1, pixelUnit: "nm",
                                                   minimumAreaPx: 1, variantJoin: run, variantSettings: settings, endOnDirection: 2)
         let groups = try XCTUnwrap(report.variantGroups)
         func group(_ kind: PrecipitateObjectReport.VariantGroup.Kind, _ i: Int) -> PrecipitateObjectReport.VariantGroup { groups.first { $0.kind == kind && $0.index == i }! }
@@ -181,7 +181,7 @@ final class ObjectVariantsTests: XCTestCase {
         // the group's density is the kit function over exactly that group's counted objects
         let ids = Set(report.rows.filter { $0.variant?.direction == 0 }.map(\.id))
         let subset = s.objects.classes.flatMap(\.objects).filter { ids.contains($0.id) }
-        let kit = PrecipitateSegmentation.density(objects: subset, accepted: ids, analysedPixels: s.objects.analysedPixels,
+        let kit = try PrecipitateSegmentation.density(objects: subset, accepted: ids, analysedPixels: s.objects.analysedPixels,
                                                   width: s.objects.width, height: s.objects.height, pixelSize: 1, pixelUnit: "nm")
         XCTAssertEqual(group(.direction, 0).arealDensity, kit.arealDensity)
         // the CSV
@@ -194,7 +194,7 @@ final class ObjectVariantsTests: XCTestCase {
             XCTAssertEqual(line.split(separator: ",", omittingEmptySubsequences: false).count - (line.contains("\"") ? 1 : 0), header, "every row has the header's columns: \(line)")
         }
         // a report decoded from before the columns existed
-        let old = PrecipitateObjectReport.make(objects: s.objects, phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: 1, pixelUnit: "nm", minimumAreaPx: 1)
+        let old = try PrecipitateObjectReport.make(objects: s.objects, phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: 1, pixelUnit: "nm", minimumAreaPx: 1)
         let decoded = try JSONDecoder().decode(PrecipitateObjectReport.self, from: JSONEncoder().encode(old))
         XCTAssertNil(decoded.variantGroups); XCTAssertNil(decoded.rows.first?.variant)
         XCTAssertFalse(old.csv().contains("variant_status"))
@@ -380,7 +380,7 @@ extension ObjectVariantsTests {
                 XCTAssertEqual(a.direction, setup.habitFamily[k])
                 XCTAssertEqual(a.directionName, preset.familyNames[setup.habitFamily[k]])
             }
-            let report = PrecipitateObjectReport.make(objects: s.objects, phaseNames: ["Al", "plate"], matrixPhaseIndex: 0, pixelSize: 1, pixelUnit: "nm",
+            let report = try PrecipitateObjectReport.make(objects: s.objects, phaseNames: ["Al", "plate"], matrixPhaseIndex: 0, pixelSize: 1, pixelUnit: "nm",
                                                       minimumAreaPx: 1, variantJoin: run, variantSettings: settings, endOnDirection: beam,
                                                       variantDirections: setup.habitFamily)
             let groups = try XCTUnwrap(report.variantGroups)

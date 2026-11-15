@@ -240,7 +240,7 @@ package nonisolated enum ParallaxSubpixelReconstructor {
 
         let paddingY = preprocessing.stackHeight - preprocessing.scanHeight
         let paddingX = preprocessing.stackWidth - preprocessing.scanWidth
-        let cropped = crop(
+        let cropped = try crop(
             pixelOutput, width: outputWidth, height: outputHeight,
             paddingY: paddingY, paddingX: paddingX, factor: factor
         )
@@ -277,16 +277,22 @@ package nonisolated enum ParallaxSubpixelReconstructor {
         return window
     }
 
-    private static func crop(
+    /// The padded upsampled image without its padding. A padding that leaves no image, or a crop outside the image, is a refusal:
+    /// a negative size trapped in `[Float](repeating:count:)` (mac4DSTEM#300).
+    package static func crop(
         _ pixels: [Float], width: Int, height: Int,
         paddingY: Int, paddingX: Int, factor: Double
-    ) -> FloatImage {
+    ) throws -> FloatImage {
         let cropPaddingY = Int((Double(paddingY) * factor).rounded(.toNearestOrEven))
         let cropTop = Int((Double(paddingY) / 2 * factor).rounded(.toNearestOrEven))
         let cropPaddingX = Int((Double(paddingX) * factor).rounded(.toNearestOrEven))
         let cropLeft = Int((Double(paddingX) / 2 * factor).rounded(.toNearestOrEven))
         let cropHeight = height - cropPaddingY
         let cropWidth = width - cropPaddingX
+        guard width > 0, height > 0, pixels.count >= width * height, cropHeight > 0, cropWidth > 0,
+              cropTop >= 0, cropLeft >= 0, cropTop <= height - cropHeight, cropLeft <= width - cropWidth else {
+            throw ReconstructionError.invalidInput("the upsampled image is no larger than its padding")
+        }
         var cropped = [Float](repeating: 0, count: cropHeight * cropWidth)
         for row in 0..<cropHeight {
             let source = (cropTop + row) * width + cropLeft

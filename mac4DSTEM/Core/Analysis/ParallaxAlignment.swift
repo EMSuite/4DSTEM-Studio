@@ -121,6 +121,20 @@ package nonisolated struct ParallaxAlignmentResult: Sendable {
 }
 
 package nonisolated enum ParallaxAligner {
+    /// The fitted shifts' median, rounded to whole scan pixels, by which every shift is centred. A NaN or infinite shift (a fit on
+    /// an empty or saturated image) is a refusal: `Int(NaN)` trapped here (mac4DSTEM#300).
+    package nonisolated static func wholeMedianShift(_ shifts: [ParallaxScanShift]) throws -> (row: Int, column: Int) {
+        guard shifts.allSatisfy({ $0.row.isFinite && $0.column.isFinite }) else {
+            throw AlignmentError.invalidInput("a fitted bright-field shift is not a finite number")
+        }
+        let row = median(shifts.map(\.row)).rounded(.toNearestOrEven)
+        let column = median(shifts.map(\.column)).rounded(.toNearestOrEven)
+        guard abs(row) < Float(Int32.max), abs(column) < Float(Int32.max) else {
+            throw AlignmentError.invalidInput("a fitted bright-field shift is not a finite number")
+        }
+        return (Int(row), Int(column))
+    }
+
     package enum AlignmentError: LocalizedError, Equatable {
         case invalidInput(String)
         case memoryLimit(bytes: Int, limit: Int)
@@ -421,8 +435,7 @@ package nonisolated enum ParallaxAligner {
         }
         try checkCancellation(cancellation)
 
-        let medianRow = Int(median(fittedShifts.map(\.row)).rounded(.toNearestOrEven))
-        let medianColumn = Int(median(fittedShifts.map(\.column)).rounded(.toNearestOrEven))
+        let (medianRow, medianColumn) = try wholeMedianShift(fittedShifts)
         let centeredShifts = fittedShifts.map {
             ParallaxScanShift(row: $0.row - Float(medianRow),
                               column: $0.column - Float(medianColumn))

@@ -172,8 +172,10 @@ package nonisolated enum FitOverlays {
         let g2 = (x: map.localG2x[scanIndex], y: map.localG2y[scanIndex])
         var predicted: [Marker] = []
         let margin: Float = 2
-        for h in -maxOrder...maxOrder {
-            for k in -maxOrder...maxOrder where h != 0 || k != 0 {
+        // A negative order draws nothing; `-maxOrder...maxOrder` trapped on it (mac4DSTEM#300).
+        let order = max(0, maxOrder)
+        for h in -order...order {
+            for k in -order...order where h != 0 || k != 0 {
                 let point = raw(Float(h) * g1.x + Float(k) * g2.x,
                                 Float(h) * g1.y + Float(k) * g2.y)
                 guard point.x >= -margin, point.x <= Float(patternWidth) + margin,

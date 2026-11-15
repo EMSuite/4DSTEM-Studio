@@ -11,8 +11,13 @@
 import Foundation
 
 enum UITestingLaunch {
-    /// Launched by the UI test target: deterministic window, no restore.
+    /// Launched by the UI test target: deterministic window, no restore. Debug builds only (#310): the reset below deletes saved
+    /// state, which a release build never does on a launch argument.
+    #if DEBUG
     static let isActive = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+    #else
+    static let isActive = false
+    #endif
 
     /// The window's width: the default 1440, or `--ui-window-width <points>` (800 or more), so a journey can see the narrower layout.
     static let windowWidth: CGFloat = {

@@ -115,7 +115,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let descriptor = state.descriptor else { return .refusal(status: 404, message: "This window has no dataset open.") }
             if let shape = named(call.arguments["shape"], VirtualShapeMode.self), shape != state.resultPresentation.virtualShape {
                 state.resultPresentation.virtualShape = shape   // the window's onChange commits it, as for the picker
@@ -144,7 +144,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             if let direction = call.arguments["direction"] { state.activePane = direction == "region" ? .realSpace : .diffraction }
             if let shape = named(call.arguments["region_shape"], RegionShape.self), shape != state.realSpaceShape {
                 state.realSpaceShape = shape   // the window's onChange sums the new region, as for the picker
@@ -170,7 +170,7 @@ extension Mac4DSTEMAgentDoor {
                   parameters: ReconstructionField.all.map(\.parameter),
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             for field in ReconstructionField.all {
                 if let text = call.arguments[field.parameter.name] { field.apply(text, state) }
             }
@@ -188,7 +188,7 @@ extension Mac4DSTEMAgentDoor {
                                               required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             guard let step = call.arguments["step"].flatMap(ReconstructionStep.init(rawValue:)) else {
                 return .refusal(status: 400, message: "Name a step.")

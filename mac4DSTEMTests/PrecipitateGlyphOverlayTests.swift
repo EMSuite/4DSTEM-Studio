@@ -10,20 +10,20 @@ import DiffractoOrientation
 
 final class PrecipitateGlyphOverlayTests: XCTestCase {
     /// 8 x 6 scan, phase 1: A a 3 px bar (interior), B a 1 px speck (interior), C 2 px on the right edge.
-    private func report(minimum: Int = 2) -> PrecipitateObjectReport {
+    private func report(minimum: Int = 2) throws -> PrecipitateObjectReport {
         var labels = [Int32](repeating: 0, count: 8 * 6)
         for x in 2...4 { labels[2 * 8 + x] = 1 }
         labels[4 * 8 + 5] = 1
         labels[1 * 8 + 7] = 1; labels[2 * 8 + 7] = 1
-        let objects = PrecipitateSegmentation.classObjects(
+        let objects = try PrecipitateSegmentation.classObjects(
             labels: labels, width: 8, height: 6, roles: .init(precipitateClasses: [1], matrix: [0], notIndexed: [-1]),
             pixelSize: nil, pixelUnit: nil)
-        return PrecipitateObjectReport.make(objects: objects, phaseNames: ["Al", "θ′"], matrixPhaseIndex: 0,
+        return try PrecipitateObjectReport.make(objects: objects, phaseNames: ["Al", "θ′"], matrixPhaseIndex: 0,
                                             pixelSize: 2, pixelUnit: "nm", minimumAreaPx: minimum)
     }
 
     func testOneGlyphPerObjectFromTheTablesOwnRows() throws {
-        let r = report()
+        let r = try report()
         let set = PrecipitateGlyphSet.make(r)
         XCTAssertEqual(set.glyphs.count, r.rows.count)
         let a = try XCTUnwrap(set.glyphs.first { $0.counted })
@@ -34,8 +34,8 @@ final class PrecipitateGlyphOverlayTests: XCTestCase {
         XCTAssertTrue(a.readout.hasSuffix("nm"), a.readout)
     }
 
-    func testCountedOnlyDropsEdgeAndSmallObjects() {
-        let set = PrecipitateGlyphSet.make(report())
+    func testCountedOnlyDropsEdgeAndSmallObjects() throws {
+        let set = PrecipitateGlyphSet.make(try report())
         XCTAssertEqual(set.shown(PrecipitateOverlaySettings(countedOnly: true)).count, 1, "only A is counted")
         XCTAssertEqual(set.shown(PrecipitateOverlaySettings(countedOnly: false)).count, 3)
     }
@@ -43,7 +43,7 @@ final class PrecipitateGlyphOverlayTests: XCTestCase {
     /// The geometry through the display transform: the same object lands at the same fraction of a 64 x 48 pane and of a
     /// 320 x 240 one (a virtual image and an EDX map of the same scan), and keeps its aspect and angle.
     func testTheSameObjectIsAtTheSameFractionOnEveryPane() throws {
-        let set = PrecipitateGlyphSet.make(report())
+        let set = PrecipitateGlyphSet.make(try report())
         let g = try XCTUnwrap(set.glyphs.first { $0.counted })
         let small = PrecipitateGlyphGeometry.place(g, gridWidth: set.width, gridHeight: set.height, paneSize: CGSize(width: 64, height: 48))
         let big = PrecipitateGlyphGeometry.place(g, gridWidth: set.width, gridHeight: set.height, paneSize: CGSize(width: 320, height: 240))
@@ -57,7 +57,7 @@ final class PrecipitateGlyphOverlayTests: XCTestCase {
     }
 
     func testHitTestFindsTheObjectUnderAPixel() throws {
-        let set = PrecipitateGlyphSet.make(report())
+        let set = PrecipitateGlyphSet.make(try report())
         let on = PrecipitateOverlaySettings(countedOnly: false)
         XCTAssertNotNil(set.hit(x: 3, y: 2, settings: on))
         XCTAssertNil(set.hit(x: 0, y: 0, settings: on))

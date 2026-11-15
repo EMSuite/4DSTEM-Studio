@@ -4,6 +4,7 @@ import SwiftUI
 import ShellMetal
 #if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
 import DSTEMCore
+import DiffractoCore
 import DSTEMSession
 #endif
 
@@ -1396,10 +1397,15 @@ struct RealSpacePane: View {
                     // it "001 / 111 / 101" renders in the ambient label colour
                     // over an arbitrary orientation map.
                     Group {
-                        switch IPFLegendKind.kind(for: appState.acomSession.orientationMap?.symmetry) {
+                        // A phase's orientation map (#293) is keyed by that phase's symmetry, an ACOM map by the ACOM crystal's.
+                        let legend = appState.displayedResultKind == PhaseResultPicture.orientation.productKind
+                            ? IPFLegendKind.kind(forLaueClass: appState.displayedProduct?.provenance["orientation_symmetry"].flatMap(LaueClass.init(rawValue:)))
+                            : IPFLegendKind.kind(for: appState.acomSession.orientationMap?.symmetry)
+                        switch legend {
                         case .hexagonal: HexagonalIPFLegend()
                         case .monoclinic: MonoclinicIPFLegend()
                         case .cubic: CubicIPFLegend()
+                        case .other(let laue): FundamentalZoneIPFLegend(laueClass: laue)
                         }
                     }
                     .padding(7)

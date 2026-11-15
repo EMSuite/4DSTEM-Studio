@@ -18,6 +18,18 @@ import ImagoCore
 
 package nonisolated enum PrecipitateSegmentation {
 
+    /// Why a class map cannot be segmented: its caller's data does not hold together (mac4DSTEM#300: these were `precondition`s
+    /// and a `try!`, so a malformed map trapped the app instead of being refused).
+    package enum Refusal: LocalizedError, Equatable {
+        case invalidInput(String)
+
+        package var errorDescription: String? {
+            switch self {
+            case .invalidInput(let why): "The precipitate objects cannot be found: \(why)."
+            }
+        }
+    }
+
     /// One segmented object. `lengthPx` is the needle length: scikit-image's `feret_diameter_max`, the largest caliper distance
     /// (since task 39; it was the extent along the principal axis plus 1 px, which differs by under 1 px on diagonals).
     /// `widthPx` is the extent across the principal axis, end to end (the range of the members' projections + 1).
@@ -175,15 +187,17 @@ package nonisolated enum PrecipitateSegmentation {
     package nonisolated static func classObjects(
         labels: [Int32], width: Int, height: Int, roles: LabelRoles,
         pixelSize: Double?, pixelUnit: String?
-    ) -> ClassMapObjects {
-        precondition(width >= 0 && height >= 0, "class-map dimensions must be non-negative")
-        precondition(labels.count == width * height, "labels must match class-map dimensions")
-        precondition(
-            roles.precipitateClasses.isDisjoint(with: roles.matrix)
+    ) throws -> ClassMapObjects {
+        guard width >= 0, height >= 0 else { throw Refusal.invalidInput("the class map's dimensions are negative") }
+        let (pixels, overflow) = width.multipliedReportingOverflow(by: height)
+        guard !overflow, labels.count == pixels else {
+            throw Refusal.invalidInput("the class map has \(labels.count) labels for \(width) × \(height) positions")
+        }
+        guard roles.precipitateClasses.isDisjoint(with: roles.matrix)
                 && roles.precipitateClasses.isDisjoint(with: roles.notIndexed)
-                && roles.matrix.isDisjoint(with: roles.notIndexed),
-            "role sets must be disjoint; labels in no set are indexed other labels"
-        )
+                && roles.matrix.isDisjoint(with: roles.notIndexed) else {
+            throw Refusal.invalidInput("a label is both a precipitate class and the matrix or not indexed")
+        }
 
         let total = labels.count
         let notIndexedPixels = labels.count { roles.notIndexed.contains($0) }
@@ -194,10 +208,10 @@ package nonisolated enum PrecipitateSegmentation {
         let areaRule = "All indexed labels, including matrix and other classes, are in the analysed area; only not-indexed labels are excluded."
 
         var nextObjectID = 1
-        let classes = roles.precipitateClasses.sorted().map { label -> ClassObjects in
+        let classes = try roles.precipitateClasses.sorted().map { label -> ClassObjects in
             let objects = Self.objects(of: labels.map { $0 == label }, width: width, height: height, firstID: nextObjectID)
             nextObjectID += objects.count
-            let density = Self.density(objects: objects, accepted: Set(objects.map(\.id)),
+            let density = try Self.density(objects: objects, accepted: Set(objects.map(\.id)),
                                        analysedPixels: analysedPixels, width: width, height: height,
                                        pixelSize: pixelSize, pixelUnit: pixelUnit)
             let pixelCount = objects.reduce(0) { $0 + $1.area }
@@ -259,11 +273,15 @@ package nonisolated enum PrecipitateSegmentation {
     package nonisolated static func density(
         objects: [Object], accepted: Set<Int>, analysedPixels: Int, width: Int, height: Int,
         pixelSize: Double?, pixelUnit: String?
-    ) -> ObjectStatistics.ArealDensity {
+    ) throws -> ObjectStatistics.ArealDensity {
         let image = kitLabels(of: objects, width: width, height: height)
         let labels = Set(objects.enumerated().filter { accepted.contains($0.element.id) }.map { Int32($0.offset + 1) })
-        // The frame is the label image and `analysedPixels` is within it by construction; the kit refuses only a malformed image.
-        return try! ObjectStatistics.arealDensity(labels: image, accepted: labels, analysedPixels: analysedPixels,
-                                                  pixelSize: pixelSize, pixelUnit: pixelUnit)
+        // The kit refuses a malformed label image or an analysed area outside the frame: a refusal, not a trap (mac4DSTEM#300).
+        do {
+            return try ObjectStatistics.arealDensity(labels: image, accepted: labels, analysedPixels: analysedPixels,
+                                                     pixelSize: pixelSize, pixelUnit: pixelUnit)
+        } catch {
+            throw Refusal.invalidInput("the object density was refused (\(error))")
+        }
     }
 }

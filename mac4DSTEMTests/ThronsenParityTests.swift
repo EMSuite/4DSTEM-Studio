@@ -165,9 +165,9 @@ final class ThronsenParityTests: XCTestCase {
         return (map, library, peaks.reduce(0) { $0 + $1.count })
     }
 
-    private func objectRows(_ labels: [Int], width: Int, height: Int) -> [Int: (counted: Int, edge: Int, medianNm: Double?, densityPerUm2: Double?)] {
+    private func objectRows(_ labels: [Int], width: Int, height: Int) throws -> [Int: (counted: Int, edge: Int, medianNm: Double?, densityPerUm2: Double?)] {
         let kit: [Int32] = labels.map { $0 < 0 ? 9 : ($0 == 4 ? 9 : Int32($0)) }
-        let objects = PrecipitateSegmentation.classObjects(
+        let objects = try PrecipitateSegmentation.classObjects(
             labels: kit, width: width, height: height,
             roles: .init(precipitateClasses: [1, 2, 3], matrix: [0], notIndexed: [9]), pixelSize: Self.stridePixelNm, pixelUnit: "nm")
         var out: [Int: (counted: Int, edge: Int, medianNm: Double?, densityPerUm2: Double?)] = [:]
@@ -197,8 +197,8 @@ final class ThronsenParityTests: XCTestCase {
         // accepted it without a bisect. A change that moves it again needs a reason.
         XCTAssertEqual(100 - accuracy, 1.41, accuracy: 0.05)
 
-        let theirs = objectRows(truth.labels, width: truth.width, height: truth.height)
-        let mine = objectRows(ours.labels, width: truth.width, height: truth.height)
+        let theirs = try objectRows(truth.labels, width: truth.width, height: truth.height)
+        let mine = try objectRows(ours.labels, width: truth.width, height: truth.height)
         for (label, name) in [(1, "θ′ edge-on"), (2, "θ′ face-on"), (3, "T1")] {
             let t = try XCTUnwrap(theirs[label]), m = try XCTUnwrap(mine[label])
             print("THRONSEN objects \(name): truth \(t) ours \(m)")
@@ -244,11 +244,11 @@ final class ThronsenParityTests: XCTestCase {
     private struct ObjectLine { var counted: Int; var edge: Int; var small: Int; var medianNm: Double?; var densityPerUm2: Double?; var angles: [Double] }
 
     /// Objects per precipitate class through the app's pipeline (`classObjects`, the report) at `stepNm` per position and a minimum size.
-    private func objectLines(_ labels: [Int], width: Int, height: Int, stepNm: Double, minimum: Int) -> [Int: ObjectLine] {
+    private func objectLines(_ labels: [Int], width: Int, height: Int, stepNm: Double, minimum: Int) throws -> [Int: ObjectLine] {
         let kit: [Int32] = labels.map { $0 < 0 || $0 == 4 ? 9 : Int32($0) }
-        let objects = PrecipitateSegmentation.classObjects(labels: kit, width: width, height: height,
+        let objects = try PrecipitateSegmentation.classObjects(labels: kit, width: width, height: height,
             roles: .init(precipitateClasses: [1, 2, 3], matrix: [0], notIndexed: [9]), pixelSize: stepNm, pixelUnit: "nm")
-        let report = PrecipitateObjectReport.make(objects: objects, phaseNames: ["Al", "θ′ edge-on", "θ′ face-on", "T1"], matrixPhaseIndex: 0,
+        let report = try PrecipitateObjectReport.make(objects: objects, phaseNames: ["Al", "θ′ edge-on", "θ′ face-on", "T1"], matrixPhaseIndex: 0,
                                                   pixelSize: stepNm, pixelUnit: "nm", minimumAreaPx: minimum)
         var out: [Int: ObjectLine] = [:]
         for s in report.summaries {
@@ -281,9 +281,9 @@ final class ThronsenParityTests: XCTestCase {
         return out
     }
 
-    private func isolated(_ labels: [Int], width: Int, height: Int) -> Int {
+    private func isolated(_ labels: [Int], width: Int, height: Int) throws -> Int {
         let kit: [Int32] = labels.map { $0 < 0 || $0 == 4 ? 9 : Int32($0) }
-        let objects = PrecipitateSegmentation.classObjects(labels: kit, width: width, height: height,
+        let objects = try PrecipitateSegmentation.classObjects(labels: kit, width: width, height: height,
             roles: .init(precipitateClasses: [1, 2, 3], matrix: [0], notIndexed: [9]), pixelSize: nil, pixelUnit: nil)
         return objects.classes.flatMap(\.objects).filter { $0.area == 1 }.count
     }
@@ -382,10 +382,10 @@ final class ThronsenParityTests: XCTestCase {
         // 3. the spread: counts, median Feret, edge-corrected density, with every object and with single-position objects dropped
         for minimum in [1, 2] {
             for (k, name) in names.enumerated() {
-                line("\(name) full min\(minimum)", objectLines(full[k], width: 512, height: 512, stepNm: paperStepNm, minimum: minimum))
-                line("\(name) stride3 min\(minimum)", objectLines(third[k], width: 171, height: 171, stepNm: paperStepNm * 3, minimum: minimum))
+                line("\(name) full min\(minimum)", try objectLines(full[k], width: 512, height: 512, stepNm: paperStepNm, minimum: minimum))
+                line("\(name) stride3 min\(minimum)", try objectLines(third[k], width: 171, height: 171, stepNm: paperStepNm * 3, minimum: minimum))
             }
-            line("ours stride3 min\(minimum)", objectLines(oursLabels, width: 171, height: 171, stepNm: paperStepNm * 3, minimum: minimum))
+            line("ours stride3 min\(minimum)", try objectLines(oursLabels, width: 171, height: 171, stepNm: paperStepNm * 3, minimum: minimum))
         }
         // 4. the edge check: our wrong positions within 2 positions of a truth boundary; the one-position objects per map
         let near3 = nearBoundary(third[0], width: 171, height: 171)
@@ -404,9 +404,9 @@ final class ThronsenParityTests: XCTestCase {
             print(String(format: "THRONSEN-EDGE %@ stride3: %d wrong, %d within 2 positions of a truth boundary (%.1f %%)", names[k], wrong.count, near, 100 * Double(near) / Double(max(wrong.count, 1))))
         }
         for k in 0..<5 {
-            print("THRONSEN-ISOLATED \(names[k]) full: \(isolated(full[k], width: 512, height: 512)) one-position objects; stride3: \(isolated(third[k], width: 171, height: 171))")
+            print("THRONSEN-ISOLATED \(names[k]) full: \(try isolated(full[k], width: 512, height: 512)) one-position objects; stride3: \(try isolated(third[k], width: 171, height: 171))")
         }
-        print("THRONSEN-ISOLATED ours stride3: \(isolated(oursLabels, width: 171, height: 171)) one-position objects")
+        print("THRONSEN-ISOLATED ours stride3: \(try isolated(oursLabels, width: 171, height: 171)) one-position objects")
         // 5. variants per class: the distinct in-plane rotations among the winning entries of each class (known-variants rule), and the offset
         let library = ours.library
         let matrixEntry = library.entries[ours.map.matrixEntryIndex]
@@ -427,8 +427,8 @@ final class ThronsenParityTests: XCTestCase {
             for a in angles { bins[min(max(Int((a + 90) / 15), 0), 11)] += 1 }
             return bins.enumerated().filter { $0.element > 0 }.map { String(format: "%+.0f..%+.0f: %d", Double($0.offset) * 15 - 90, Double($0.offset + 1) * 15 - 90, $0.element) }.joined(separator: ", ")
         }
-        let truthObjects = objectLines(third[0], width: 171, height: 171, stepNm: paperStepNm * 3, minimum: 4)
-        let oursObjects = objectLines(oursLabels, width: 171, height: 171, stepNm: paperStepNm * 3, minimum: 4)
+        let truthObjects = try objectLines(third[0], width: 171, height: 171, stepNm: paperStepNm * 3, minimum: 4)
+        let oursObjects = try objectLines(oursLabels, width: 171, height: 171, stepNm: paperStepNm * 3, minimum: 4)
         for (label, cls) in [(1, "θ′ edge-on"), (2, "θ′ face-on"), (3, "T1")] {
             print("THRONSEN-ANGLES truth \(cls) (min 4 px, counted): \(families(truthObjects[label]?.angles ?? []))")
             print("THRONSEN-ANGLES ours \(cls) (min 4 px, counted): \(families(oursObjects[label]?.angles ?? []))")

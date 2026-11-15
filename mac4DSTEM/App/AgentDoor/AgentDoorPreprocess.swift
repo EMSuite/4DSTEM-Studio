@@ -78,14 +78,14 @@ extension Mac4DSTEMAgentDoor {
                   parameters: [AgentParameter("path", .text, summary: "The file, relative to the Agent folder.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             switch folder.resolve(call.arguments["path"] ?? "") {
             case .failure(let refusal): return .refusal(status: 404, message: refusal.message)
             case .success(let url):
                 guard FileManager.default.fileExists(atPath: url.path) else {
                     return .refusal(status: 404, message: noFileMessage(url))
                 }
-                state.statusText = "An agent opened \(url.lastPathComponent) with options."
+                state.statusText = "An agent opened \(quotedAgentText(url.lastPathComponent)) with options."
                 state.openFileForConfiguration(url: url)
                 return .json(["configuring": folder.relativePath(of: url)])
             }
@@ -145,7 +145,7 @@ extension Mac4DSTEMAgentDoor {
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let descriptor = state.descriptor, let pending = state.makeCurrentViewPending(descriptor: descriptor) else {
                 return .refusal(status: 404, message: "This window has no dataset open to preprocess.")
             }
@@ -173,7 +173,7 @@ extension Mac4DSTEMAgentDoor {
                     return .refusal(status: 403, message: "Saving is off. Ask the person to turn on \"Let agents save results "
                         + "there\" in Settings > Agents, or use ask_person true.")
                 }
-                guard let root = folder.url else { return .refusal(status: 404, message: AgentFolder.noFolder) }
+                guard let root = folder.url else { return .refusal(status: 404, message: folder.missingMessage) }
                 switch fileName(a["name"], default: suggested, extension: "h5") {
                 case .failure(let refusal): return .refusal(status: 400, message: refusal.message)
                 case .success(let name):
@@ -185,7 +185,7 @@ extension Mac4DSTEMAgentDoor {
                 }
             }
             let openAfter = a["open_after"] == "true"
-            state.statusText = "An agent started preprocessing into \(destination.lastPathComponent)."
+            state.statusText = "An agent started preprocessing into \(quotedAgentText(destination.lastPathComponent))."
             state.writePreprocessed(pending: pending, to: destination) { outcome in
                 switch outcome {
                 case .wrote(let message):

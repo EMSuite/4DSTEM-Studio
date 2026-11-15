@@ -26,6 +26,12 @@ extension Mac4DSTEMAgentDoor {
     /// Whether the person lets agents write into the Agent folder (Settings > Agents).
     static var savesAllowed = false
 
+    /// The windows an agent's `open_file` is opening, from the tool's answer until the open returns.
+    static var opening: Set<ObjectIdentifier> = []
+
+    /// Whether an agent's open of `state` is in flight (`AppState.agentBusy`).
+    static func isOpening(_ state: AppState) -> Bool { opening.contains(ObjectIdentifier(state)) }
+
     /// What a file tool answers when its path names no file; an empty path is the folder itself, never "no file <folder name>".
     static func noFileMessage(_ url: URL) -> String {
         guard let root = folder.url, url.standardizedFileURL.path != root.standardizedFileURL.path else {
@@ -39,18 +45,20 @@ extension Mac4DSTEMAgentDoor {
                   summary: "The files in the Agent folder the person chose in Settings > Agents (and its subfolders): path relative to "
                       + "the folder, size in bytes, modification date. open_file opens one; save_result_image saves into the folder.",
                   input: .noWindow) { _ in
-            guard let listed = folder.listing() else { return .refusal(status: 404, message: AgentFolder.noFolder) }
+            guard let listed = folder.listing() else { return .refusal(status: 404, message: folder.missingMessage) }
             return .json(["folder": folder.url?.lastPathComponent ?? "", "files": listed.files, "truncated": listed.truncated])
         },
         AgentTool(name: "open_file", title: "Open file",
-                  summary: "Opens a file of the Agent folder in the window, as File > Open does, replacing the dataset it shows. It "
+                  summary: "Opens a file of the Agent folder in the window, as File > Open does, replacing the dataset it shows. As "
+                      + "there, one window holds one kind: a spectrum image opened in a window with a 4D scan, or a 4D file in a "
+                      + "window with only a spectrum image, opens in a NEW window: list_windows then names it. It "
                       + "starts the open and answers at once; get_window says busy until the dataset is in, and get_log says if it failed.",
                   input: .window,
                   parameters: [AgentParameter("path", .text, summary: "The file, relative to the Agent folder, as list_agent_folder "
                                                   + "names it.", required: true)],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             let file: URL
             switch folder.resolve(call.arguments["path"] ?? "") {
             case .success(let url): file = url
@@ -60,8 +68,13 @@ extension Mac4DSTEMAgentDoor {
             guard FileManager.default.fileExists(atPath: file.path, isDirectory: &isFolder), !isFolder.boolValue else {
                 return .refusal(status: 404, message: noFileMessage(file))
             }
-            state.statusText = "An agent opened \(file.lastPathComponent)."
-            Task { await state.openFileAsync(url: file) }
+            state.statusText = "An agent opened \(quotedAgentText(file.lastPathComponent))."
+            // Busy from this answer on, not from the moment the open's own loading stage begins (#266: about a second later).
+            opening.insert(ObjectIdentifier(state))
+            Task {
+                await state.openFileAsync(url: file)
+                opening.remove(ObjectIdentifier(state))
+            }
             return .json(["opening": folder.relativePath(of: file)])
         },
         AgentTool(name: "save_result_image", title: "Save result picture",
@@ -77,8 +90,8 @@ extension Mac4DSTEMAgentDoor {
                 return .refusal(status: 403, message: "Saving is off. Ask the person to turn on \"Let agents save results there\" in "
                     + "mac4DSTEM's Settings > Agents.")
             }
-            guard !state.isBusy else { return busyRefusal }
-            guard let root = folder.url else { return .refusal(status: 404, message: AgentFolder.noFolder) }
+            guard !state.agentBusy else { return busyRefusal }
+            guard let root = folder.url else { return .refusal(status: 404, message: folder.missingMessage) }
             let name: String
             switch fileName(call.arguments["name"], default: state.exportBaseName + "_result") {
             case .success(let made): name = made
@@ -123,6 +136,9 @@ extension Mac4DSTEMAgentDoor {
         return CGImageDestinationFinalize(destination) ? data as Data : nil
     }
 
+    /// The longest file name a save takes, in UTF-8 bytes before the extension.
+    static let fileNameByteLimit = 200
+
     /// A save's file name: letters, digits, spaces, `-`, `_` and `.`, no folders, ending in .png.
     static func fileName(_ given: String?, default fallback: String, extension ext: String = "png") -> Result<String, AgentFolderRefusal> {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_."))
@@ -134,6 +150,12 @@ extension Mac4DSTEMAgentDoor {
             while name.hasPrefix(".") { name = "_" + String(name.dropFirst()) }
         }
         if name.lowercased().hasSuffix("." + ext) { name = String(name.dropLast(ext.count + 1)) }
+        // A name the agent gives is refused when too long; the dataset's own is shortened (#310). macOS allows 255 bytes.
+        if given?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            while name.utf8.count > fileNameByteLimit { name.removeLast() }
+        } else if name.utf8.count > fileNameByteLimit {
+            return .failure(AgentFolderRefusal("A file name is at most \(fileNameByteLimit) bytes before its extension."))
+        }
         guard !name.isEmpty, !name.hasPrefix("."), name.unicodeScalars.allSatisfy(allowed.contains) else {
             return .failure(AgentFolderRefusal("A file name is letters, digits, spaces, - _ and . only, without folders, and does "
                 + "not start with a dot."))
@@ -149,7 +171,7 @@ extension Mac4DSTEMAgentDoor {
             return .failure(ToolRefusal(status: 403, message: "Saving is off. Ask the person to turn on \"Let agents save results "
                 + "there\" in mac4DSTEM's Settings > Agents."))
         }
-        guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: AgentFolder.noFolder)) }
+        guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: folder.missingMessage)) }
         let name: String
         switch fileName(given, default: fallback, extension: ext) {
         case .success(let made): name = made

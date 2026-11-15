@@ -137,8 +137,10 @@ private struct DatasetWindow: View {
             // person left it on. Asking again for the state it has does nothing.
             Mac4DSTEMAgentDoor.enroll(appState, enabled: preferences.agentDoorEnabled,
                                       runsAllowed: preferences.agentRunsEnabled)
-            Mac4DSTEMAgentDoor.setFolder(bookmark: preferences.agentFolderBookmark,
-                                         savesAllowed: preferences.agentFolderSavesEnabled)
+            if let fresh = Mac4DSTEMAgentDoor.setFolder(bookmark: preferences.agentFolderBookmark,
+                                                        savesAllowed: preferences.agentFolderSavesEnabled) {
+                preferences.agentFolderBookmark = fresh   // the folder moved: keep the bookmark that finds it (#310)
+            }
             // A 4D file opened while this window holds only a spectrum image goes to a new window
             // (`AppState.routesOpenToNewWindow`), which takes it through the relay as a menu action.
             appState.openInNewWindow = { [menuRelay, openWindow] url, configure in
@@ -162,6 +164,8 @@ private struct DatasetWindow: View {
         .task {
             if let action = menuRelay.take() { MenuActionRelay.run(action, in: appState) }
         }
+        #if DEBUG
+        // `--demo-fixture` (UI journeys): the demo opens at launch. DEBUG only (#310).
         .task {
                 guard !loadedLaunchFixture,
                       ProcessInfo.processInfo.arguments.contains("--demo-fixture") else {
@@ -173,7 +177,6 @@ private struct DatasetWindow: View {
                 )
                 await appState.openDemoFixture(calibrated: !uncalibrated)
             }
-        #if DEBUG
         // `--open <absolute path>` (a UI journey on a real file, macTEM's launch option): the file opens through the window's own
         // open path; a file that brings a spectrum image shows the EDS room. Once per process. DEBUG only.
         .task {

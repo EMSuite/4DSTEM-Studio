@@ -50,7 +50,7 @@ final class DemoV3VariantsTests: XCTestCase {
         _ = await state.runPhaseMapping()
         let map = try XCTUnwrap(state.phaseMapping.map, state.statusText)
         let labeled = PhaseMapObjectsBridge.labeledMap(from: map)
-        let objects = PrecipitateSegmentation.classObjects(labels: labeled.labels, width: map.width, height: map.height, roles: labeled.roles,
+        let objects = try PrecipitateSegmentation.classObjects(labels: labeled.labels, width: map.width, height: map.height, roles: labeled.roles,
                                                            pixelSize: nil, pixelUnit: nil)
         let outcome = ObjectVariantJoin.run(objects: objects, map: map, library: state.phaseMapping.lastLibrary,
                                             matrixEntryIndex: state.phaseMapping.lastRun?.matrixEntryIndex, settings: VariantSettings())
@@ -115,7 +115,7 @@ final class DemoV3VariantsTests: XCTestCase {
         let map = try XCTUnwrap(state.phaseMapping.map, state.statusText)
         let run = try XCTUnwrap(state.phaseMapping.lastStructureRun)
         let labeled = PhaseMapObjectsBridge.labeledMap(from: map)
-        let objects = PrecipitateSegmentation.classObjects(labels: labeled.labels, width: map.width, height: map.height, roles: labeled.roles,
+        let objects = try PrecipitateSegmentation.classObjects(labels: labeled.labels, width: map.width, height: map.height, roles: labeled.roles,
                                                            pixelSize: nil, pixelUnit: nil)
         let structureRun = ObjectVariantJoin.StructureRun(
             run: run, crystals: state.phaseMapping.phases.map(\.model.structure), candidateIndex: [nil, 0],
@@ -162,7 +162,7 @@ final class DemoV3VariantsTests: XCTestCase {
         XCTAssertNil(assigned["Q1"]); XCTAssertNil(assigned["Q2"])
 
         // What the legend, the object table and the CSV say (seen on screen in the PR 253 check, pinned here).
-        let report = PrecipitateObjectReport.make(
+        let report = try PrecipitateObjectReport.make(
             objects: objects, phaseNames: map.phaseNames, matrixPhaseIndex: map.matrixPhaseIndex, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1,
             variantJoin: outcome.result, variantSettings: VariantSettings(), endOnDirection: outcome.endOnDirection,
             variantDirections: outcome.habitFamilies, variantDefaultToleranceDegrees: outcome.defaultToleranceDegrees)

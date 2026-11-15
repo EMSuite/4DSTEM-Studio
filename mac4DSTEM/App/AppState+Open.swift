@@ -331,6 +331,7 @@ extension AppState {
             present(error)
             return
         }
+        lastComputeFailure = Self.errorDetail(error)   // get_window's operation.error (#323)
         statusText = "Error: \(Self.errorDetail(error))"
     }
 
@@ -565,10 +566,6 @@ extension AppState {
         // log records — so the empty readiness rows are explained, not mute.
         if let dm4 = reader as? DM4Reader, let note = await dm4.calibrationNote {
             statusText = note
-        }
-        // A MIB the kit refused but the app's own frame reads took: say why (the kit's reason would otherwise be lost).
-        if let mib = reader as? MIBReader, let why = await mib.kitRefusal {
-            activityLog.record("FormatoMIB did not take this file (\(why)); it was read by the app's own frame reads.")
         }
         // The aperture centre the FILE recorded, in SOURCE detector pixels — the only
         // aperture position `CalibrationReReference` may move. The default above is a

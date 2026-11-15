@@ -64,7 +64,7 @@ extension Mac4DSTEMAgentDoor {
                       + "Clear Calibration asks the person first, so this needs confirm true after the person said yes.",
                   input: .window, parameters: [confirmParameter], acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.calibrationSession.hasAnyCalibrationValue else {
                 return .refusal(status: 409, message: "There is no calibration value to clear.")
             }
@@ -83,7 +83,7 @@ extension Mac4DSTEMAgentDoor {
                       + "Needs confirm true after the person said yes.",
                   input: .window, parameters: [confirmParameter], acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let model = state.learnedDetection.activeModel else {
                 return .refusal(status: 409, message: "No fine-tuned model is active; the bundled model is in use.")
             }
@@ -107,7 +107,7 @@ extension Mac4DSTEMAgentDoor {
                       + "session go with the reopen. The session file stays on disk. get_window says when the dataset is back.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard let saved = state.sessionLoadSpecification, saved != state.loadedView.specification else {
                 return .refusal(status: 409, message: "The view on screen is the one the session restored; there is nothing to "
                     + "reopen without it.")
@@ -124,7 +124,7 @@ extension Mac4DSTEMAgentDoor {
                       + "then on. Nothing computed is lost.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             guard state.residency.isResident else {
                 return .refusal(status: 409, message: "The dataset is not kept in memory.")
             }
@@ -138,7 +138,7 @@ extension Mac4DSTEMAgentDoor {
                       + "dataset open it needs confirm true after the person said yes, since what is not saved goes with it.",
                   input: .window, parameters: [confirmParameter], acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
-            guard !state.isBusy, !state.datasetSession.isLoading else { return busyRefusal }
+            guard !state.agentBusy else { return busyRefusal }
             if let open = state.descriptor, call.arguments["confirm"] != "true" {
                 return needsConfirmation("The demo replaces \(open.fileName) in this window; results not saved to its session "
                     + "are lost.")

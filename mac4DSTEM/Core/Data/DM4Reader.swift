@@ -3,8 +3,8 @@
 //  Role: Read Gatan DigitalMicrograph .dm4 (and .dm3) 4D-STEM files as a FourDDataSource (the interface H5Reader provides).
 //        The tag tree, the pixel mapping and the gather of patterns, scan rows and tiles as Float32 are FormatoKit's
 //        `DM4Datacube(.appCalibratedAxes)` (FormatoKit 0.7.0); this file keeps the app's side: which object is the datacube,
-//        the pixel calibration read from its tags, the disk watch (`MappingLiveness`) before every read of a mapped file,
-//        and the rank-3 scan-shaped object ("Scan shape X/Y" tags) that the kit does not take.
+//        the pixel calibration read from its tags, and the disk watch (`MappingLiveness`) before every read of a mapped file.
+//        A rank-3 object reshaped by its "Scan shape X/Y" tags is the kit's too since FormatoKit 0.12.0 (mac4DSTEM#300).
 //
 //  Structure fields are big-endian; primitive values are little-endian (byteord == 1, required). The pixels are never
 //  copied into RAM whole — slabs are gathered from the mapping on demand.
@@ -76,13 +76,10 @@ package nonisolated struct MappingLiveness: Sendable {
 
 package actor DM4Reader: FourDDataSource {
 
-    /// Where the pixels come from.
+    /// Where the pixels come from: FormatoKit's lazy gather, for a rank-4 object (scan-fastest storage included) and for a rank-3
+    /// object reshaped by its "Scan shape X/Y" tags (FormatoKit 0.12.0, FormatoKit#46; the app's own reshape is gone, mac4DSTEM#300).
     private enum Cube: Sendable {
-        /// A rank-4 object: FormatoKit's lazy gather (scan-fastest storage included).
         case kit(DM4Datacube)
-        /// A rank-3 object reshaped to a scan by its "Scan shape X/Y" tags.
-        // delete at mac4DSTEM/FormatoKit#7: a 3D-to-4D reshape by scan-shape tags in DM4Datacube
-        case scanShaped(ScanShapedCube)
     }
 
     /// Replaced only by `reopen`, with a fresh mapping of the same path.
@@ -93,9 +90,9 @@ package actor DM4Reader: FourDDataSource {
     private let isScanFastest: Bool
     /// How the file is held, chosen once at open; a reopen holds it the same way.
     private let options: Data.ReadingOptions
-    /// The element type the kit's gather hands out (the file's, kept by `keepStoredType`, #260); nil for the rank-3
-    /// scan-shaped path, which reads only Float32. A reopen refuses a file of another type, so this holds for the reader's life.
-    private nonisolated let storedType: FormatoDataType?
+    /// The element type the kit's gather hands out (the file's, kept by `keepStoredType`, #260). A reopen refuses a file of
+    /// another type, so this holds for the reader's life.
+    private nonisolated let storedType: FormatoDataType
 
     /// Non-nil only when the file is MAPPED: a file read into memory (a network volume) is valid after its disk is gone and
     /// needs no guard. Owner: this reader; one descriptor per open reader (a reopen replaces it with the new mapping's).
@@ -150,7 +147,7 @@ package actor DM4Reader: FourDDataSource {
         let opened = try Self.openCube(path: path, options: options)
         let chosen = opened.chosen, tree = opened.tree
         cube = chosen.cube
-        if case .kit(let kit) = chosen.cube { storedType = kit.layout.outputType } else { storedType = nil }
+        switch chosen.cube { case .kit(let kit): storedType = kit.layout.outputType }
         isScanFastest = chosen.scanFastest
         calibrationNote = chosen.note
         let object = chosen.object
@@ -203,41 +200,30 @@ package actor DM4Reader: FourDDataSource {
             guard let code = tree.numbers["ImageList.\(object.index).ImageData.DataType"].flatMap({ Int(exactly: $0) }) else { continue }
             // The first object with more than two non-singleton dimensions and a pixel type the kit reads.
             guard dims.filter({ $0 > 1 }).count > 2, DMFile.dataType(code: code) != nil else { continue }
-            if dims.count == 4 {
-                let kit: DM4Datacube
-                do {
-                    // The stored type, converted by the app (`float32Values`, the kit's own conversion), so a tile can be
-                    // held at its stored bit depth (#260).
-                    kit = try DM4Datacube(path: path, objectIndex: object.index, convention: .appCalibratedAxes,
-                                          storage: isMapped ? .mapped : .readIntoMemory, keepStoredType: true)
-                } catch DM4Error.cannotOpen(let detail) {
-                    throw DM4Error.cannotOpen(detail)
-                } catch {
-                    continue          // a declared length that does not fit the file: the next candidate, as before
-                }
-                let shape = kit.layout.permutation.map { kit.layout.storedShape[$0] }
-                chosen = Chosen(cube: .kit(kit), object: object, dataType: code, shape: shape,
-                                scanFastest: kit.layout.scanFastest, note: kit.calibrationNote)
-                break
-            } else if dims.count == 3 {
-                // (N_scan, Qy, Qx); the scan shape comes from the tags.
-                //
-                // DEVIATION from py4DSTEM, deliberate and unported: for this 3D "TitanX" layout py4DSTEM rolls the data by −2
-                // pixels along axis 1, correcting a TitanX detector artefact. This reader does not. The consequence is stated
-                // rather than hidden: on a file that really carries that artefact, every q-vector read here sits 2 px from
-                // where py4DSTEM would put it, which is a calibration-scale shift, not a rounding one. It is unported because
-                // no TitanX file has been available to measure it on, and rolling every 3D file by −2 px on the strength of
-                // a comment would silently corrupt the ones that do not need it. archived `docs/dm4-format.md`
-                // §3.3 carries the record; the note is here because the project requires a deviation to be readable at the code.
-                guard let scanX = Self.scanShape(tree.numbers, "Scan shape X"), let scanY = Self.scanShape(tree.numbers, "Scan shape Y"),
-                      scanX > 0, scanY > 0 else { continue }
-                guard let flat = try? ScanShapedCube(path: path, options: options, object: object, dataType: code, scanY: scanY, scanX: scanX) else {
-                    continue
-                }
-                chosen = Chosen(cube: .scanShaped(flat), object: object, dataType: code, shape: [scanY, scanX, dims[1], dims[0]],
-                                scanFastest: false, note: nil)
-                break
+            // A rank-4 object, or a rank-3 stack (N_scan, Qy, Qx) whose "Scan shape X/Y" tags are whole numbers multiplying to N:
+            // the kit decides, and reads the tags with `Int(exactly:)`, so a NaN or infinite tag refuses the object (#300).
+            //
+            // DEVIATION from py4DSTEM, deliberate and unported: for the 3D "TitanX" layout py4DSTEM rolls the data by −2 pixels along
+            // axis 1, correcting a TitanX detector artefact. Neither the kit nor this reader does. On a file that really carries that
+            // artefact, every q-vector read here sits 2 px from where py4DSTEM would put it, a calibration-scale shift, not a rounding
+            // one. Unported because no TitanX file has been available to measure it on, and rolling every 3D file by −2 px on the
+            // strength of a comment would silently corrupt the ones that do not need it (archived `docs/dm4-format.md` §3.3).
+            guard dims.count == 4 || dims.count == 3 else { continue }
+            let kit: DM4Datacube
+            do {
+                // The stored type, converted by the app (`float32Values`, the kit's own conversion), so a tile can be held at its
+                // stored bit depth (#260).
+                kit = try DM4Datacube(path: path, objectIndex: object.index, convention: .appCalibratedAxes,
+                                      storage: isMapped ? .mapped : .readIntoMemory, keepStoredType: true)
+            } catch DM4Error.cannotOpen(let detail) {
+                throw DM4Error.cannotOpen(detail)
+            } catch {
+                continue          // a declared length that does not fit the file, or a stack without a usable scan shape: the next candidate
             }
+            let shape = kit.layout.permutation.map { kit.layout.storedShape[$0] }
+            chosen = Chosen(cube: .kit(kit), object: object, dataType: code, shape: shape,
+                            scanFastest: kit.layout.scanFastest, note: kit.calibrationNote)
+            break
         }
         guard let chosen else { throw DM4Error.noDatacube }
         return (chosen, tree)
@@ -317,16 +303,10 @@ package actor DM4Reader: FourDDataSource {
 
     /// `rows` x `columns` source scan positions over the view's READ crop (or the whole detector), as Float, BEFORE binning.
     private func gather(_ view: LoadView, rows: Range<Int>, columns: Range<Int>) throws -> [Float] {
-        switch cube {
-        case .kit:
-            guard let values = try storedGather(view, rows: rows, columns: columns).float32Values() else {
-                throw DM4Error.truncated
-            }
-            return values
-        case .scanShaped(let flat):
-            let (start, count) = gatherBox(view, rows: rows, columns: columns)
-            return try flat.read(start: start, count: count)
+        guard let values = try storedGather(view, rows: rows, columns: columns).float32Values() else {
+            throw DM4Error.truncated
         }
+        return values
     }
 
     private func gatherBox(_ view: LoadView, rows: Range<Int>, columns: Range<Int>) -> (start: [Int], count: [Int]) {
@@ -337,14 +317,15 @@ package actor DM4Reader: FourDDataSource {
 
     /// The kit's gather at the stored type, over the same box as `gather`.
     private func storedGather(_ view: LoadView, rows: Range<Int>, columns: Range<Int>) throws -> FormatoArray {
-        guard case .kit(let kit) = cube else { throw FourDDataSourceError.noStoredRead }
         let (start, count) = gatherBox(view, rows: rows, columns: columns)
-        return try kit.signal.array.read(start: start, count: count)
+        switch cube {
+        case .kit(let kit): return try kit.signal.array.read(start: start, count: count)
+        }
     }
 
-    /// The kit's stored type for an unbinned view; nil for a binned view (computed in Float32) and the scan-shaped path.
+    /// The kit's stored type for an unbinned view; nil for a binned view (computed in Float32).
     package nonisolated func storedElementType(for view: LoadView) -> FormatoDataType? {
-        guard view.specification.detectorBin == 1, let storedType, storedType.convertsToFloat32 else { return nil }
+        guard view.specification.detectorBin == 1, storedType.convertsToFloat32 else { return nil }
         return storedType
     }
 
@@ -413,95 +394,12 @@ package actor DM4Reader: FourDDataSource {
                                 qSize: qPixelSize, qUnits: qPixelUnits)
     }
 
-    private nonisolated static func scanShape(_ numbers: [String: Double], _ needle: String) -> Int? {
-        for (key, value) in numbers where key.contains(needle) { return Int(value) }
-        return nil
-    }
-
     private static func dtypeName(_ dataType: Int) -> String {
         switch dataType {
         case 1: return "int16"; case 2: return "float32"; case 6: return "uint8"
         case 7: return "int32"; case 9: return "int8"; case 10: return "uint16"
         case 11: return "uint32"; case 12: return "float64"
         default: return "dm-type-\(dataType)"
-        }
-    }
-}
-
-/// A rank-3 DM object (N_scan, Qy, Qx), mapped, read as the 4D cube `[Ry, Rx, Qy, Qx]` its scan-shape tags give. Frames are
-/// contiguous, so a slab is one run per detector row (one run per frame when the detector is not cropped).
-// delete at mac4DSTEM/FormatoKit#7: a 3D-to-4D reshape by scan-shape tags in DM4Datacube
-private nonisolated struct ScanShapedCube: Sendable {
-    let data: Data
-    let offset: Int
-    let dataType: Int
-    let elementSize: Int
-    let rx: Int, qy: Int, qx: Int
-
-    init(path: String, options: Data.ReadingOptions, object: DM4ImageObject, dataType: Int, scanY: Int, scanX: Int) throws {
-        guard let type = DMFile.dataType(code: dataType) else { throw DM4Error.unsupportedDataType(dataType) }
-        let (qy, qx) = (object.dimensions[1], object.dimensions[0])
-        // Chain multiplication with overflow checks so absurd tag-derived dims reject the candidate instead of trapping.
-        var expected = type.byteSize
-        for n in [scanY, scanX, qy, qx] {
-            let (next, overflow) = expected.multipliedReportingOverflow(by: n)
-            guard !overflow else { throw DM4Error.truncated }
-            expected = next
-        }
-        let (end, overflow) = object.dataOffset.addingReportingOverflow(expected)
-        // A declared array length of 0 (some writers omit it) is still tolerated when the mapping holds the whole cube.
-        guard !overflow, object.dataOffset >= 0, object.dataByteCount == expected || object.dataByteCount == 0 else {
-            throw DM4Error.truncated
-        }
-        data = try Data(contentsOf: URL(fileURLWithPath: path), options: options)
-        guard end <= data.count else { throw DM4Error.truncated }
-        offset = object.dataOffset; self.dataType = dataType; elementSize = type.byteSize
-        self.rx = scanX; self.qy = qy; self.qx = qx
-    }
-
-    /// `start`, `count`: `[scanY, scanX, detectorY, detectorX]`; the slab as Float, frames in order, each row of the crop after the last.
-    func read(start: [Int], count: [Int]) throws -> [Float] {
-        var out = [Float](repeating: 0, count: count.reduce(1, *))
-        var at = 0
-        let wholeRows = start[3] == 0 && count[3] == qx
-        for y in 0..<count[0] {
-            for x in 0..<count[1] {
-                let frame = (start[0] + y) * rx + start[1] + x
-                if wholeRows {
-                    try decode(byteOffset: offset + (frame * qy + start[2]) * qx * elementSize, count: count[2] * qx, into: &out, at: at)
-                    at += count[2] * qx
-                } else {
-                    for row in 0..<count[2] {
-                        try decode(byteOffset: offset + ((frame * qy + start[2] + row) * qx + start[3]) * elementSize,
-                                   count: count[3], into: &out, at: at)
-                        at += count[3]
-                    }
-                }
-            }
-        }
-        return out
-    }
-
-    /// Little-endian pixels to Float at `destination`, each converted the way a C cast does. A slice past the mapping means a
-    /// truncated file; never hand back zero-filled pixels as if they were read.
-    private func decode(byteOffset start: Int, count: Int, into out: inout [Float], at destination: Int) throws {
-        guard start >= 0, count >= 0, start + count * elementSize <= data.count,
-              destination >= 0, destination + count <= out.count else { throw DM4Error.truncated }
-        data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
-            guard let base = raw.baseAddress else { return }
-            let p = base + start
-            let d = destination
-            switch dataType {
-            case 1:  for i in 0..<count { out[d + i] = Float(p.loadUnaligned(fromByteOffset: i * 2, as: Int16.self)) }
-            case 10: for i in 0..<count { out[d + i] = Float(p.loadUnaligned(fromByteOffset: i * 2, as: UInt16.self)) }
-            case 7:  for i in 0..<count { out[d + i] = Float(p.loadUnaligned(fromByteOffset: i * 4, as: Int32.self)) }
-            case 11: for i in 0..<count { out[d + i] = Float(p.loadUnaligned(fromByteOffset: i * 4, as: UInt32.self)) }
-            case 6:  for i in 0..<count { out[d + i] = Float(p.loadUnaligned(fromByteOffset: i, as: UInt8.self)) }
-            case 9:  for i in 0..<count { out[d + i] = Float(p.loadUnaligned(fromByteOffset: i, as: Int8.self)) }
-            case 2:  for i in 0..<count { out[d + i] = p.loadUnaligned(fromByteOffset: i * 4, as: Float.self) }
-            case 12: for i in 0..<count { out[d + i] = Float(p.loadUnaligned(fromByteOffset: i * 8, as: Double.self)) }
-            default: break
-            }
         }
     }
 }

@@ -36,6 +36,7 @@
 		300000000000000000000414 /* ShellAgentDoor in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000413 /* ShellAgentDoor */; };
 		300000000000000000000410 /* ShellSpectroscopy in Frameworks */ = {isa = PBXBuildFile; productRef = 30000000000000000000040F /* ShellSpectroscopy */; };
 		300000000000000000000412 /* ShellEDXModel in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000411 /* ShellEDXModel */; };
+		300000000000000000000416 /* ShellEDXAgent in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000415 /* ShellEDXAgent */; };
 		300000000000000000000501 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000500 /* Sparkle */; };
 		500000000000000000000302 /* DSTEMQuickLook in Frameworks */ = {isa = PBXBuildFile; productRef = 500000000000000000000301 /* DSTEMQuickLook */; };
 		500000000000000000000304 /* FormatoPeek in Frameworks */ = {isa = PBXBuildFile; productRef = 500000000000000000000303 /* FormatoPeek */; };
@@ -364,6 +365,7 @@
 				300000000000000000000410 /* ShellSpectroscopy in Frameworks */,
 				300000000000000000000412 /* ShellEDXModel in Frameworks */,
 				300000000000000000000414 /* ShellAgentDoor in Frameworks */,
+				300000000000000000000416 /* ShellEDXAgent in Frameworks */,
 				30000000000000000000001D /* SpectroEDX in Frameworks */,
 				30000000000000000000001F /* FormatoCore in Frameworks */,
 				300000000000000000000021 /* FormatoDM in Frameworks */,
@@ -490,6 +492,7 @@
 				30000000000000000000040F /* ShellSpectroscopy */,
 				300000000000000000000411 /* ShellEDXModel */,
 				300000000000000000000413 /* ShellAgentDoor */,
+				300000000000000000000415 /* ShellEDXAgent */,
 				300000000000000000000500 /* Sparkle */,
 			);
 			productName = mac4DSTEM;
@@ -1643,7 +1646,7 @@
 			repositoryURL = "https://github.com/mac4DSTEM/DiffractoKit";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.16.0;
+				minimumVersion = 0.17.0;
 			};
 		};
 		30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */ = {
@@ -1815,6 +1818,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
 			productName = ShellEDXModel;
+		};
+		300000000000000000000415 /* ShellEDXAgent */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
+			productName = ShellEDXAgent;
 		};
 		300000000000000000000413 /* ShellAgentDoor */ = {
 			isa = XCSwiftPackageProductDependency;

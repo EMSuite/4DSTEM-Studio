@@ -101,11 +101,37 @@ extension Mac4DSTEMAgentDoor {
         },
     ]
 
-    /// The Output line for settings an agent changed: "An agent set <what>: name value, ...", in the order the names sort.
+    /// The Output line for settings an agent changed: "An agent set <what>: name value, ...", in the order the names sort. A value
+    /// that is not a plain number or word (a name, a path) is quoted and cleaned by `quotedAgentText` (#310).
     static func agentChangeLine(_ what: String, _ arguments: [String: String]) -> String {
-        let pairs = arguments.keys.sorted().compactMap { name in arguments[name].map { "\(name) \($0)" } }
+        let pairs = arguments.keys.sorted().compactMap { name in arguments[name].map { "\(quotedAgentText(name)) \(quotedAgentText($0))" } }
         return "An agent set \(what): " + (pairs.isEmpty ? "nothing" : pairs.joined(separator: ", ")) + "."
     }
+
+    /// Text an agent chose, as it may stand in the status line and the Output log: a plain number or word (letters, digits,
+    /// `_ . + -`) as it is; anything else in quotes, with line breaks and other control characters shown as spaces, inner quotes
+    /// as ', and at most `agentTextDisplayLimit` characters, so an agent cannot write a line that reads as the app's own (#310).
+    static func quotedAgentText(_ text: String) -> String {
+        let plain = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_.+-"))
+        if !text.isEmpty, text.count <= agentTextDisplayLimit, text.unicodeScalars.allSatisfy({ plain.contains($0) && $0.isASCII }) {
+            return text
+        }
+        var cleaned = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            if CharacterSet.controlCharacters.contains(scalar) || CharacterSet.newlines.contains(scalar) {
+                cleaned.append(" ")
+            } else if scalar == "\"" || scalar == "\u{201C}" || scalar == "\u{201D}" {
+                cleaned.append("'")
+            } else {
+                cleaned.append(scalar)
+            }
+        }
+        var shown = String(cleaned)
+        if shown.count > agentTextDisplayLimit { shown = String(shown.prefix(agentTextDisplayLimit)) + "…" }
+        return "\u{201C}" + shown + "\u{201D}"
+    }
+
+    static let agentTextDisplayLimit = 120
 
     /// Phase mapping as an agent reads it: the phases, the settings, what the tolerances are in detector pixels, and why the task
     /// cannot run yet (or null).

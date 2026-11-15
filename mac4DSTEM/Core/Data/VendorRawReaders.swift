@@ -320,41 +320,17 @@ package actor EMPADReader: FourDDataSource {
         }
         return value.intValue
     }
-
-    fileprivate static func checkedProduct(_ values: [Int]) throws -> Int {
-        var result = 1
-        for value in values {
-            let next = result.multipliedReportingOverflow(by: value)
-            guard !next.overflow else { throw VendorRawError.malformed("dimensions overflow addressable storage") }
-            result = next.partialValue
-        }
-        return result
-    }
-
-    fileprivate static func read(path: String, offset: Int, count: Int) throws -> Data {
-        guard let handle = FileHandle(forReadingAtPath: path) else { throw VendorRawError.cannotOpen(path) }
-        // try? OK (v2 S7 audit): best-effort close of a read-only handle on
-        // the way out; the read's own errors already threw above.
-        defer { try? handle.close() }
-        try handle.seek(toOffset: UInt64(offset))
-        let data = try handle.read(upToCount: count) ?? Data()
-        guard data.count == count else { throw VendorRawError.truncated("expected \(count) bytes at offset \(offset)") }
-        return data
-    }
 }
 
-/// Merlin MIB v1 reader contract: regular per-frame MIB (not packed R64),
-/// U08/U16/U32 big-endian payloads, 1x1/2x2/2x2G assemblies, and a companion
-/// `.hdr` containing ScanX/ScanY. Headers are skipped independently per frame.
+/// Merlin MIB with a companion `.hdr` containing ScanX/ScanY (or Frames per Trigger).
 /// The frames are `FormatoMIB.MIBReader(path:convention: .appScanXY)`'s: the ScanX/ScanY companion, the full detector assembly, the
-/// unflipped values as Float32 (any header size from 384 to 65536; `pixelCode` is the stored code). A file the kit refuses but this app's
-/// reader always took (a header with no width and height, a detector that disagrees with its assembly) is read here, frame by frame, as before.
+/// unflipped values as Float32 (any header size from 384 to 65536; `pixelCode` is the stored code; since FormatoKit 0.12.0 also a header
+/// with no width and height, or one that disagrees with its assembly). A file the kit refuses is refused with the kit's reason: the app's own
+/// frame reads are gone (mac4DSTEM#300, they trapped on a crafted header offset).
 package actor MIBReader: FourDDataSource {
-    /// Where the frames are read from.
+    /// Where the frames are read from: the kit's lazy array, and the descriptor that watches the disk.
     private enum Source: Sendable {
         case kit(array: any FormatoLazyArray, liveness: MappingLiveness)
-        /// delete at mac4DSTEM/FormatoKit#7: headers without width and height, and a detector that disagrees with its assembly (the kit does not take header-less MIB)
-        case frames(headerBytes: Int, bytesPerPixel: Int, frameBytes: Int)
     }
 
     private let path: String
@@ -364,12 +340,10 @@ package actor MIBReader: FourDDataSource {
     private let detectorWidth: Int
     private let dtype: String
     private let source: Source
-    /// The kit array's element type (the stored integer type, `keepStoredType`, #260); nil for the app's own frame reads.
-    private nonisolated let storedType: FormatoDataType?
+    /// The kit array's element type (the stored integer type, `keepStoredType`, #260).
+    private nonisolated let storedType: FormatoDataType
     /// THE LATCH (as `DM4Reader`): set by the first read that finds the disk gone, never cleared.
     private var diskGone = false
-    /// Why FormatoMIB did not take the file, when the app's own frame reads did; the opener logs it.
-    package private(set) var kitRefusal: String?
 
     package init(path: String) throws {
         // Merlin's "save to multiple files" (default1.mib … defaultN.mib beside one default.hdr): the kit reads the parts in order
@@ -400,92 +374,45 @@ package actor MIBReader: FourDDataSource {
         // distinguishing the two belongs to the deferred MIB-out-of-Preview
         // work (docs/v2-release.md §3), which owns this reader's contract.
         let hdrURL = URL(fileURLWithPath: path).deletingPathExtension().appendingPathExtension("hdr")
-        guard let hdr = try? String(contentsOf: hdrURL, encoding: .utf8) else {
+        guard (try? String(contentsOf: hdrURL, encoding: .utf8)) != nil else {
             throw VendorRawError.unsupported("MIB needs its companion .hdr (ScanX and ScanY, or Merlin's Frames per Trigger) so the scan shape is never guessed.")
         }
-        // The kit first; the descriptor is opened BEFORE the kit maps the file.
-        let watch = try? vendorLiveness(path: path)
-        var refusal = "its disk could not be watched"
-        if let watch {
-            do {
-                let kit = try FormatoMIB.MIBReader(path: path, convention: .appScanXY, keepStoredType: true)
-                let shape = kit.signal.array.shape
-                if shape.count == 4 {
-                    (scanHeight, scanWidth, detectorHeight, detectorWidth) = (shape[0], shape[1], shape[2], shape[3])
-                    dtype = kit.pixelCode
-                    source = .kit(array: kit.signal.array, liveness: watch)
-                    storedType = kit.signal.array.dataType
-                    return
-                }
-                refusal = "the frames are not scan-shaped"
-            } catch {
-                refusal = mibMessage(error)
-            }
+        // The descriptor is opened BEFORE the kit maps the file.
+        let watch: MappingLiveness
+        do { watch = try vendorLiveness(path: path) } catch {
+            throw VendorRawError.malformed("This MIB file's disk could not be watched.")
         }
-        kitRefusal = refusal
-
-        // The app's own reading. The stored pixel code is the first frame header's.
-        let head = try EMPADReader.read(path: path, offset: 0, count: min(4096, try EMPADReader.fileSize(path)))
-        let fields = head.firstIndex(of: 0).map {
-            String(decoding: head[..<$0], as: UTF8.self).split(separator: ",", omittingEmptySubsequences: false)
+        let kit: FormatoMIB.MIBReader
+        // The kit's refusal keeps its kind (unsupported layout, malformed header, unreadable file), as the app's reader gave it.
+        do { kit = try FormatoMIB.MIBReader(path: path, convention: .appScanXY, keepStoredType: true) } catch {
+            throw VendorRawError.from(error, path: path)
         }
-        dtype = fields.flatMap { $0.count > 6 ? String($0[6]) : nil } ?? "U16"
-        guard let fields, fields.count > 10, let offset = Int(fields[2]), offset > 0 else {
-            throw VendorRawError.malformed("MIB first frame header has no valid data offset.")
-        }
-        let layout = fields[7].trimmingCharacters(in: .whitespacesAndNewlines)
-        switch layout {
-        case "1x1": detectorHeight = 256; detectorWidth = 256
-        case "2x2": detectorHeight = 512; detectorWidth = 512
-        case "2x2G": detectorHeight = 514; detectorWidth = 514
-        default: throw VendorRawError.unsupported("MIB detector assembly \(layout); expected 1x1, 2x2, or 2x2G.")
-        }
-        let bytesPerPixel: Int
-        switch dtype {
-        case "U08": bytesPerPixel = 1
-        case "U16": bytesPerPixel = 2
-        case "U32": bytesPerPixel = 4
-        case "R64": throw VendorRawError.unsupported("packed/raw R64 MIB is not in the v1 direct-reader contract; convert it to regular MIB/HDF5 first.")
-        default: throw VendorRawError.unsupported("MIB pixel encoding \(dtype); expected U08, U16, or U32.")
-        }
-        let frameBytes = try EMPADReader.checkedProduct([detectorHeight, detectorWidth, bytesPerPixel]) + offset
-        var values: [String: Int] = [:]
-        for line in hdr.split(whereSeparator: \Character.isNewline) {
-            let parts = line.split(separator: "\t", maxSplits: 1).map(String.init)
-            if parts.count == 2, let value = Int(parts[1].trimmingCharacters(in: .whitespaces)) {
-                values[parts[0].trimmingCharacters(in: CharacterSet(charactersIn: ": "))] = value
-            }
-        }
-        guard let sx = values["ScanX"], sx > 0, let sy = values["ScanY"], sy > 0 else {
-            // The kit reads Merlin's Frames per Trigger; where it refused, its reason is the one to give.
-            throw VendorRawError.malformed("MIB companion .hdr has no positive ScanX/ScanY (\(refusal)).")
-        }
-        scanWidth = sx; scanHeight = sy
-        let expected = try EMPADReader.checkedProduct([sx, sy, frameBytes])
-        let actual = try EMPADReader.fileSize(path)
-        guard actual == expected else {
-            throw VendorRawError.malformed("MIB .hdr describes \(sx)×\(sy) frames (\(expected) bytes), but the file has \(actual) bytes.")
-        }
-        source = .frames(headerBytes: offset, bytesPerPixel: bytesPerPixel, frameBytes: frameBytes)
-        storedType = nil
+        let shape = kit.signal.array.shape
+        guard shape.count == 4 else { throw VendorRawError.malformed("This MIB file's frames are not scan-shaped.") }
+        (scanHeight, scanWidth, detectorHeight, detectorWidth) = (shape[0], shape[1], shape[2], shape[3])
+        dtype = kit.pixelCode
+        source = .kit(array: kit.signal.array, liveness: watch)
+        storedType = kit.signal.array.dataType
     }
 
-    /// The stored integer type for an unbinned view read through the kit; nil for the app's own frame reads.
+    /// The stored integer type (little-endian, `keepStoredType`) for an unbinned view.
     package nonisolated func storedElementType(for view: LoadView) -> FormatoDataType? {
         vendorStoredType(storedType, view: view)
     }
 
     package func readStoredScanTile(_ view: LoadView, yRange: Range<Int>) throws -> FourDStoredTile {
-        guard let type = storedElementType(for: view), case .kit(let array, _) = source else {
-            throw FourDDataSourceError.noStoredRead
-        }
+        guard let type = storedElementType(for: view) else { throw FourDDataSourceError.noStoredRead }
         try view.requireSource(shape: [scanHeight, scanWidth, detectorHeight, detectorWidth])
         guard yRange.lowerBound >= 0, yRange.upperBound <= view.descriptor.ry, !yRange.isEmpty else {
             throw VendorRawError.malformed("MIB tile is out of bounds.")
         }
         try requireDiskAlive()
-        let slab = try vendorStoredSlab(array, view: view, viewRows: yRange, viewColumns: 0..<view.descriptor.rx,
+        let slab: FormatoArray
+        switch source {
+        case .kit(let array, _):
+            slab = try vendorStoredSlab(array, view: view, viewRows: yRange, viewColumns: 0..<view.descriptor.rx,
                                         detector: (detectorHeight, detectorWidth), path: path)
+        }
         guard slab.dataType == type else { throw VendorRawError.malformed("pixels are not \(type.rawValue).") }
         return FourDStoredTile(yRange: yRange, dataType: type, bytes: slab.bytes)
     }
@@ -515,33 +442,6 @@ package actor MIBReader: FourDDataSource {
         case .kit(let array, _):
             return try vendorSlab(array, view: view, viewRows: viewRows, viewColumns: viewColumns,
                                   detector: (detectorHeight, detectorWidth), path: path)
-        case .frames(let headerBytes, let bytesPerPixel, let frameBytes):
-            var out = [Float]()
-            for viewY in viewRows {
-                for viewX in viewColumns {
-                    let frame = view.sourceScanY(viewY) * scanWidth + view.sourceScanX(viewX)
-                    let count = detectorHeight * detectorWidth
-                    let data = try EMPADReader.read(path: path, offset: frame * frameBytes + headerBytes,
-                                                    count: count * bytesPerPixel)
-                    let crop = view.readDetectorCrop
-                    let rows = crop.map { $0.yOffset..<($0.yOffset + $0.height) } ?? 0..<detectorHeight
-                    let columns = crop.map { $0.xOffset..<($0.xOffset + $0.width) } ?? 0..<detectorWidth
-                    data.withUnsafeBytes { bytes in
-                        out.reserveCapacity(out.count + rows.count * columns.count)
-                        for row in rows {
-                            for column in columns {
-                                let index = row * detectorWidth + column
-                                switch bytesPerPixel {
-                                case 1: out.append(Float(bytes.loadUnaligned(fromByteOffset: index, as: UInt8.self)))
-                                case 2: out.append(Float(bytes.loadUnaligned(fromByteOffset: index * 2, as: UInt16.self).bigEndian))
-                                default: out.append(Float(bytes.loadUnaligned(fromByteOffset: index * 4, as: UInt32.self).bigEndian))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return out
         }
     }
 

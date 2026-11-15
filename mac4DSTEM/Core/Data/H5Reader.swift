@@ -297,19 +297,21 @@ package actor H5Reader: FourDDataSource {
         }
         let buffer: [Float]
         do {
-            guard let floats = try reader.readDataset(candidate.path, maximumBytes: Int.max).float32Values() else {
+            // Only the image used: the first slice of a stack (mac4DSTEM#300: the whole dataset was read, and with no cap a crafted
+            // stack dimension could ask for any amount of memory). The kit's default cap still bounds the slab.
+            let slab = dims.count == 2
+                ? try reader.readDataset(candidate.path)
+                : try reader.readDataset(candidate.path, start: [0, 0, 0],
+                                         count: candidate.slicesFirst ? [1, candidate.qy, candidate.qx] : [candidate.qy, candidate.qx, 1])
+            guard let floats = slab.float32Values() else {
                 throw H5Error.readFailed("probe image \(candidate.path)")
             }
             buffer = floats
         } catch {
             throw H5Error.readFailed("probe image \(candidate.path)")
         }
-        guard dims.count == 3 else { return buffer }
-        if candidate.slicesFirst { return Array(buffer[0..<(candidate.qy * candidate.qx)]) }
-        let slices = dims[2]
-        var pixels = [Float](repeating: 0, count: candidate.qy * candidate.qx)
-        for index in pixels.indices { pixels[index] = buffer[index * slices] }
-        return pixels
+        // Either way the slab is the qy·qx image in C order.
+        return buffer
     }
 
     /// Dimensions of a dataset at `path`, nil when it is not a dataset.
@@ -682,7 +684,7 @@ package actor H5Reader: FourDDataSource {
                 return (try? reader.readBooleans(cal + "/QR_flip"))?.first
             case .numeric, .unsupported("float16"):
                 // The element as libhdf5 converted it to a native int: floats truncate toward zero; "not 0" is the flag.
-                if let value = (try? reader.readDataset(cal + "/QR_flip", maximumBytes: Int.max))?.doubles().first, value.isFinite {
+                if let value = (try? reader.readDataset(cal + "/QR_flip"))?.doubles().first, value.isFinite {
                     return value.rounded(.towardZero) != 0
                 }
             default: break
@@ -705,7 +707,7 @@ package actor H5Reader: FourDDataSource {
     private func storedDoubles(_ path: String, _ info: HDF5DatasetInfo) -> [Double]? {
         switch info.type {
         case .numeric, .unsupported("float16"):
-            return (try? reader.readDataset(path, maximumBytes: Int.max))?.doubles()
+            return (try? reader.readDataset(path))?.doubles()
         default:
             return nil
         }

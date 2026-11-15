@@ -119,8 +119,7 @@ private struct DatasetWindow: View {
         // Finder's "Open With" — this is the handler that requires.
         // `openFile` refuses a second load while one is in flight, so a
         // double-click during a load is declined with a reason rather than
-        // reaching HDF5 twice.
-        // UNVERIFIED ON SCREEN: not yet driven from Finder.
+        // reaching HDF5 twice. Driven from Finder on 2026-11-11 (`ExternalOpen`, drive check 3).
         .onOpenURL { url in
             // The file this window holds, opened again from Finder: the window comes forward and nothing reloads.
             if ExternalOpen.isHeld(url, heldPath: appState.descriptor?.filePath) {
@@ -507,7 +506,7 @@ struct mac4DSTEMApp: App {
             .windowToolbarStyle(.unified)
             .commands {
                 DatasetCommands(menuRelay: menuRelay, recents: recents)
-                ZoomCommands()   // View > Zoom In / Zoom Out / Zoom to Fit (lane H1, UI/ZoomCommands.swift)
+                ZoomCommands()   // View > Zoom In / Zoom Out / Zoom to Fit (MacEMUI ShellControls, ZoomCommands.swift)
                 #if SPARKLE
                 SoftwareUpdateCommands(update: softwareUpdate)   // mac4DSTEM > Check for Updates…
                 #endif

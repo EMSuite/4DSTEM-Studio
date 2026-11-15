@@ -7,8 +7,7 @@
 
 import Foundation
 
-/// The one place the R–Q rotation changes sign (ADR 040 decision 2, Gate D
-/// archived the archived notes).
+/// The one place the R–Q rotation changes sign (ADR 040 decision 2).
 ///
 /// DEVIATION (convention, not physics): this app reads a file's axes as
 /// (Ry, Rx, Qy, Qx) (`DatasetDescriptor.swift`), py4DSTEM as (Rx, Ry, Qx, Qy).

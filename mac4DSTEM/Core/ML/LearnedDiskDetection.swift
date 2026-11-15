@@ -164,11 +164,8 @@ package nonisolated enum DiskDisagreement {
 extension LearnedDiskDetector {
 
     /// Lock-guarded permille gate for progress callbacks, admitting a fraction
-    /// only when its 0.1 % bucket differs from the last admitted one.
-    ///
-    /// Duplicated from `TiledDiskDetection.swift`'s file-private
-    /// `ProgressCoalescer` rather than shared, on purpose (see the type doc
-    /// below): the learned stage stays inside Core/ML.
+    /// only when its 0.1 % bucket differs from the last admitted one. The learned stage's own (the classical detection's
+    /// progress is the kit's).
     nonisolated private final class ProgressCoalescer: @unchecked Sendable {
         private let lock = NSLock()
         private var lastBucket = -1

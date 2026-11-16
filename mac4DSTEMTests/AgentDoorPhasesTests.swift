@@ -175,6 +175,10 @@ final class AgentDoorPhasesTests: XCTestCase {
         let typed = try await call("set_phase_mapping", ["orientation_source": "typedZones"])
         XCTAssertFalse(typed.refused, typed.text)
         XCTAssertEqual(state.phaseMapping.orientationSource, .typedZones)
+        // Grains and phases is held back in 5.4.0 (#468): the door refuses it and the source stays as it was.
+        let grains = try await call("set_phase_mapping", ["orientation_source": "grains"])
+        XCTAssertTrue(grains.refused, grains.text)
+        XCTAssertEqual(state.phaseMapping.orientationSource, .typedZones)
         let back = try await call("set_phase_mapping", ["orientation_source": "structures"])
         XCTAssertEqual(state.phaseMapping.orientationSource, .structures)
         let before = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(back.text.utf8)) as? [String: Any])

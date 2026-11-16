@@ -67,18 +67,21 @@ struct PhaseMappingSections: View {
             if let saved = appState.savedPhaseMappingRunNote {
                 InspectorNote(saved).accessibilityIdentifier("phaseMapping.savedRun")
             }
-            InspectorRow("Method") {
-                Picker("Method", selection: $product.method) {
-                    ForEach(PhaseMappingMethod.allCases, id: \.self) { method in
-                        Text(method.title).tag(method)
+            // One method offered (Grains and phases is held back, mac4DSTEM#468): no picker with a single choice.
+            if PhaseMappingMethod.offered.count > 1 {
+                InspectorRow("Method") {
+                    Picker("Method", selection: $product.method) {
+                        ForEach(PhaseMappingMethod.offered, id: \.self) { method in
+                            Text(method.title).tag(method)
+                        }
                     }
+                    .labelsHidden()
+                    .accessibilityIdentifier("phaseMapping.method")
                 }
-                .labelsHidden()
-                .accessibilityIdentifier("phaseMapping.method")
+                .help("Matrix with precipitates: one phase is the matrix, its spots are removed and the other phases are looked "
+                      + "for in what is left (Thronsen et al. 2024). Grains and phases: every position is matched against each "
+                      + "phase's templates and the best phase wins, with a reliability (ASTAR, Rauch & Dupuy 2005).")
             }
-            .help("Matrix with precipitates: one phase is the matrix, its spots are removed and the other phases are looked for "
-                  + "in what is left (Thronsen et al. 2024). Grains and phases: every position is matched against each "
-                  + "phase's templates and the best phase wins, with a reliability (ASTAR, Rauch & Dupuy 2005).")
             ForEach(Array(product.phases.enumerated()), id: \.element.id) { index, slot in
                 PhaseRow(index: index, slot: slot)
             }

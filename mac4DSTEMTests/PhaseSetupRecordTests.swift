@@ -79,6 +79,20 @@ final class PhaseSetupRecordTests: XCTestCase {
         XCTAssertEqual(restored.phases[1].model.source, .imported)
     }
 
+    /// Grains and phases is held back in 5.4.0 (#468): the method is not offered, and a grains session reopens as found from the
+    /// structures; the other sources come back as saved. Mutation: grains offered again, or the restore keeps grains - red.
+    func testGrainsIsNotOfferedAndAGrainsSessionReopensFromTheStructures() throws {
+        XCTAssertEqual(PhaseMappingMethod.offered, [.matrixWithPrecipitates])
+        XCTAssertEqual(PhaseOrientationSource.offered, [.structures, .typedZones])
+        let saved = try setup()
+        for (source, back) in [(PhaseOrientationSource.grains, PhaseOrientationSource.structures),
+                               (.structures, .structures), (.typedZones, .typedZones)] {
+            let record = PhaseSetupRecord(phases: saved.phases, reference: saved.reference, matching: saved.matching,
+                                          cifSources: [:], orientationSource: source)
+            XCTAssertEqual(record.restoredOrientationSource, back, "\(source)")
+        }
+    }
+
     func testAStructureThatCannotBeRebuiltRefusesTheWholeList() throws {
         let saved = try setup()
         let slim = saved.record.withoutCIFTexts

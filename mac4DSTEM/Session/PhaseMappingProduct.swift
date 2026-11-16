@@ -317,6 +317,11 @@ package enum PhaseOrientationSource: String, Sendable, Equatable, CaseIterable, 
 
     /// Whether the run treats one phase as the matrix (the two "Matrix with precipitates" sources).
     package var hasMatrix: Bool { self != .grains }
+
+    /// The sources the window, the door and a reopened session offer: grains only while its method is offered.
+    package static var offered: [PhaseOrientationSource] {
+        allCases.filter { $0 != .grains || PhaseMappingMethod.offered.contains(.grainsAndPhases) }
+    }
 }
 
 /// The method the Phases section offers (mac4DSTEM#252): a matrix with precipitates in it, or grains of several phases.
@@ -330,6 +335,10 @@ package enum PhaseMappingMethod: String, Sendable, Equatable, CaseIterable {
         case .grainsAndPhases: "Grains and phases (no matrix)"
         }
     }
+
+    /// The methods the Phases section offers. Grains and phases is held back in 5.4.0: on Thronsen A it left 95.8 % not
+    /// indexed and found no Al (mac4DSTEM#468). The code and its tests stay; add it back here when #468 is fixed.
+    package static let offered: [PhaseMappingMethod] = [.matrixWithPrecipitates]
 }
 
 @Observable

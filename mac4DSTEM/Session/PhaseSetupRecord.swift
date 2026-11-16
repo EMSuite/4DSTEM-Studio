@@ -265,7 +265,9 @@ extension PhaseSetupRecord {
 
     /// The source the setup was saved with; a session from before 5.3 has none and was typed zones.
     package var restoredOrientationSource: PhaseOrientationSource {
-        orientationSource.flatMap(PhaseOrientationSource.init(rawValue:)) ?? .typedZones
+        let source = orientationSource.flatMap(PhaseOrientationSource.init(rawValue:)) ?? .typedZones
+        // A grains session reopened while that method is not offered (mac4DSTEM#468) comes back as found from the structures.
+        return PhaseOrientationSource.offered.contains(source) ? source : .structures
     }
 
     /// The phase list and settings, or why not. `held`: the imported models this window already has.

@@ -77,4 +77,12 @@ final class AgentDoorGuideTests: XCTestCase {
         XCTAssertGreaterThan(seen.count, 10, "the guide names the tools it means in backticks")
         XCTAssertEqual(seen.subtracting(registered), [], "the guide names tools the door does not register")
     }
+
+    /// 15 Nov 2026 (SiGe, the 5.4.0 sweep): an agent built a Bragg vector map on a centre-of-mass origin the app had flagged,
+    /// and the map came out smeared. The overview says to act on the app's own signals before the next step, with that case.
+    func testTheOverviewSaysToActOnAFlaggedResultFirst() {
+        let text = Mac4DSTEMAgentDoor.Guide.overview.text
+        XCTAssertTrue(text.contains("Never build a step on a flagged result"), text)
+        XCTAssertTrue(text.contains("origin_from_bragg_peaks"), text)
+    }
 }

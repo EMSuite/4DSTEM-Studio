@@ -56,6 +56,10 @@ extension Mac4DSTEMAgentDoor {
             `run_task`; judge the map with `get_result_image` against the scan map. See topic phase_mapping.
 
             Ways of working the person expects:
+            - Read the app's own signals after every step and act on them before the next one: the origin's fit RMS and \
+            flag (calibration.items), the kernel's candidates and warnings, the scan summary, any refusal. Never build a \
+            step on a flagged result. A centre-of-mass origin flagged on a spot pattern means: detect the disks, run step \
+            origin_from_bragg_peaks, then check that the Bragg vector map shows sharp spots, not smears.
             - Change one setting at a time and look at the picture after each change. Numbers alone mislead; the pictures \
             are drawn by the same code that draws the person's screen.
             - Every change shows in the person's Output as "An agent ...". When a tool moves a setting you did not name, \

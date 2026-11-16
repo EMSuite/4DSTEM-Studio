@@ -10,6 +10,82 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). App
 - **Runs on macOS 26** (was macOS 27) on Apple Silicon. Figure export writes through SwiftUI's `FileDocument`; the toolbar's Save
   button takes its low priority on macOS 26.1 and newer. MacEMUI 0.3.2. CI builds and runs the unit tests again, on Xcode 26.6.
 
+## [5.4.0](https://github.com/macEMSuite/mac4DSTEM/compare/v5.3.1...v5.4.0) (2026-11-16)
+
+
+### Features
+
+* an orientation map per phase for phase mapping from the structures ([#393](https://github.com/macEMSuite/mac4DSTEM/issues/393)) ([ef013da](https://github.com/macEMSuite/mac4DSTEM/commit/ef013da36d8d67b2355945ac86f2a91984977f05))
+* claimed disks for a phase map made from the structures ([#419](https://github.com/macEMSuite/mac4DSTEM/issues/419)) ([39ff0b8](https://github.com/macEMSuite/mac4DSTEM/commit/39ff0b8596b733fbe1af86a701f59c3ecb6522b1))
+* closing, opening another file or quitting asks before it stops a running analysis ([#401](https://github.com/macEMSuite/mac4DSTEM/issues/401)) ([93bea93](https://github.com/macEMSuite/mac4DSTEM/commit/93bea933fb08ada0c7b8eb593ba83a6de1229f4d))
+* Grains and phases (no matrix), the best phase per position with its reliability ([#420](https://github.com/macEMSuite/mac4DSTEM/issues/420)) ([bfe0f01](https://github.com/macEMSuite/mac4DSTEM/commit/bfe0f0152a125849d18933e0cb70fc6f52661684))
+* Keep in memory by default when the cube fits a quarter of the RAM ([#407](https://github.com/macEMSuite/mac4DSTEM/issues/407)) ([f60e6c2](https://github.com/macEMSuite/mac4DSTEM/commit/f60e6c20ec611820f03caf30a68146ef4e6c2fe6))
+* Keep in memory holds the cube at its stored bit depth ([#392](https://github.com/macEMSuite/mac4DSTEM/issues/392)) ([23e2822](https://github.com/macEMSuite/mac4DSTEM/commit/23e28222a5f3a45973e1e8d59f26332e3c7e9864))
+* Materials Project lookup through the agent door ([#382](https://github.com/macEMSuite/mac4DSTEM/issues/382)) ([4389fbe](https://github.com/macEMSuite/mac4DSTEM/commit/4389fbe50707af01409e5664e84a5a7435f11e67))
+* the agent door reaches Settings, Clear Calibration, Remove Fine-Tuned Model, Reopen Without This Session, Release cube and the demo ([#380](https://github.com/macEMSuite/mac4DSTEM/issues/380)) ([4ce2014](https://github.com/macEMSuite/mac4DSTEM/commit/4ce201436416c781e5ba8b680baadff7f59a2c83))
+* the agent door reaches the EDS room: get_eds, set_eds, run_eds, and run_task quantifies a spectrum image alone ([#375](https://github.com/macEMSuite/mac4DSTEM/issues/375)) ([1374f67](https://github.com/macEMSuite/mac4DSTEM/commit/1374f67c67a3ba7bbe6e7cbaf678f8826b9d9de8))
+* the agent door sets the view: pane zoom, display orientation and mirror, fit overlay, Same scale ([#384](https://github.com/macEMSuite/mac4DSTEM/issues/384)) ([7891e2d](https://github.com/macEMSuite/mac4DSTEM/commit/7891e2db7db32d6e429f8be7e121cf5140bc3cfc))
+* type the R–Q rotation and transpose in Prepare and set_calibration, as py4DSTEM's QR_rotation and QR_flip ([#417](https://github.com/macEMSuite/mac4DSTEM/issues/417)) ([1267cc5](https://github.com/macEMSuite/mac4DSTEM/commit/1267cc5e2a945223f57f1cb2b3b1ab9630e9fedf))
+
+
+### Bug Fixes
+
+* a crafted sidecar crop or RGBA map is refused or clipped instead of trapping ([#383](https://github.com/macEMSuite/mac4DSTEM/issues/383)) ([cbfe69d](https://github.com/macEMSuite/mac4DSTEM/commit/cbfe69d48930d7b74c765ab665f1859fbecbf912))
+* a dataset switch during a residency or open await publishes nothing onto the new dataset ([#395](https://github.com/macEMSuite/mac4DSTEM/issues/395)) ([ea91348](https://github.com/macEMSuite/mac4DSTEM/commit/ea913488436f7bc151ec09c50b176ef9d5fbf154))
+* a malformed precipitate class map is refused with a sentence instead of trapping ([#387](https://github.com/macEMSuite/mac4DSTEM/issues/387)) ([97c9641](https://github.com/macEMSuite/mac4DSTEM/commit/97c9641f6b08ff0ad240e918b1a0dc1304851d54))
+* a phase map with the matrix mostly not indexed names the origin and the distortion fit ([#394](https://github.com/macEMSuite/mac4DSTEM/issues/394)) ([c52f54b](https://github.com/macEMSuite/mac4DSTEM/commit/c52f54b2193e78f9d156b413818eeec8109a984d)), closes [#298](https://github.com/macEMSuite/mac4DSTEM/issues/298)
+* a release run in a fresh tag checkout creates its dmgbuild venv ([70d9208](https://github.com/macEMSuite/mac4DSTEM/commit/70d9208d0449109ac5940822007ddd3561b57999))
+* a scattered centre-of-mass origin points to Origin from Bragg Peaks ([#436](https://github.com/macEMSuite/mac4DSTEM/issues/436)) ([f273a35](https://github.com/macEMSuite/mac4DSTEM/commit/f273a35722b34a84d0c21eb0fdbe0376f1d14521))
+* a sidecar write returns its own lineage omission instead of leaving it in a global ([#399](https://github.com/macEMSuite/mac4DSTEM/issues/399)) ([44f8b1a](https://github.com/macEMSuite/mac4DSTEM/commit/44f8b1a78307dcb92818b6e8481dfb457193f7ca))
+* a stale parallax depth index names no depth instead of trapping ([#389](https://github.com/macEMSuite/mac4DSTEM/issues/389)) ([718f5f3](https://github.com/macEMSuite/mac4DSTEM/commit/718f5f3fdcbbb347900a7c0036e69f791d4bef21))
+* a strain map computed without the ellipse says so beside its Quantitative badge ([#403](https://github.com/macEMSuite/mac4DSTEM/issues/403)) ([e9ddb81](https://github.com/macEMSuite/mac4DSTEM/commit/e9ddb81f62f34e703f08a237efcbcbef22c4237d))
+* a typed-zones phase map records the excitation slab of each phase ([#433](https://github.com/macEMSuite/mac4DSTEM/issues/433)) ([6643cf1](https://github.com/macEMSuite/mac4DSTEM/commit/6643cf1ca434ef89e28580deafeb737f40f8164a))
+* a virtual-detector run lands at most once ([#400](https://github.com/macEMSuite/mac4DSTEM/issues/400)) ([77f5744](https://github.com/macEMSuite/mac4DSTEM/commit/77f57442bb31dfef534920a4b3d1a3d5165b389c))
+* Build Kernel keeps an origin set by hand ([#432](https://github.com/macEMSuite/mac4DSTEM/issues/432)) ([4937049](https://github.com/macEMSuite/mac4DSTEM/commit/4937049071af2bab99d6202d9cff3693ad6478f1))
+* closing a dataset window releases its resident cube and the file at once ([#429](https://github.com/macEMSuite/mac4DSTEM/issues/429)) ([a6b9545](https://github.com/macEMSuite/mac4DSTEM/commit/a6b9545acf72e8e617dac295734106b2b6c99199))
+* crafted 4D files are refused instead of trapping ([#379](https://github.com/macEMSuite/mac4DSTEM/issues/379)) ([db18fdd](https://github.com/macEMSuite/mac4DSTEM/commit/db18fdda7a3bd65c45f77c4ba159499de816b211))
+* DPC guidance no longer asks for an origin that is already set ([#431](https://github.com/macEMSuite/mac4DSTEM/issues/431)) ([b732011](https://github.com/macEMSuite/mac4DSTEM/commit/b732011706234c16d7724fa0e285aa9bdcb98848))
+* File › Open offers .hspy files, which the HDF5 reader opens ([#463](https://github.com/macEMSuite/mac4DSTEM/issues/463)) ([ee4c87e](https://github.com/macEMSuite/mac4DSTEM/commit/ee4c87e4989bb6823684333e024745f06eba2970))
+* Grains and phases offers no claimed-disks overlay instead of asking for a new run ([#456](https://github.com/macEMSuite/mac4DSTEM/issues/456)) ([b2cd3a1](https://github.com/macEMSuite/mac4DSTEM/commit/b2cd3a146cff9818b5ebd2bb941ea4aea21f0b79))
+* Grains and phases offers no claimed-disks overlay instead of asking for a new run ([#462](https://github.com/macEMSuite/mac4DSTEM/issues/462)) ([b2cd3a1](https://github.com/macEMSuite/mac4DSTEM/commit/b2cd3a146cff9818b5ebd2bb941ea4aea21f0b79))
+* hold back Grains and phases for 5.4.0 ([#475](https://github.com/macEMSuite/mac4DSTEM/issues/475)) ([081021b](https://github.com/macEMSuite/mac4DSTEM/commit/081021b0ded1f3db2a147ca59969d27efa514268))
+* NaN or empty data in DPC, parallax, fit overlays and Quick Look no longer traps ([#385](https://github.com/macEMSuite/mac4DSTEM/issues/385)) ([70c0234](https://github.com/macEMSuite/mac4DSTEM/commit/70c02346ef4faeec4ad52192b07e65fb5e5afc19))
+* NaN, infinite or empty data in DPC, parallax, fit overlays and Quick Look is refused or drawn black instead of trapping ([70c0234](https://github.com/macEMSuite/mac4DSTEM/commit/70c02346ef4faeec4ad52192b07e65fb5e5afc19))
+* one open at a time, claimed before the open's first await ([#405](https://github.com/macEMSuite/mac4DSTEM/issues/405)) ([65b3772](https://github.com/macEMSuite/mac4DSTEM/commit/65b37726363d0de4b5d0f8b65032d0282f6f5ddc))
+* phase mapping progress moves through both passes ([#381](https://github.com/macEMSuite/mac4DSTEM/issues/381)) ([288ac3b](https://github.com/macEMSuite/mac4DSTEM/commit/288ac3b88f40a032c2ff28c7b913df91d9a63953))
+* preparing the learned detector loads a package once however many callers wait ([#398](https://github.com/macEMSuite/mac4DSTEM/issues/398)) ([30a2df6](https://github.com/macEMSuite/mac4DSTEM/commit/30a2df68fe958749f78c0a7896d323d33eaf5c1e))
+* real-data acceptance pins follow the py4DSTEM disk-detection defaults ([#444](https://github.com/macEMSuite/mac4DSTEM/issues/444)) ([35ed281](https://github.com/macEMSuite/mac4DSTEM/commit/35ed281a91aca932afbdef941ac28332970c3ad3))
+* Settings &gt; Agents &gt; Folder &gt; Choose… opens a folder panel ([#457](https://github.com/macEMSuite/mac4DSTEM/issues/457)) ([3321d67](https://github.com/macEMSuite/mac4DSTEM/commit/3321d67949c14f75b371b9dbe7a692b10031ae27))
+* Settings &gt; Agents &gt; Folder &gt; Choose… opens a folder panel ([#465](https://github.com/macEMSuite/mac4DSTEM/issues/465)) ([3321d67](https://github.com/macEMSuite/mac4DSTEM/commit/3321d67949c14f75b371b9dbe7a692b10031ae27))
+* the ACOM full-scan estimate counts a monoclinic phase's 4x library ([#418](https://github.com/macEMSuite/mac4DSTEM/issues/418)) ([d2c0eea](https://github.com/macEMSuite/mac4DSTEM/commit/d2c0eea62aa24d6bce07d96ed933028f752ea6ef))
+* the agent door refuses an open during a run, naming the run ([#409](https://github.com/macEMSuite/mac4DSTEM/issues/409)) ([def0b0a](https://github.com/macEMSuite/mac4DSTEM/commit/def0b0a6275f1acf9fa42f759712c19a765b355c))
+* the agent door's busy, failure and open answers agree with the window ([#378](https://github.com/macEMSuite/mac4DSTEM/issues/378)) ([10e4642](https://github.com/macEMSuite/mac4DSTEM/commit/10e46425fbe1b56a9f5b9461772e60ed33cfd47b))
+* the agent door's tool layer reads bounded files, creates files exclusively, finds a moved Agent folder, quotes agent text ([#376](https://github.com/macEMSuite/mac4DSTEM/issues/376)) ([f527167](https://github.com/macEMSuite/mac4DSTEM/commit/f5271670de17f46f083e874e7c3dc3e698227f71))
+* the App Store build is named 4DSTEM Studio (guideline 5.2.5) ([#474](https://github.com/macEMSuite/mac4DSTEM/issues/474)) ([eeea697](https://github.com/macEMSuite/mac4DSTEM/commit/eeea69733bb856176706cebe6bef473594104eab))
+* the Bragg vector map shows the disks whatever the intensity scale ([#448](https://github.com/macEMSuite/mac4DSTEM/issues/448)) ([7c181a6](https://github.com/macEMSuite/mac4DSTEM/commit/7c181a62b47f06f0fa9d2d9a3c39787a1b203e31))
+* the Bragg vector map shows the disks whatever the intensity scale ([#450](https://github.com/macEMSuite/mac4DSTEM/issues/450)) ([7c181a6](https://github.com/macEMSuite/mac4DSTEM/commit/7c181a62b47f06f0fa9d2d9a3c39787a1b203e31))
+* the door's virtual detector keeps both radii when the new inner is beyond the old outer ([#449](https://github.com/macEMSuite/mac4DSTEM/issues/449)) ([b1256ca](https://github.com/macEMSuite/mac4DSTEM/commit/b1256ca2e65667c44449dd227371fd6118643e8a))
+* the door's virtual detector keeps both radii when the new inner is beyond the old outer ([#451](https://github.com/macEMSuite/mac4DSTEM/issues/451)) ([b1256ca](https://github.com/macEMSuite/mac4DSTEM/commit/b1256ca2e65667c44449dd227371fd6118643e8a))
+* the door's workflow guide says to act on a flagged result before the next step ([#447](https://github.com/macEMSuite/mac4DSTEM/issues/447)) ([ec34868](https://github.com/macEMSuite/mac4DSTEM/commit/ec34868c451200302dfd510d0fba307b52abdf1a))
+* the latest saved-result pick wins when two finish out of order ([#397](https://github.com/macEMSuite/mac4DSTEM/issues/397)) ([896f09d](https://github.com/macEMSuite/mac4DSTEM/commit/896f09d341d473a99764b9f328f79a3a7bbd1065))
+* the open preview's stride counts the bytes a binned view reads ([#424](https://github.com/macEMSuite/mac4DSTEM/issues/424)) ([48f9c09](https://github.com/macEMSuite/mac4DSTEM/commit/48f9c09c546cc1ac3a9cc8c1f9155e843b3e7c72))
+* the phase-contrast memory budget counts the products it holds after the fit ([#425](https://github.com/macEMSuite/mac4DSTEM/issues/425)) ([a604f16](https://github.com/macEMSuite/mac4DSTEM/commit/a604f168fe31590b2049bbb298ff8b9f61423fd7))
+* the scattered centre-of-mass hint says it is for spot patterns ([#459](https://github.com/macEMSuite/mac4DSTEM/issues/459)) ([3927fd7](https://github.com/macEMSuite/mac4DSTEM/commit/3927fd75562c2bb4288616632abefe49103a78bd))
+* the scattered centre-of-mass hint says it is for spot patterns ([#464](https://github.com/macEMSuite/mac4DSTEM/issues/464)) ([3927fd7](https://github.com/macEMSuite/mac4DSTEM/commit/3927fd75562c2bb4288616632abefe49103a78bd))
+* the Thronsen parity test states the parabolic subpixel fit its pins were recorded with ([#443](https://github.com/macEMSuite/mac4DSTEM/issues/443)) ([0032f09](https://github.com/macEMSuite/mac4DSTEM/commit/0032f09288b491ffedf4f1df4cfb04918338c6bd))
+* the Thronsen parity test states the parabolic subpixel fit its pins were recorded with ([#453](https://github.com/macEMSuite/mac4DSTEM/issues/453)) ([0032f09](https://github.com/macEMSuite/mac4DSTEM/commit/0032f09288b491ffedf4f1df4cfb04918338c6bd))
+* the update window shows the short release notes, not raw CHANGELOG lines ([#434](https://github.com/macEMSuite/mac4DSTEM/issues/434)) ([1acc52b](https://github.com/macEMSuite/mac4DSTEM/commit/1acc52b2460732a8ae1b9f181f32bb7e3e6b5f66))
+* the virtual detector and the mean and max patterns are computed off the main thread ([#428](https://github.com/macEMSuite/mac4DSTEM/issues/428)) ([0690030](https://github.com/macEMSuite/mac4DSTEM/commit/0690030d0ee897c9183227f92ee869297a7b9c6e))
+* under a beam stop the origin row gives only the stop's remedy ([#454](https://github.com/macEMSuite/mac4DSTEM/issues/454)) ([647a9ad](https://github.com/macEMSuite/mac4DSTEM/commit/647a9adaca3194b44c71f6334876c0b4f01dd16d))
+* under a beam stop the origin row gives only the stop's remedy ([#455](https://github.com/macEMSuite/mac4DSTEM/issues/455)) ([647a9ad](https://github.com/macEMSuite/mac4DSTEM/commit/647a9adaca3194b44c71f6334876c0b4f01dd16d))
+* whole counts are written without a grouping separator ([#430](https://github.com/macEMSuite/mac4DSTEM/issues/430)) ([6cd0168](https://github.com/macEMSuite/mac4DSTEM/commit/6cd0168114b2a4d5c81a1dcc59b31b56a3a7b4fe))
+
+
+### Performance Improvements
+
+* phase-contrast alignment re-centres its stacks in place ([#440](https://github.com/macEMSuite/mac4DSTEM/issues/440)) ([3805fc2](https://github.com/macEMSuite/mac4DSTEM/commit/3805fc2a3f38e0cb33d1ff3b9eebef887d735b65))
+* the Keep-in-memory fill reads in 64 MiB tiles and drops a stale cube before allocating ([#406](https://github.com/macEMSuite/mac4DSTEM/issues/406)) ([5372a2a](https://github.com/macEMSuite/mac4DSTEM/commit/5372a2a2a73d5eff901237f1250fd5204ff1b1de))
+
 ## [5.3.1](https://github.com/macEMSuite/mac4DSTEM/compare/v5.3.0...v5.3.1) (2026-11-14)
 
 

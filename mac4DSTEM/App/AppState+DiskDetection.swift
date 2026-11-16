@@ -506,11 +506,21 @@ extension AppState {
         publishProduct(
             kind: "bragg_vector_map", displayName: "Bragg vector map", valueUnits: "log_intensity",
             payload: .scalar(FloatImage(width: bvm.width, height: bvm.height,
-                                        pixels: bvm.pixels.map { log10(1 + max($0, 0)) })),
+                                        pixels: Self.braggMapDisplayPixels(bvm.pixels))),
             domain: .detector,
             sampling: ProductSampling(row: own.row, column: own.column, units: own.units),
             extraProvenance: own.provenance, ownProvenanceOnly: true)
         Task { await ensureScanNavigator() }
+    }
+
+    /// The Bragg vector map's display values: `log10(1 + I / m)`, with `m` the median of the positive bins, so the map does
+    /// not depend on the intensity scale. A plain `log10(1 + I)` flattened every disk to 0 when intensities are far below 1
+    /// (a simulated WS2 cube: beam 5.7e-4, disks ~1e-7), leaving only the direct beam visible (#448).
+    nonisolated static func braggMapDisplayPixels(_ pixels: [Float]) -> [Float] {
+        let positive = pixels.filter { $0 > 0 }.sorted()
+        guard !positive.isEmpty else { return pixels.map { _ in 0 } }
+        let median = positive[positive.count / 2]
+        return pixels.map { log10(1 + max($0, 0) / median) }
     }
 
     /// Publish where the last neural-net and the last classical full-scan run

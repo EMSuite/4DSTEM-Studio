@@ -64,6 +64,18 @@ final class CentreOfMassScatterHintTests: XCTestCase {
                       "the status line does not say it: \(state.statusText)")
     }
 
+    /// #454. Mutation: the readiness row ignores the beam stop -> two conflicting hints -> red.
+    func testUnderABeamStopOnlyTheStopsRemedyShows() async throws {
+        let source = JitteredBeamSource(jitter: 3)
+        let state = AppState()
+        await state.activate(descriptor: try await source.discoverPrimaryDataset(), reader: source, runInitialAnalysis: false)
+        await state.calibrateOrigin()
+        XCTAssertTrue(row(state).contains(hint), "fixture: the scatter hint shows first: \(row(state))")
+        state.calibrationSession.calibration.origin?.beamStopCoversBeam = true
+        XCTAssertTrue(row(state).contains("Beam\u{00A0}stop over the direct beam"), row(state))
+        XCTAssertFalse(row(state).contains("Origin from Bragg Peaks"), row(state))
+    }
+
     func testATightCentreOfMassSaysNothingNew() async throws {
         let source = JitteredBeamSource(jitter: 0)
         let state = AppState()

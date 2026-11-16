@@ -438,7 +438,8 @@ package struct CalibrationReadinessReport: Equatable, Sendable {
         if calibration.originResidualIsAcceptable, !calibration.originFriedelResidualIsAcceptable {
             originDetail += " · Friedel fit over the 1\u{00A0}px limit (not for quantitative use)"
         }
-        if provenance.suggestsOriginFromBraggPeaks {
+        // Under a beam stop the Bragg-peak origin has no direct beam to find; the stop's own remedy above is the one hint (#454).
+        if provenance.suggestsOriginFromBraggPeaks, calibration.originBeamStopIsAcceptable {
             // Two reasons set it (`AppState.calibrateOrigin`): a spot pattern, or a centre of mass scattered over 1 px (#324).
             let scattered = (originResidual ?? 0) > Calibration.centreOfMassScatterHintPixels
             originDetail += scattered

@@ -42,12 +42,12 @@ enum CompanionFolderAccess {
         panel.canCreateDirectories = false
         panel.directoryURL = need.folder
         panel.prompt = "Allow"
-        panel.message = "\(url.lastPathComponent) is \(need.description). To read them together, allow mac4DSTEM to read this folder."
+        panel.message = "\(url.lastPathComponent) is \(need.description). To read them together, allow \(AppName.display) to read this folder."
         let response = await withCheckedContinuation { continuation in
             panel.begin { continuation.resume(returning: $0) }
         }
         guard response == .OK, let folder = panel.url else {
-            throw Declined(message: "Not opened: \(url.lastPathComponent) is \(need.description), and mac4DSTEM reads them only with "
+            throw Declined(message: "Not opened: \(url.lastPathComponent) is \(need.description), and \(AppName.display) reads them only with "
                 + "access to their folder.")
         }
         if folder.startAccessingSecurityScopedResource() { held.append(folder) }

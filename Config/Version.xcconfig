@@ -10,3 +10,10 @@ MARKETING_VERSION = 5.3.1
 // container and defaults, so nobody's settings are touched (#122). The HDF5 helper keeps its fixed identifier
 // (HDF5HelperClient.serviceName), so a drive copy opens no HDF5 file.
 MACEM_APP_ID = com.mac4dstem.mac4DSTEM
+
+// The app's name on the Mac (the .app, Finder, the menu bar, About), per flavour. App Review refuses "Mac" in an App
+// Store app's name (guideline 5.2.5, mac4DSTEM 5.2.0 rejected 16 Nov 2026), so the store build (MACEM_STORE_BUILD=YES) is
+// "4DSTEM Studio"; the website download keeps "mac4DSTEM". The module stays mac4DSTEM in both (PRODUCT_MODULE_NAME), so
+// saved sessions and the tests read the same types. AppName.display carries the name into the app's sentences.
+MACEM_APP_NAME_NO = mac4DSTEM
+MACEM_APP_NAME_YES = 4DSTEM Studio

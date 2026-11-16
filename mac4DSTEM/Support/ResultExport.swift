@@ -134,7 +134,7 @@ extension AppState {
             try sessionSidecar.remember(url, for: descriptor)
         } catch {
             statusText = "Saved \(what); choose the session file again after relaunch"
-            errorMessage = "\(what) was saved to \(url.lastPathComponent), but mac4DSTEM could not "
+            errorMessage = "\(what) was saved to \(url.lastPathComponent), but \(AppName.display) could not "
                 + "remember access for a future launch: \(Self.errorDetail(error))"
         }
     }
@@ -157,7 +157,7 @@ extension AppState {
     /// companion file mac4DSTEM may update and reopen": two words of ours for one of the user's.
     enum SessionSavePanelWording {
         static let title = "Save Session"
-        static let message = "Choose where mac4DSTEM keeps this dataset's analysis. It is reopened with the dataset."
+        static let message = "Choose where \(AppName.display) keeps this dataset's analysis. It is reopened with the dataset."
     }
 
     private func writableSessionSidecarURL(for descriptor: DatasetDescriptor) -> URL? {
@@ -892,7 +892,7 @@ extension AppState {
     /// pre-v1.0 sessions in use), so such a product is refused, not guessed.
     static func savedDomain(_ provenance: [String: String], displayName: String) throws -> ProductDomain {
         guard let domain = provenance["display_domain"].flatMap(ProductDomain.init) else {
-            throw SimpleError("“\(displayName)” was saved by a version of mac4DSTEM before 1.0 and cannot be compared. Run the analysis again to compare it.")
+            throw SimpleError("“\(displayName)” was saved by a version of \(AppName.display) before 1.0 and cannot be compared. Run the analysis again to compare it.")
         }
         return domain
     }
@@ -1066,7 +1066,7 @@ extension AppState {
         let expected = sessionSidecar.location(for: descriptor)
         let panel = NSOpenPanel()
         panel.title = "Allow Access to the Session File"
-        panel.message = "Choose \(expected.lastPathComponent) so mac4DSTEM may read the session saved beside this dataset."
+        panel.message = "Choose \(expected.lastPathComponent) so \(AppName.display) may read the session saved beside this dataset."
         panel.prompt = "Allow Access"
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
@@ -1109,7 +1109,7 @@ extension AppState {
         let current = sessionSidecar.location(for: descriptor)
         guard let url = runSidecarSavePanel(
             title: "Change Session File",
-            message: "Choose the companion file mac4DSTEM keeps this dataset's session in. Existing saved results are copied across.",
+            message: "Choose the companion file \(AppName.display) keeps this dataset's session in. Existing saved results are copied across.",
             suggesting: current
         ) else {
             statusText = "Session file unchanged"
@@ -1675,7 +1675,7 @@ extension AppState {
     }
 
     var exportBaseName: String {   // internal: the figure export names its file from it too
-        let file = descriptor.map { ($0.fileName as NSString).deletingPathExtension } ?? "mac4DSTEM"
+        let file = descriptor.map { ($0.fileName as NSString).deletingPathExtension } ?? AppName.display
         return file
     }
 

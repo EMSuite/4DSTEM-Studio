@@ -97,7 +97,7 @@ extension AppState {
     func choosePreprocessDestination(suggestedName: String) -> URL? {
         let panel = NSSavePanel()
         panel.title = "Write Preprocessed py4DSTEM DataCube"
-        panel.message = "The source stays unchanged. mac4DSTEM writes a new canonical EMD file."
+        panel.message = "The source stays unchanged. \(AppName.display) writes a new canonical EMD file."
         panel.allowedContentTypes = [UTType(filenameExtension: "h5") ?? .data]
         panel.nameFieldStringValue = suggestedName
         guard panel.runModal() == .OK else { return nil }

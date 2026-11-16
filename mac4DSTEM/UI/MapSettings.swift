@@ -1236,7 +1236,7 @@ private struct ACOMSections: View {
             } else if let model = appState.resolvedACOMModel {
                 InspectorValueRow("Symmetry", model.symmetry.displayName)
                 InspectorValueRow("Source", acomPhaseModelSourceLabel(source: model.source, id: model.id))
-                InspectorNote("The phase model is selected explicitly; mac4DSTEM never infers it from the dataset name.")
+                InspectorNote("The phase model is selected explicitly; \(AppName.display) never infers it from the dataset name.")
             }
 
             if appState.acomSession.modelSelection == .customCubic {

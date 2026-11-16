@@ -1,20 +1,22 @@
-# Mac App Store listing: mac4DSTEM
+# Mac App Store listing: 4DSTEM Studio (mac4DSTEM)
 
-Approved by Paul on 2026-11-05 for the first submission (5.2.0); names, subtitles and screenshots are his.
+Approved by Paul on 2026-11-05 for the first submission (5.2.0); names, subtitles and screenshots are his. App Review refused
+"mac4DSTEM" as the store name (guideline 5.2.5, 16 Nov 2026); from 5.4.0 the store app is "4DSTEM Studio" (Paul's choice), in
+these texts and in the store build (Config/Version.xcconfig). Nothing in the listing names the app "mac…".
 
 One plain UTF-8 file per App Store Connect field. Counts are characters (`wc -m`), no trailing newline in the limited fields.
 
-- `name.txt`: 9 / 30
+- `name.txt`: 13 / 30
 - `subtitle.txt`: 28 / 30
 - `promotional-text.txt`: 147 / 170
-- `description.txt`: 2787 / 4000 (plain text, no markdown)
+- `description.txt`: 2799 / 4000 (plain text, no markdown)
 - `keywords.txt`: 93 / 100 (comma-separated, no spaces after commas; no word from the name or subtitle, which Apple indexes already, and no other product names)
 - `whats-new.txt`: 1090 / 4000 (5.4.0)
 - `category.txt`: primary Education, secondary Productivity (no limit)
 - `urls.txt`: support, marketing and privacy policy URLs on mac4dstem.com (no limit)
 - `age-rating.txt`: questionnaire answers, all None, rating 4+ (no limit)
 - `app-privacy.txt`: Data Not Collected, with the Materials Project reasoning (no limit)
-- `review-notes.txt`: 1371 / 4000
+- `review-notes.txt`: 2899 / 4000
 
 Every claim comes from the README, CHANGELOG or mac4dstem.com as of 2026-11-05; nothing from the roadmap.
 

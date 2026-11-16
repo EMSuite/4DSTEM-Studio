@@ -361,7 +361,7 @@ package enum SessionSidecarReadFailure: Equatable {
     package static func reason(sidecar: String, error: Error) -> String {
         switch classify(error) {
         case .notPermitted:
-            return "\(sidecar) sits beside this dataset but mac4DSTEM has not been granted access "
+            return "\(sidecar) sits beside this dataset but \(AppName.display) has not been granted access "
                 + "to it by macOS. Choose Allow Access… (sidebar or Dataset menu) and pick that "
                 + "file; the dataset then reopens with its session."
         case .unreadable:

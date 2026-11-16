@@ -96,7 +96,13 @@ assert_mac4dstem_arm64_only() {
 assert_mac4dstem_bundle_arm64_only() {
   app="$1"
   arch_failures=0
-  assert_mac4dstem_arm64_only "$app/Contents/MacOS/mac4DSTEM" || arch_failures=1
+  # The executable is named after the flavour (mac4DSTEM, or the store build's "4DSTEM Studio"): read it, never assume it.
+  exe="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist" 2>/dev/null)"
+  if [ -z "$exe" ]; then
+    echo "FAIL: $app/Contents/Info.plist names no executable." >&2
+    return 1
+  fi
+  assert_mac4dstem_arm64_only "$app/Contents/MacOS/$exe" || arch_failures=1
   for library in FormatoLibHDF5 FormatoLibSZ FormatoLibAEC; do
     if [ ! -f "$app/Contents/Frameworks/$library.framework/$library" ]; then
       echo "FAIL: $app is missing embedded $library.framework." >&2

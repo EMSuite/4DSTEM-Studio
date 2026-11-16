@@ -5,6 +5,7 @@
 //        itself sends nothing (the privacy label stays "Data Not Collected").
 //
 
+import DSTEMCore
 import Foundation
 
 nonisolated enum FeedbackLinks {
@@ -25,8 +26,8 @@ nonisolated enum FeedbackLinks {
         link.scheme = "mailto"
         link.path = address
         link.queryItems = [
-            URLQueryItem(name: "subject", value: "mac4DSTEM feedback"),
-            URLQueryItem(name: "body", value: "\n\nmac4DSTEM \(appVersion), macOS \(systemVersion)"),
+            URLQueryItem(name: "subject", value: "\(AppName.display) feedback"),
+            URLQueryItem(name: "body", value: "\n\n\(AppName.display) \(appVersion), macOS \(systemVersion)"),
         ]
         return link.url
     }

@@ -107,7 +107,7 @@ extension Mac4DSTEMAgentDoor {
             var out: [String: Any] = ["material_id": id, "running": false, "can_import": canImport(outcome: outcome)]
             switch outcome {
             case .noAPIKey:
-                out["blocked_because"] = "No Materials Project API key is stored. Ask the person to add theirs in mac4DSTEM's "
+                out["blocked_because"] = "No Materials Project API key is stored. Ask the person to add theirs in \(AppName.display)'s "
                     + "Settings; the door never handles the key."
             case .failure(let message):
                 out["blocked_because"] = message

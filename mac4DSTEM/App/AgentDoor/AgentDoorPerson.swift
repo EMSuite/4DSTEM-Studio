@@ -32,7 +32,7 @@ extension Mac4DSTEMAgentDoor {
 
     static let personTools: [AgentTool] = [
         AgentTool(name: "get_settings", title: "Settings",
-                  summary: "mac4DSTEM's Settings as the window shows them: General (open behaviour, keep awake, figure size and "
+                  summary: "\(AppName.display)'s Settings as the window shows them: General (open behaviour, keep awake, figure size and "
                       + "format), Appearance (theme, colormaps, intensity display, scale bar), Analysis (the learned detector "
                       + "offer, the model caches' sizes) and Agents (whether runs and saves are allowed, the Agent folder's name). "
                       + "set_settings changes the analysis and display ones.",

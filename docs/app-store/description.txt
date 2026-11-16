@@ -1,4 +1,4 @@
-See your 4D-STEM data as you work on it. mac4DSTEM turns a scan into virtual images, Bragg disk maps, strain, orientation and phase maps, ptychographic reconstructions and EDS quantification, interactively and natively on Apple silicon.
+See your 4D-STEM data as you work on it. 4DSTEM Studio turns a scan into virtual images, Bragg disk maps, strain, orientation and phase maps, ptychographic reconstructions and EDS quantification, interactively and natively on Apple silicon.
 
 Move a detector and the virtual image follows. Change a calibration or a fit setting and see what it does while you make it. No scripts, no notebooks: open a file and start.
 
@@ -23,6 +23,6 @@ YOUR DATA STAYS ON YOUR MAC
 No account, no analytics, no telemetry. Datasets and results are read from and written to your own storage only. The one network request is an optional Materials Project lookup that you start yourself, with your own API key, which is kept in the macOS Keychain.
 
 OPEN SOURCE
-mac4DSTEM is free software under GPL-3.0. The source, the issue tracker and the tolerance each function is checked to are at github.com/mac4DSTEM/mac4DSTEM.
+4DSTEM Studio is free software under GPL-3.0. The source, the issue tracker and the tolerance each function is checked to are linked from the website.
 
 Requires a Mac with Apple silicon.

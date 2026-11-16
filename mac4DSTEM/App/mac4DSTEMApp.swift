@@ -332,7 +332,7 @@ private struct DatasetCommands: Commands {
         // The Help menu: the app ships no help book, so the default "mac4DSTEM Help" item only said help was unavailable. In its
         // place, the support page and an email to the project (`FeedbackLinks`); the app itself sends nothing.
         CommandGroup(replacing: .help) {
-            Button("mac4DSTEM Support") { if let url = FeedbackLinks.support { openURL(url) } }
+            Button("\(AppName.display) Support") { if let url = FeedbackLinks.support { openURL(url) } }
             Button("Send Feedback…") { if let url = FeedbackLinks.mail { openURL(url) } }
         }
         CommandMenu("Analysis") {
@@ -491,7 +491,7 @@ struct mac4DSTEMApp: App {
     #endif
 
     var body: some Scene {
-        WindowGroup("mac4DSTEM", id: "dataset") {
+        WindowGroup(AppName.display, id: "dataset") {
             DatasetWindow(preferences: preferences, recents: recents, menuRelay: menuRelay)
                 .environment(tableSelection)
                 .environment(reportUpdates)

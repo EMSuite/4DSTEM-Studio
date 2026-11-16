@@ -50,9 +50,10 @@ if (( STORE == 1 )); then
   echo "== App Store archive and export ($(git -C "$ROOT" rev-parse --short HEAD))"
   "$ROOT/tools/release/build-app-store.sh" "$OUT" > "$OUT/store.log" 2>&1 || { tail -30 "$OUT/store.log"; exit 1; }
   PKG="$(tail -1 "$OUT/store.log")"
-  VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$OUT/mac4DSTEM-store.xcarchive/Products/Applications/mac4DSTEM.app/Contents/Info.plist")"
+  STORE_NAME="$(sed -n 's/^MACEM_APP_NAME_YES = //p' "$ROOT/Config/Version.xcconfig")"   # "4DSTEM Studio" (guideline 5.2.5)
+  VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$OUT/mac4DSTEM-store.xcarchive/Products/Applications/$STORE_NAME.app/Contents/Info.plist")"
   [[ "$VERSION" == "$EXPECTED" ]] || { echo "The built app says $VERSION but the tag is $TAG." >&2; exit 1; }
-  echo "mac4DSTEM $VERSION: $PKG"
+  echo "$STORE_NAME $VERSION: $PKG"
   if [[ -z "${ASC_KEY_ID:-}" || -z "${ASC_ISSUER_ID:-}" ]]; then
     echo "No App Store Connect API key (ASC_KEY_ID, ASC_ISSUER_ID): built and checked, not validated or uploaded."
     exit 0

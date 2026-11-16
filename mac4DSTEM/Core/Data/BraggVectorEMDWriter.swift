@@ -106,9 +106,9 @@ package nonisolated enum BraggVectorEMDWriter {
             case .publishFailed(let detail):
                 return "Could not publish the completed session file: \(detail)"
             case .sidecarRequiresNewerReader(let minimum, let supported):
-                return "This session file requires mac4DSTEM session schema "
+                return "This session file requires \(AppName.display) session schema "
                     + "\(minimum) or newer to read safely; this build supports "
-                    + "\(supported). It was probably written by a newer mac4DSTEM — "
+                    + "\(supported). It was probably written by a newer \(AppName.display) — "
                     + "nothing was restored, so nothing can be misread."
             case .malformedAttribute(let name):
                 return "The session file's \(name) attribute exists but "

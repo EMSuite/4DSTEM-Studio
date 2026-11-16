@@ -4,7 +4,7 @@ import Foundation
 /// walkthroughs. It never appears in normal launches and performs no file I/O.
 package actor DemoFourDDataSource: FourDDataSource {
     package static let descriptor = DatasetDescriptor(
-        filePath: "/Demo/mac4DSTEM Demo.h5",
+        filePath: "/Demo/4D-STEM Demo.h5",
         datasetPath: "/demo/data",
         shape: [12, 12, 64, 64],
         dtypeDescription: "float32 · deterministic demo",

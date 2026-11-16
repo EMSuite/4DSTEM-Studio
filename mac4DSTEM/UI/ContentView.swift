@@ -31,7 +31,7 @@ struct ContentView: View {
     var body: some View {
         ShellWindow(
             navigation: appState.navigation.panels,
-            title: appState.descriptor?.fileName ?? appState.spectroscopy.metadata?.fileName ?? "mac4DSTEM",
+            title: appState.descriptor?.fileName ?? appState.spectroscopy.metadata?.fileName ?? AppName.display,
             sidebar: { WorkspaceSidebar() },
             canvas: { WorkspaceView() },
             inspector: { WorkspaceInspector() },

@@ -1,6 +1,8 @@
 Notes for App Review
 
-mac4DSTEM analyses 4D-STEM datasets from electron microscopes. You do not need a dataset of your own to try it.
+Name: this version renames the app to 4DSTEM Studio, in App Store Connect and in the build (the name on the Mac, the menus, the About window), after the guideline 5.2.5 review of version 5.2.0. The bundle identifier is unchanged.
+
+4DSTEM Studio analyses 4D-STEM datasets from electron microscopes. You do not need a dataset of your own to try it.
 
 How to try it:
 1. Launch the app. The welcome window opens.
@@ -12,18 +14,18 @@ The Spectroscopy workspace stays unavailable on the demo: it opens only when the
 Materials Project (optional):
 In Crystal Maps, the phase picker has a "Materials Project…" button that fetches a crystal structure from api.materialsproject.org. It needs the user's own free Materials Project API key, which the user types and the app stores in the macOS Keychain. It is optional: a structure can also come from a CIF file through "Import CIF…", and the rest of the app works without either. This is the app's only network request, and it is made only when the user starts it.
 
-Agent access (com.apple.security.network.server): mac4DSTEM uses this entitlement for one feature. It is off by default. When the person turns it on, mac4DSTEM opens a listening socket (Network.framework NWListener) on this Mac's loopback address, 127.0.0.1, port 47811. It answers incoming Model Context Protocol requests over HTTP from an AI assistant the person runs on the same Mac (for example Claude Code), so the assistant can read what mac4DSTEM's windows show. The sandbox refuses the listener without this entitlement. It answers only requests that carry the token shown in that pane and refuses requests from web pages. It is not reachable from other computers. The app itself sends nothing anywhere through it. What the assistant does with what it reads is governed by that assistant and its provider.
+Agent access (com.apple.security.network.server): 4DSTEM Studio uses this entitlement for one feature. It is off by default. When the person turns it on, 4DSTEM Studio opens a listening socket (Network.framework NWListener) on this Mac's loopback address, 127.0.0.1, port 47811. It answers incoming Model Context Protocol requests over HTTP from an AI assistant the person runs on the same Mac (for example Claude Code), so the assistant can read what 4DSTEM Studio's windows show. The sandbox refuses the listener without this entitlement. It answers only requests that carry the token shown in that pane and refuses requests from web pages. It is not reachable from other computers. The app itself sends nothing anywhere through it. What the assistant does with what it reads is governed by that assistant and its provider.
 
 To see the listener:
-1. Choose mac4DSTEM > Settings… and open Agents.
+1. Choose 4DSTEM Studio > Settings… and open Agents.
 2. Turn on the switch. Status shows "On (port 47811)".
 3. Click Copy Connection Command. The copied line contains the access token.
-4. In Terminal, run: curl -H "Authorization: Bearer TOKEN" http://127.0.0.1:47811/v1 (replace TOKEN with the token from the copied line). mac4DSTEM answers with its name and the list of its agent tools.
+4. In Terminal, run: curl -H "Authorization: Bearer TOKEN" http://127.0.0.1:47811/v1 (replace TOKEN with the token from the copied line). 4DSTEM Studio answers with its name and the list of its agent tools.
 Turn the switch off and the port closes.
 
 No account, sign-in or purchase is needed anywhere in the app.
 
 Open source:
-mac4DSTEM is free software under GPL-3.0. Source: https://github.com/mac4DSTEM/mac4DSTEM
+4DSTEM Studio is free software under GPL-3.0. Source: https://github.com/macEMSuite/mac4DSTEM
 
 Contact: mail@mac4dstem.com

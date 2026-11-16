@@ -30,16 +30,16 @@ package nonisolated enum HDF5HelperError: LocalizedError, Equatable {
     package var errorDescription: String? {
         switch self {
         case .helperStopped(let operation):
-            return "The HDF5 reader stopped while it was \(operation). The file may be damaged; mac4DSTEM is unaffected."
+            return "The HDF5 reader stopped while it was \(operation). The file may be damaged; \(AppName.display) is unaffected."
         case .timedOut(let operation, let seconds):
             return "The HDF5 reader took longer than \(Int(seconds.rounded())) s \(operation) and was stopped. "
-                + "The file may be damaged; mac4DSTEM is unaffected."
+                + "The file may be damaged; \(AppName.display) is unaffected."
         case .refused(let sentence):
             return sentence
         case .malformedReply(let operation):
             return "The HDF5 reader gave an unreadable answer while it was \(operation)."
         case .unavailable:
-            return "The HDF5 reader could not be started. Reinstall mac4DSTEM."
+            return "The HDF5 reader could not be started. Reinstall \(AppName.display)."
         }
     }
 }

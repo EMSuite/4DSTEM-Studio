@@ -441,9 +441,11 @@ package struct CalibrationReadinessReport: Equatable, Sendable {
         // Under a beam stop the Bragg-peak origin has no direct beam to find; the stop's own remedy above is the one hint (#454).
         if provenance.suggestsOriginFromBraggPeaks, calibration.originBeamStopIsAcceptable {
             // Two reasons set it (`AppState.calibrateOrigin`): a spot pattern, or a centre of mass scattered over 1 px (#324).
+            // A scattered fit alone does not tell a spot pattern from atomic-resolution data, where there are no Bragg disks
+            // and the scatter is the signal, so that hint names the case it serves (#459).
             let scattered = (originResidual ?? 0) > Calibration.centreOfMassScatterHintPixels
             originDetail += scattered
-                ? " · Centre of mass scattered: after Detect All Disks use Origin from Bragg Peaks (advanced correction)"
+                ? " · Centre of mass scattered: on a spot pattern, after Detect All Disks use Origin from Bragg Peaks (advanced correction)"
                 : " · Spot pattern: after Detect All Disks use Origin from Bragg Peaks (advanced correction)"
         }
 

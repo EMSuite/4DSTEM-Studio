@@ -148,7 +148,7 @@ extension AppState {
                 calibrationSession.provenance.probeNotMeasuredNote = "several disks are as bright as the beam; type it in Bragg Disks"
                 statusText = "Origin ✓  fit RMS \(Num.fixed(Double(rms), 3)) px. \(note)"
             } else if scattered {
-                statusText = "Origin ✓  fit RMS \(Num.fixed(Double(rms), 3)) px, scattered: try Origin from Bragg Peaks (Prepare)"
+                statusText = "Origin ✓  fit RMS \(Num.fixed(Double(rms), 3)) px, scattered: on a spot pattern try Origin from Bragg Peaks (Prepare)"
             } else {
                 statusText = "Origin ✓  r ≈ \(Num.fixed(radius, 1)) px, fit RMS \(Num.fixed(Double(rms), 3)) px (\(fitFn.rawValue))"
             }

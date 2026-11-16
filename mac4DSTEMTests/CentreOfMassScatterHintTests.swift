@@ -41,7 +41,8 @@ private actor JitteredBeamSource: FourDDataSource {
 
 @MainActor
 final class CentreOfMassScatterHintTests: XCTestCase {
-    private let hint = "Centre of mass scattered: after Detect All Disks use Origin from Bragg Peaks"
+    /// #459: it names the case it serves; on atomic-resolution data (SrTiO3 Merlin, BFO-BTO EMPAD) there are no Bragg disks.
+    private let hint = "Centre of mass scattered: on a spot pattern, after Detect All Disks use Origin from Bragg Peaks"
 
     private func row(_ state: AppState) -> String {
         state.calibrationSession.readiness.items.first { $0.kind == .originProbe }?.detail ?? "no Origin & probe row"
@@ -60,7 +61,7 @@ final class CentreOfMassScatterHintTests: XCTestCase {
         XCTAssertTrue(state.calibrationSession.provenance.suggestsOriginFromBraggPeaks)
         XCTAssertTrue(row(state).contains(hint), row(state))
         XCTAssertFalse(row(state).contains("Spot pattern"), "one disk is not a spot pattern: \(row(state))")
-        XCTAssertTrue(state.activityLog.messages.contains { $0.contains("scattered: try Origin from Bragg Peaks") },
+        XCTAssertTrue(state.activityLog.messages.contains { $0.contains("scattered: on a spot pattern try Origin from Bragg Peaks") },
                       "the status line does not say it: \(state.statusText)")
     }
 

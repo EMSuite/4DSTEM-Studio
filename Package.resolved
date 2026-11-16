@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mac4DSTEM/MacEMUI",
       "state" : {
-        "revision" : "d902ad44a03a9349ac6cd0435c173bda1fb19fbd",
-        "version" : "0.12.1"
+        "revision" : "94e250b6e591c557127ddf2662ea9ec70d7dfce5",
+        "version" : "0.12.2"
       }
     },
     {

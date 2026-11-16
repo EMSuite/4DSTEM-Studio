@@ -138,8 +138,11 @@ extension AppState {
             // A spot pattern: the centre of mass follows the spots' intensities, not the beam (2 px across a public SPED scan,
             // where the origin from the Bragg peaks is flat to 0.05 px). The row points to that option until it has run.
             // #324: a centre of mass scattered over 1 px (low counts, a walking beam, a shadow it averages in) points there too.
+            // Not under a beam stop: the Bragg-peak origin needs the direct beam, and the stop has its own remedy (#454).
             let scattered = method == .centreOfMass && rms.isFinite && rms > Calibration.centreOfMassScatterHintPixels
-            calibrationSession.provenance.suggestsOriginFromBraggPeaks = brightDisks > 1 || scattered
+                && calibrationSession.calibration.originBeamStopIsAcceptable
+            calibrationSession.provenance.suggestsOriginFromBraggPeaks = (brightDisks > 1 || scattered)
+                && calibrationSession.calibration.originBeamStopIsAcceptable
             if !standing, result.meanProbeRadius == nil, brightDisks > 1 {
                 let note = OriginCalibration.severalBrightDisksNote(count: brightDisks)
                 calibrationSession.provenance.probeNotMeasuredNote = "several disks are as bright as the beam; type it in Bragg Disks"

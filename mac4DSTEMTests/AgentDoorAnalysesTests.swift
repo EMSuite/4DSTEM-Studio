@@ -193,6 +193,28 @@ final class AgentDoorAnalysesTests: XCTestCase {
         withExtendedLifetime(state) {}
     }
 
+    /// Mutation: inner is applied before outer whatever the values (#449) - red: inner 15 comes back clamped to the old outer.
+    func testBothRadiiHoldWhenTheNewInnerIsBeyondTheOldOuter() async throws {
+        let state = enrolledState()
+        await state.openDemoFixture()
+        let first = try await call("set_virtual_detector", ["shape": "annulus", "inner": 2, "outer": 5])
+        XCTAssertFalse(first.refused, first.text)
+        try await waitUntilIdle(state)
+        let wider = try await call("set_virtual_detector", ["inner": 15, "outer": 25])
+        XCTAssertFalse(wider.refused, wider.text)
+        XCTAssertEqual(Double(state.aperture.inner), 15, accuracy: 0.51)
+        XCTAssertEqual(Double(state.aperture.outer), 25, accuracy: 0.51)
+        try await waitUntilIdle(state)
+        let narrower = try await call("set_virtual_detector", ["inner": 3, "outer": 6])
+        XCTAssertFalse(narrower.refused, narrower.text)
+        XCTAssertEqual(Double(state.aperture.inner), 3, accuracy: 0.51)
+        XCTAssertEqual(Double(state.aperture.outer), 6, accuracy: 0.51)
+        try await waitUntilIdle(state)
+        let crossed = try await call("set_virtual_detector", ["inner": 9, "outer": 4])
+        XCTAssertTrue(crossed.refused, crossed.text)
+        withExtendedLifetime(state) {}
+    }
+
     /// Mutation: set_reconstruction writes the wrong field, or a stage runs without what it needs - red.
     func testReconstructionFieldsAndStepsFollowTheAgent() async throws {
         let state = enrolledState()

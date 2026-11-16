@@ -121,7 +121,15 @@ extension Mac4DSTEMAgentDoor {
                 state.resultPresentation.virtualShape = shape   // the window's onChange commits it, as for the picker
             }
             if let preset = named(call.arguments["preset"], DetectorPreset.self) { state.applyDetectorPreset(preset) }
-            let fields: [(String, ApertureEntry.Field)] = [("center_x", .centerX), ("center_y", .centerY), ("inner", .inner), ("outer", .outer)]
+            let inner = call.arguments["inner"].flatMap(Double.init), outer = call.arguments["outer"].flatMap(Double.init)
+            if let inner, let outer, inner > outer {
+                return .refusal(status: 400, message: "inner (\(inner)) is larger than outer (\(outer)).")
+            }
+            // Each radius is kept within the other's current value, so a new inner beyond the current outer goes after the
+            // new outer; otherwise inner goes first, so a smaller outer is not held up by the old inner (#449).
+            let outerFirst = inner.map { Float($0) > state.aperture.outer } ?? false
+            let radii: [(String, ApertureEntry.Field)] = outerFirst ? [("outer", .outer), ("inner", .inner)] : [("inner", .inner), ("outer", .outer)]
+            let fields: [(String, ApertureEntry.Field)] = [("center_x", .centerX), ("center_y", .centerY)] + radii
             for (name, field) in fields {
                 if let value = call.arguments[name].flatMap(Double.init) {
                     ApertureEntry.apply(value, to: field, in: state, patternWidth: descriptor.qx, patternHeight: descriptor.qy)

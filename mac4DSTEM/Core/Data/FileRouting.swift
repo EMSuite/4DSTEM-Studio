@@ -28,6 +28,10 @@ package nonisolated enum OpenRoute: Equatable, Sendable {
 }
 
 package nonisolated enum FileRouting {
+    /// The extensions File › Open and the other dataset pickers offer. HyperSpy's .hspy is HDF5 and routes by its first bytes
+    /// like .h5 (#458); it was missing here, so the panel greyed it out.
+    package static let openPanelExtensions = ["h5", "hdf5", "hspy", "emd", "dm4", "dm3", "mib", "raw", "xml"]
+
     /// The route for `path`. `.raw` is EMPAD's data file (the kit names only its `.xml`); a file whose extension the kit does not
     /// know but whose first bytes are HDF5 still goes to the HDF5 reader, as every unknown extension did before.
     package static func route(path: String) -> OpenRoute {

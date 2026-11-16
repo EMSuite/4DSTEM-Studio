@@ -21,7 +21,7 @@ extension Mac4DSTEMAgentDoor {
     static func newAgentFolderTarget(_ given: String?, default fallback: String, extension ext: String) -> Result<URL, ToolRefusal> {
         guard savesAllowed else {
             return .failure(ToolRefusal(status: 403, message: "Saving is off. Ask the person to turn on \"Let agents save results "
-                + "there\" in mac4DSTEM's Settings > Agents."))
+                + "there\" in \(AppName.display)'s Settings > Agents."))
         }
         guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: folder.missingMessage)) }
         switch fileName(given, default: fallback, extension: ext) {

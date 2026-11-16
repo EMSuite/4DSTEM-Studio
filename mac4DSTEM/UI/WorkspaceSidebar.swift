@@ -289,7 +289,7 @@ struct SessionSection: View {
                 Button(SessionSidebarWording.allowAccessTitle) { appState.allowAccessToSessionSidecar() }
                     .controlSize(.small)
                     .disabled(appState.isBusy)
-                    .help("Choose the session file beside this dataset so mac4DSTEM may read it; the dataset then reopens with its session.")
+                    .help("Choose the session file beside this dataset so \(AppName.display) may read it; the dataset then reopens with its session.")
                     .accessibilityIdentifier("sidebar.session.allowAccess")
             }
         }

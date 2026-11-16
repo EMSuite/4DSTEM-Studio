@@ -81,7 +81,7 @@ extension Mac4DSTEMAgentDoor {
             guard let state = call.window?.state as? AppState else { return notAWindow }
             guard savesAllowed else {
                 return .refusal(status: 403, message: "Saving is off. Ask the person to turn on \"Let agents save results there\" in "
-                    + "mac4DSTEM's Settings > Agents.")
+                    + "\(AppName.display)'s Settings > Agents.")
             }
             guard !state.agentBusy else { return busyRefusal }
             guard let root = folder.url else { return .refusal(status: 404, message: folder.missingMessage) }
@@ -162,7 +162,7 @@ extension Mac4DSTEMAgentDoor {
                             extension ext: String) -> Result<String, ToolRefusal> {
         guard savesAllowed else {
             return .failure(ToolRefusal(status: 403, message: "Saving is off. Ask the person to turn on \"Let agents save results "
-                + "there\" in mac4DSTEM's Settings > Agents."))
+                + "there\" in \(AppName.display)'s Settings > Agents."))
         }
         guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: folder.missingMessage)) }
         let name: String

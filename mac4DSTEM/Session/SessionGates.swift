@@ -198,7 +198,7 @@ package final class SessionGates {
             // defect (Gate B finding).
             // The controls named are the ones that exist (review 2026-10-02 e5): "Allow Access…" in the
             // sidebar's Session section and the Dataset menu, and Dataset › Change Session Sidecar….
-            remedy = "If mac4DSTEM has not been granted access to it, "
+            remedy = "If \(AppName.display) has not been granted access to it, "
                 + "grant it with Allow Access… (sidebar or Dataset menu); "
                 + "if the file itself cannot be read or decoded, move it "
                 + "aside or choose a different companion file with "

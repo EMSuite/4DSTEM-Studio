@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import DSTEMCore
 import DSTEMSession
 import Foundation
 
@@ -89,7 +90,7 @@ enum RunInterruptionWording {
         switch action {
         case .close: return "\(run). Closing the window stops it, and \(lost)"
         case .open(let url, _): return "\(run). Opening \(url.lastPathComponent) stops it, and \(lost)"
-        case .quit: return "\(run). Quitting mac4DSTEM stops it, and \(lost)"
+        case .quit: return "\(run). Quitting \(AppName.display) stops it, and \(lost)"
         }
     }
 

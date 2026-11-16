@@ -6,6 +6,7 @@
 //        moves or overwrites a file.
 //
 
+import DSTEMCore
 import Foundation
 
 @MainActor
@@ -50,7 +51,7 @@ final class AgentFolder {
         scoped = resolved.startAccessingSecurityScopedResource()
         // Outside the sandbox (tests, tools) there is no scope to start; what matters is that the folder can be reached.
         guard scoped || (try? resolved.checkResourceIsReachable()) == true else {
-            unavailableReason = "macOS no longer lets mac4DSTEM open the Agent folder \(resolved.lastPathComponent). Ask the person "
+            unavailableReason = "macOS no longer lets \(AppName.display) open the Agent folder \(resolved.lastPathComponent). Ask the person "
                 + "to choose it again in Settings > Agents."
             return nil
         }
@@ -84,7 +85,7 @@ final class AgentFolder {
         return resolved.map { ($0.path as NSString).abbreviatingWithTildeInPath }
     }
 
-    static let noFolder = "No Agent folder is chosen. Ask the person to choose one in mac4DSTEM's Settings > Agents > Agent folder."
+    static let noFolder = "No Agent folder is chosen. Ask the person to choose one in \(AppName.display)'s Settings > Agents > Agent folder."
 
     /// What a tool answers while no folder is open: none chosen, or the reason the chosen one is not open.
     var missingMessage: String { unavailableReason ?? Self.noFolder }

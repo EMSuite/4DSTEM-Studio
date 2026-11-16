@@ -220,7 +220,7 @@ package nonisolated struct PhaseSetupRecord: Codable, Equatable, Sendable {
             case .structureChanged(let name):
                 "The saved phase list is not restored: \"\(name)\" does not rebuild as the structure the saved run used. Add the phases again in Phases."
             case .unknownSettings:
-                "The saved phase list is not restored: its settings were saved by a newer mac4DSTEM."
+                "The saved phase list is not restored: its settings were saved by a newer \(AppName.display)."
             }
         }
     }

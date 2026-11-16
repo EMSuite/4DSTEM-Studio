@@ -687,7 +687,7 @@ package enum ReplayPlanner {
         guard let entry = ReplayContract.entry(kind: step.kind) else {
             // A kind this build does not know — a newer app's recipe, or a
             // hand-edited file. Refusing by name beats dropping it silently.
-            return .failure(ReplayRefusal(reason: "this version of mac4DSTEM does not know how to replay a '\(step.kind)' step"))
+            return .failure(ReplayRefusal(reason: "this version of \(AppName.display) does not know how to replay a '\(step.kind)' step"))
         }
         return entry.parse(step)
     }

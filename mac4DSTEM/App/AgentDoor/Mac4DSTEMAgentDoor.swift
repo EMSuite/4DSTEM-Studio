@@ -30,7 +30,7 @@ enum Mac4DSTEMAgentDoor {
 
     /// The app's one door.
     static let shared: AgentDoor = {
-        let door = AgentDoor(appName: "mac4DSTEM", appVersion: FeedbackLinks.appVersion, preferredPort: port)
+        let door = AgentDoor(appName: AppName.display, appVersion: FeedbackLinks.appVersion, preferredPort: port)
         door.register(Mac4DSTEMAgentDoor.allTools)
         return door
     }()
@@ -193,5 +193,5 @@ enum Mac4DSTEMAgentDoor {
         },
     ]
 
-    static let notAWindow = AgentToolOutput.refusal(status: 500, message: "That window is not a mac4DSTEM window.")
+    static let notAWindow = AgentToolOutput.refusal(status: 500, message: "That window is not a \(AppName.display) window.")
 }

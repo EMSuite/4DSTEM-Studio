@@ -62,6 +62,11 @@ same steps one at a time.
 The website DMG updates itself with Sparkle 2 (mac4DSTEM > Check for Updates…, `App/SoftwareUpdate.swift`); the App Store
 build has no updater, because the store updates it and refuses an app that updates itself. Decided 2026-11-11:
 
+- **One name per build.** The store build is **4DSTEM Studio** (`4DSTEM Studio.app`, its executable, CFBundleName and
+  CFBundleDisplayName), because App Review refuses "Mac" in an App Store app's name (guideline 5.2.5, 5.2.0 rejected
+  2026-11-16); the website DMG stays mac4DSTEM. `Config/Version.xcconfig` sets both (`MACEM_APP_NAME_YES`/`_NO`), the module
+  stays `mac4DSTEM`, the bundle identifier is unchanged, and `AppName.display` puts the build's name in the app's
+  sentences. `build-app-store.sh` checks the product carries the name, without "mac", under the same identifier.
 - **One switch.** `MACEM_STORE_BUILD` (NO unless the store script sets YES) picks `Info.plist` or `Info-Direct.plist`,
   `mac4DSTEM.entitlements` or `mac4DSTEM-Direct.entitlements`, and the `SPARKLE` compile condition. The store build links
   with `-dead_strip_dylibs` (the three HDF5 frameworks kept with `-needed_framework`, because FormatoKit opens them by path

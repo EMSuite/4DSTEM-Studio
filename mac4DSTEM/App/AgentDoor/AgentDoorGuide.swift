@@ -8,13 +8,14 @@
 //  a registered tool (`AgentDoorGuideTests`).
 //
 
+import DSTEMCore
 import Foundation
 import ShellAgentDoor
 
 extension Mac4DSTEMAgentDoor {
     static let guideTools: [AgentTool] = [
         AgentTool(name: "get_workflow_guide", title: "Workflow guide",
-                  summary: "Read this first. How a person evaluates a 4D-STEM scan in mac4DSTEM, step by step, which tool does each "
+                  summary: "Read this first. How a person evaluates a 4D-STEM scan in \(AppName.display), step by step, which tool does each "
                       + "step and how to judge the result (what a good disk detection looks like, how to find the noise floor). "
                       + "topic: " + Guide.allCases.map(\.rawValue).joined(separator: ", ") + "; overview by default.",
                   input: .noWindow,
@@ -42,7 +43,7 @@ extension Mac4DSTEMAgentDoor {
         }
 
         private static let overviewText = """
-            How a person works through a 4D-STEM scan in mac4DSTEM (the order the sidebar follows):
+            How a person works through a 4D-STEM scan in \(AppName.display) (the order the sidebar follows):
 
             1. Look. `get_window` says what is open, what the calibration lacks (calibration.items, verdict) and why a step \
             cannot run yet. `get_scan_map` shows a virtual image of the scan with the pixel-to-position rule; \

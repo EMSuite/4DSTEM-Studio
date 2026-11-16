@@ -49,7 +49,20 @@ PKG="$(print -l "$EXPORT"/*.pkg(N) | head -1)"
 # What App Review checks first, checked here on the product, not on the settings.
 pkgutil --check-signature "$PKG" | grep -q "Installer Distribution\|3rd Party Mac Developer Installer" \
   || { echo "FAIL: $PKG is not signed with an installer distribution certificate" >&2; exit 1; }
-APP="$ARCHIVE/Products/Applications/mac4DSTEM.app"
+# The store build is named "4DSTEM Studio" (Config/Version.xcconfig MACEM_APP_NAME_YES): App Review refuses "Mac" in an app's
+# name (guideline 5.2.5). Read the name from there, then check the product carries it, under the unchanged bundle identifier.
+STORE_NAME="$(sed -n 's/^MACEM_APP_NAME_YES = //p' "$ROOT/Config/Version.xcconfig")"
+[[ -n "$STORE_NAME" ]] || { echo "FAIL: Config/Version.xcconfig sets no MACEM_APP_NAME_YES" >&2; exit 1; }
+APP="$ARCHIVE/Products/Applications/$STORE_NAME.app"
+EXE="$APP/Contents/MacOS/$STORE_NAME"
+[[ -x "$EXE" ]] || { echo "FAIL: the archive holds no $STORE_NAME.app with its executable" >&2; exit 1; }
+for key in CFBundleName CFBundleDisplayName; do
+  name="$(/usr/libexec/PlistBuddy -c "Print :$key" "$APP/Contents/Info.plist" 2>/dev/null)"
+  [[ "$name" == "$STORE_NAME" ]] || { echo "FAIL: the store app's $key is '$name', not '$STORE_NAME'" >&2; exit 1; }
+  [[ "${name:l}" != *mac* ]] || { echo "FAIL: the store app's $key '$name' contains \"mac\" (guideline 5.2.5)" >&2; exit 1; }
+done
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" == com.mac4dstem.mac4DSTEM ]] \
+  || { echo "FAIL: the store app's bundle identifier changed; App Store updates need com.mac4dstem.mac4DSTEM" >&2; exit 1; }
 assert_mac4dstem_bundle_arm64_only "$APP"
 codesign -d --entitlements :- "$APP" > "$OUT/store-entitlements.plist" 2>/dev/null
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' "$OUT/store-entitlements.plist" 2>/dev/null)" == true ]] \
@@ -64,13 +77,13 @@ done
   || { echo "FAIL: Info.plist does not answer the export-compliance question" >&2; exit 1; }
 [[ ! -d "$APP/Contents/Frameworks/Sparkle.framework" ]] || { echo "FAIL: Sparkle is in the store build" >&2; exit 1; }
 # Nor any trace of it: no load command or symbol in the executable, no feed in Info.plist, no installer exception.
-if otool -L "$APP/Contents/MacOS/mac4DSTEM" | grep -i sparkle >/dev/null || nm -u "$APP/Contents/MacOS/mac4DSTEM" | grep -E '_OBJC_CLASS_\$_SPU|Sparkle' >/dev/null; then
+if otool -L "$EXE" | grep -i sparkle >/dev/null || nm -u "$EXE" | grep -E '_OBJC_CLASS_\$_SPU|Sparkle' >/dev/null; then
   echo "FAIL: the store executable links Sparkle" >&2; exit 1
 fi
 # The store build drops unused load commands (-dead_strip_dylibs); the HDF5 frameworks are kept as needed, so it links what
 # the download links, Sparkle aside.
 for library in FormatoLibHDF5 FormatoLibSZ FormatoLibAEC; do
-  otool -L "$APP/Contents/MacOS/mac4DSTEM" | grep "@rpath/$library.framework" >/dev/null \
+  otool -L "$EXE" | grep "@rpath/$library.framework" >/dev/null \
     || { echo "FAIL: the store executable lost its $library load command" >&2; exit 1; }
 done
 ! /usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$APP/Contents/Info.plist" >/dev/null 2>&1 \

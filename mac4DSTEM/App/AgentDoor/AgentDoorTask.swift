@@ -63,7 +63,7 @@ extension Mac4DSTEMAgentDoor {
                       + "phase list.",
                   input: .window,
                   parameters: PhaseSetting.all.map(\.parameter) + [
-                      AgentParameter("orientation_source", .choice(PhaseOrientationSource.allCases.map(\.rawValue)),
+                      AgentParameter("orientation_source", .choice(PhaseOrientationSource.offered.map(\.rawValue)),
                                      summary: "structures or typedZones, as Advanced > Typed zone axes does."),
                   ],
                   acts: true) { call in

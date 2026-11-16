@@ -1,4 +1,4 @@
-Version 5.4.0 is a stability release.
+Version 5.4.1 is a stability release.
 
 • Keep in memory holds the cube at its stored bit depth and is on by default when the cube fits a quarter of the RAM; closing a window frees it at once.
 • The origin row reads its own fit: a scattered centre of mass on a spot pattern points to Origin from Bragg Peaks, and a beam stop gets only its own remedy.

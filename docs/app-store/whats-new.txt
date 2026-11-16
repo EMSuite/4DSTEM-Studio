@@ -1,13 +1,9 @@
-Version 5.3.1 fixes wrong or misleading results and tidies the window.
+Version 5.4.0 is a stability release.
 
-• Placing a virtual detector no longer moves the calibrated origin. A beam centre by hand is now set on purpose in Prepare: Use Detector Centre as Origin, or type x and y.
-• Phase mapping refuses an origin that is not a measured beam centre, instead of mapping on a guess.
-• A typed orientation relationship now stands for all its variants in the matrix: one pair, as a paper states it, is enough.
-• Fit Distortion from Spots fits Phase mapping's matrix, not the last phase added, and a new dataset starts with an empty phase list.
-• Calibrate Q from crystal reads diamond-type rings from the right first ring.
-• Opening a dataset writes nothing on the disk that holds it.
-• A cube from another file no longer shows the previous file's EDS maps.
-• An empty virtual detector and an origin with no measured position are refused rather than drawn as a dark image.
-• Detection keeps the count of positions where it failed after calibration.
-• The sidebar's task rows and Next/Previous Task work with the keyboard and VoiceOver.
-• Software updates use a new signing key.
+• Grains and phases (no matrix): maps the best phase at every position, with its reliability, for samples of several phases.
+• Keep in memory holds the cube at its stored bit depth and is on by default when the cube fits a quarter of the RAM; closing a window frees it at once.
+• The origin row reads its own fit: a scattered centre of mass on a spot pattern points to Origin from Bragg Peaks, and a beam stop gets only its own remedy.
+• Closing, opening another file or quitting asks before it stops a running analysis; crafted or damaged files are refused instead of stopping the app.
+• The agent door reaches more of the app: the EDS room, the view, Settings and the Materials Project.
+
+Results that change: disk detection follows py4DSTEM's default minimum relative intensity (0.5 %), so counts at default settings differ from 5.3.1; EDS absorption on GMS files takes the stage tilt from Stage Alpha and Beta, as exSpy does.

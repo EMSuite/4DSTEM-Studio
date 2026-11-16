@@ -268,7 +268,6 @@ private struct ModelCacheSection: View {
 /// (`App/AgentDoor/Mac4DSTEMAgentDoor.swift`), with this app's words for what an agent can read.
 private struct AgentSettingsSection: View {
     @Environment(AppPreferences.self) private var preferences
-    @State private var choosingFolder = false
 
     var body: some View {
         @Bindable var preferences = preferences
@@ -286,7 +285,9 @@ private struct AgentSettingsSection: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Button("Choose…") { choosingFolder = true }
+                    Button("Choose…") {
+                        Task { if let bookmark = await AgentFolderPanel.choose() { preferences.agentFolderBookmark = bookmark } }
+                    }
                         .accessibilityIdentifier("settings.agents.folder.choose")
                     if preferences.agentFolderBookmark != nil {
                         Button("Remove") { preferences.agentFolderBookmark = nil }
@@ -302,11 +303,6 @@ private struct AgentSettingsSection: View {
                 + "the folder is reached.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-        }
-        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { result in
-            if case .success(let folder) = result, let bookmark = AgentFolder.bookmark(for: folder) {
-                preferences.agentFolderBookmark = bookmark
-            }
         }
     }
 }

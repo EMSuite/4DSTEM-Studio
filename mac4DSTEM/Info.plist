@@ -54,6 +54,7 @@
 			<array>
 				<string>h5</string>
 				<string>hdf5</string>
+				<string>hspy</string>
 				<string>emd</string>
 				<string>dm4</string>
 				<string>dm3</string>

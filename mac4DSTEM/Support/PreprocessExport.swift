@@ -88,7 +88,7 @@ extension AppState {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         // The same types Open Dataset… accepts.
-        panel.allowedContentTypes = ["h5", "hdf5", "emd", "dm4", "dm3", "mib", "raw", "xml"]
+        panel.allowedContentTypes = FileRouting.openPanelExtensions
             .compactMap { UTType(filenameExtension: $0) }
         guard panel.runModal() == .OK else { return nil }
         return panel.url

@@ -24,7 +24,7 @@ struct ContentView: View {
     @State private var showExportSheet = false
 
     private var datasetTypes: [UTType] {
-        ["h5", "hdf5", "emd", "dm4", "dm3", "mib", "raw", "xml"]
+        FileRouting.openPanelExtensions
             .compactMap { UTType(filenameExtension: $0) }
     }
 

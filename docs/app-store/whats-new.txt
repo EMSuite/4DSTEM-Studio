@@ -6,4 +6,4 @@ Version 5.4.0 is a stability release.
 • Closing, opening another file or quitting asks before it stops a running analysis; crafted or damaged files are refused instead of stopping the app.
 • The agent door reaches more of the app: the EDS room, the view, Settings and the Materials Project.
 
-Results that change: disk detection follows py4DSTEM's default minimum relative intensity (0.5 %), so counts at default settings differ from 5.3.1; EDS absorption on GMS files takes the stage tilt from Stage Alpha and Beta, as exSpy does.
+Results that change: disk detection follows py4DSTEM's default minimum relative intensity (0.5 %), so counts at default settings differ from 5.3.1; EDS absorption on GMS files takes the stage tilt from Stage Alpha and Beta, as exSpy does; viridis, inferno and RdBu are drawn from matplotlib's own tables and tagged sRGB, so map colours shift slightly.

@@ -9,9 +9,10 @@
 import Foundation
 
 public nonisolated enum AppName {
-    /// "mac4DSTEM" or "4DSTEM Studio": CFBundleDisplayName, else CFBundleName, else the project's name (a test host
-    /// without either key).
-    public static let display: String = display(from: Bundle.main.infoDictionary)
+    /// "mac4DSTEM" or "4DSTEM Studio": CFBundleDisplayName, else CFBundleName, else the project's name. Only an app's own
+    /// bundle names it: under `swift test` the main bundle is the xctest tool, and in a Quick Look extension the appex.
+    public static let display: String = Bundle.main.bundleURL.pathExtension == "app"
+        ? display(from: Bundle.main.infoDictionary) : "mac4DSTEM"
 
     /// Pure, so it is tested.
     public static func display(from info: [String: Any]?) -> String {

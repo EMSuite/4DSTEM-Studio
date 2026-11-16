@@ -242,6 +242,7 @@ mac4dstem_sources() {
         kit_module "$repo" FormatoKit FormatoCore
         want+=("${KIT_FLAGS[@]}")
         want+=(
+          "$core/AppName.swift"                     # the readers' and writers' sentences name the build (#474, 2026-11-16)
           "$core/Data/FormatoArrayFloat32.swift"
           "$core/Data/DatasetDescriptor.swift"
           "$core/Data/DiffractionPattern.swift"

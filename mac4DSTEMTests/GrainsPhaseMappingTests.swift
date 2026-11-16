@@ -162,6 +162,35 @@ final class GrainsPhaseMappingTests: XCTestCase {
         XCTAssertNil(GrainsPhaseRun.make(phaseNames: ["A"], symmetries: [cubic], fields: [a, b], usablePeakCounts: [5, 5, 0]))
     }
 
+    /// A Grains and phases map offers no claimed-disks overlay (it said "Reference library not kept for this map — run
+    /// again" right after a fresh run); a matrix map still does. Mutation: `offersClaims` ignores the source - red.
+    func testAGrainsMapOffersNoClaimsOverlay() {
+        func m(_ score: Float) -> OrientationResult {
+            var r = OrientationResult.empty
+            r.templateIndex = 0; r.score = score
+            return r
+        }
+        let cubic = CrystalOrientationSymmetry(laueClass: .mThreeBarM)
+        let a = MatrixOrientationField(width: 1, height: 1, results: [m(0.6)], orientations: [matrix_identity_double3x3])
+        let b = MatrixOrientationField(width: 1, height: 1, results: [m(0.8)], orientations: [matrix_identity_double3x3])
+        guard let run = GrainsPhaseRun.make(phaseNames: ["A", "B"], symmetries: [cubic, cubic], fields: [a, b],
+                                            usablePeakCounts: [5]) else { return XCTFail("the fields fit one scan") }
+        func record(_ source: PhaseOrientationSource) -> PhaseMappingProduct.RunRecord {
+            PhaseMappingProduct.RunRecord(
+                phaseSignature: "fixture", reference: PhaseReferenceSettings(), matching: PhaseVectorSettings(),
+                libraryEntryCount: 0, matrixEntryIndex: -1, matrixInPlaneDegrees: .nan, worstChanceMatchPercent: 0,
+                invAngstromPerPixel: 0.01, qScaleIsPhysical: false, peakCount: 0,
+                calibration: PhaseMappingProduct.CalibrationStamp(calibration: Calibration(), referenceOrigin: (0, 0)),
+                orientationSource: source)
+        }
+        let product = PhaseMappingProduct()
+        XCTAssertFalse(product.offersClaims, "no map")
+        product.publish(grains: run, ranWith: record(.grains))
+        XCTAssertFalse(product.offersClaims)
+        product.publish(run.phaseMap(reliableAbove: 15), ranWith: record(.structures))
+        XCTAssertTrue(product.offersClaims)
+    }
+
     /// The method choice: grains is its own source, the matrix method returns to the structures, the typed zones stay the matrix
     /// method's. A grains list needs two phases and no matrix; its identity ignores the matrix mark. A map without a matrix gives
     /// every phase a hue of its own, the first the first hue. Mutation: the colour rank shifted for -1 (phase 0 takes the last hue).

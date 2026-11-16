@@ -829,6 +829,10 @@ package final class PhaseMappingProduct {
         onChange?()
     }
 
+    /// Whether the claims overlay has anything to show: a matrix-with-precipitates map. Grains and phases picks one phase per
+    /// position; nothing claims disks away from a matrix, so the overlay is not offered rather than asking for a new run.
+    package var offersClaims: Bool { map != nil && lastRun?.orientationSource != .grains }
+
     /// The held grains run read again at a moved threshold: a new map, nothing matched again.
     private func applyGrainsReliability() {
         guard let lastGrainsRun, map != nil else { return }

@@ -65,7 +65,7 @@ struct DiffractionPane: View {
 
     /// The claimed-disks overlay exists once a phase map has run.
     private var claimedDisksAvailable: Bool {
-        appState.navigation.analysisMode == .phaseMapping && appState.phaseMapping.map != nil
+        appState.navigation.analysisMode == .phaseMapping && appState.phaseMapping.offersClaims
     }
 
     var body: some View {

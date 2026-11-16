@@ -5,6 +5,7 @@
 //
 
 import DSTEMCore
+import ShellAgentDoor
 import XCTest
 
 final class AppStoreReleaseTests: XCTestCase {
@@ -76,5 +77,21 @@ final class AppStoreReleaseTests: XCTestCase {
         XCTAssertEqual(AppName.display(from: ["CFBundleDisplayName": ""]), "mac4DSTEM")
         XCTAssertEqual(AppName.display(from: nil), "mac4DSTEM")
         XCTAssertEqual(AppName.display, "mac4DSTEM", "the test host is the website flavour")
+    }
+
+    /// The store build's door registers as one word: its name "4DSTEM Studio" has a space, and the copied connection command
+    /// split there (#477, fixed in MacEMUI 0.12.3). Mutation: MacEMUI back to 0.12.2 (no serverName), or the name lower-cased
+    /// as is - red.
+    @MainActor
+    func testTheStoreNameRegistersAsOneWord() throws {
+        let config = try String(contentsOf: root.appendingPathComponent("Config/Version.xcconfig"), encoding: .utf8)
+        let storeName = try XCTUnwrap(config.split(separator: "\n").first { $0.hasPrefix("MACEM_APP_NAME_YES = ") }
+            .map { String($0.dropFirst("MACEM_APP_NAME_YES = ".count)) })
+        let suite = "AppStoreReleaseTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let door = AgentDoor(appName: storeName, appVersion: "0", preferredPort: 47811, defaults: defaults)
+        XCTAssertEqual(door.serverName, "4dstem-studio")
+        XCTAssertFalse(door.serverName.contains(" "))
     }
 }

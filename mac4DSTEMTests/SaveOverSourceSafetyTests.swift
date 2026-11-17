@@ -185,6 +185,29 @@ final class SaveOverSourceSafetyTests: XCTestCase {
         XCTAssertFalse(target.sidecarHoldsUnrestoredLabels, "an applied restore owes the session file nothing")
     }
 
+    /// Labels written before the dataset's folder moved restore beside the moved file and are bound to its new path, so the
+    /// next save records it (4DSTEM-Studio#467: the folder rename to EMSuite left every saved label unrestored). Another
+    /// file name is still refused. Mutation: the exact-path comparison back - red.
+    func testLabelsRestoreBesideTheSameFileAfterItsFolderMoved() throws {
+        let source = DiskCentreLabelStore()
+        source.reset(filePath: "/old/folder/cube.h5", datasetPath: "/data")
+        source.add(.init(row: 1, col: 1), ry: 0, rx: 0)
+        let saved = try source.encodedJSON(frame: "native")
+
+        let target = DiskCentreLabelStore()
+        target.reset(filePath: "/new/folder/cube.h5", datasetPath: "/data")
+        XCTAssertTrue(try target.restore(from: saved, expecting: "/new/folder/cube.h5", frame: "native",
+                                         scanY: 3, scanX: 3, detectorY: 8, detectorX: 8))
+        XCTAssertEqual(target.centres(ry: 0, rx: 0), [.init(row: 1, col: 1)])
+        XCTAssertEqual(target.filePath, "/new/folder/cube.h5")
+        XCTAssertEqual(try DiskCentreLabelStore.decode(target.encodedJSON()).filePath, "/new/folder/cube.h5")
+
+        target.reset(filePath: "/new/folder/other.h5", datasetPath: "/data")
+        XCTAssertThrowsError(try target.restore(from: saved, expecting: "/new/folder/other.h5", frame: "native",
+                                                scanY: 3, scanX: 3, detectorY: 8, detectorX: 8))
+        XCTAssertTrue(target.isEmpty)
+    }
+
     /// The app's own save path: with the store flagged and a new label clicked, Save Calibration keeps the sidecar's
     /// labels byte-identical and says so. Mutation: drop `|| labelsWithheld` in `saveCalibrationToSessionSidecar` -> red.
     func testASaveKeepsLabelsTheViewDidNotRestore() async throws {

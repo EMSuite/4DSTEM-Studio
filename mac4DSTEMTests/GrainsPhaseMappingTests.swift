@@ -191,6 +191,40 @@ final class GrainsPhaseMappingTests: XCTestCase {
         XCTAssertTrue(product.offersClaims)
     }
 
+    /// A grains run's provenance carries the counts, like every other source's: each phase's positions, the not indexed and
+    /// the no-peak ones, at the held threshold (mac4DSTEM#480: the grains branch returned before writing them, so a door check
+    /// read nil). Mutation: the grains branch returns before the counts - red.
+    func testAGrainsRunsProvenanceCarriesTheCounts() {
+        func m(_ score: Float) -> OrientationResult {
+            var r = OrientationResult.empty
+            r.templateIndex = 0; r.score = score
+            return r
+        }
+        let cubic = CrystalOrientationSymmetry(laueClass: .mThreeBarM)
+        // Position 0: B wins 0.8 to 0.6 (reliability 25, sure); position 1: A 0.5 to 0.45 (10, not indexed); 2: no peaks.
+        let a = MatrixOrientationField(width: 3, height: 1, results: [m(0.6), m(0.5), .empty],
+                                       orientations: [matrix_identity_double3x3, matrix_identity_double3x3, nil])
+        let b = MatrixOrientationField(width: 3, height: 1, results: [m(0.8), m(0.45), .empty],
+                                       orientations: [matrix_identity_double3x3, matrix_identity_double3x3, nil])
+        guard let run = GrainsPhaseRun.make(phaseNames: ["A", "B"], symmetries: [cubic, cubic], fields: [a, b],
+                                            usablePeakCounts: [5, 5, 0]) else { return XCTFail("the fields fit one scan") }
+        let record = PhaseMappingProduct.RunRecord(
+            phaseSignature: "fixture", reference: PhaseReferenceSettings(), matching: PhaseVectorSettings(),
+            libraryEntryCount: 0, matrixEntryIndex: -1, matrixInPlaneDegrees: .nan, worstChanceMatchPercent: 0,
+            invAngstromPerPixel: 0.01, qScaleIsPhysical: false, peakCount: 0,
+            calibration: PhaseMappingProduct.CalibrationStamp(calibration: Calibration(), referenceOrigin: (0, 0)),
+            orientationSource: .grains)
+        let state = AppState()
+        state.phaseMapping.publish(grains: run, ranWith: record)
+        guard let map = state.phaseMapping.map else { return XCTFail("the grains run published no map") }
+        let provenance = state.phaseProvenance(map: map, run: record)
+        XCTAssertEqual(provenance["method"], "template_matching_best_phase")
+        XCTAssertEqual(provenance["count_0_A"], "0")
+        XCTAssertEqual(provenance["count_1_B"], "1")
+        XCTAssertEqual(provenance["count_not_indexed"], "1")
+        XCTAssertEqual(provenance["count_no_peaks"], "1")
+    }
+
     /// The method choice: grains is its own source, the matrix method returns to the structures, the typed zones stay the matrix
     /// method's. A grains list needs two phases and no matrix; its identity ignores the matrix mark. A map without a matrix gives
     /// every phase a hue of its own, the first the first hue. Mutation: the colour rank shifted for -1 (phase 0 takes the last hue).

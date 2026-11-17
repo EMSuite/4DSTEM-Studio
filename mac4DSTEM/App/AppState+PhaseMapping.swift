@@ -751,6 +751,8 @@ extension AppState {
                         "matrix_tolerance_inv_angstrom"] { out[key] = nil }
             out["direct_beam_radius_inv_angstrom"] = String(format: "%.4g", run.matching.directBeamRadiusInvAngstrom)
             out["reliable_above"] = String(format: "%.4g", phaseMapping.grainsReliableAbove)
+            // The counts too, like every other source's (mac4DSTEM#480: a grains run wrote none, so the door read nil).
+            out.merge(Self.phaseCountProvenance(map)) { _, new in new }
             return out
         }
         // Additive, and empty for `.search` — see `PhaseMappingRuleDefaults
@@ -785,8 +787,15 @@ extension AppState {
                     .joined(separator: " | ")
             }
         }
+        out.merge(Self.phaseCountProvenance(map)) { _, new in new }
+        return out
+    }
+
+    /// The result's counts as provenance keys: each phase's positions, then the not-indexed and no-peak ones.
+    static func phaseCountProvenance(_ map: PhaseMap) -> [String: String] {
+        var out: [String: String] = [:]
+        let counts = map.phaseCounts
         for (index, name) in map.phaseNames.enumerated() {
-            let counts = map.phaseCounts
             out["count_\(index)_\(name)"] = String(index < counts.count ? counts[index] : 0)
         }
         out["count_not_indexed"] = String(map.count(of: .notIndexed))

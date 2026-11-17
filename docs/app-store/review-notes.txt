@@ -26,6 +26,6 @@ Turn the switch off and the port closes.
 No account, sign-in or purchase is needed anywhere in the app.
 
 Open source:
-4DSTEM Studio is free software under GPL-3.0. Source: https://github.com/macEMSuite/mac4DSTEM
+4DSTEM Studio is free software under GPL-3.0. Source: https://github.com/EMSuite/4DSTEM-Studio
 
 Contact: mail@mac4dstem.com

@@ -50,7 +50,7 @@ the reason. The rest is computed by the suite's Swift packages, each checked aga
 [SpectroKit](https://github.com/EMSuite/SpectroKit) (EDS),
 [FormatoKit](https://github.com/EMSuite/FormatoKit) (file readers),
 [ImagoKit](https://github.com/EMSuite/ImagoKit) (FFT and image maths) and
-[MacEMUI](https://github.com/EMSuite/MacEMUI) (the window and controls both apps share). Every export names the method a
+[MacEMUI](https://github.com/EMSuite/EMSuiteUI) (the window and controls both apps share). Every export names the method a
 result came from and its reference.
 
 Which function is checked against what, and to which tolerance, is in [`docs/parity.md`](docs/parity.md); speed

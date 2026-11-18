@@ -10,6 +10,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). App
 - **Runs on macOS 26** (was macOS 27) on Apple Silicon. Figure export writes through SwiftUI's `FileDocument`; the toolbar's Save
   button takes its low priority on macOS 26.1 and newer. MacEMUI 0.3.2. CI builds and runs the unit tests again, on Xcode 26.6.
 
+## [5.4.2](https://github.com/EMSuite/4DSTEM-Studio/compare/v5.4.1...v5.4.2) (2026-11-18)
+
+
+### Bug Fixes
+
+* a Grains and phases run writes its counts like the other sources ([#486](https://github.com/EMSuite/4DSTEM-Studio/issues/486)) ([e08097b](https://github.com/EMSuite/4DSTEM-Studio/commit/e08097baa24e7072e1f847a115570700350675fa)), closes [#480](https://github.com/EMSuite/4DSTEM-Studio/issues/480)
+* saved disk-centre labels come back after the dataset's folder moved ([#489](https://github.com/EMSuite/4DSTEM-Studio/issues/489)) ([a595cbe](https://github.com/EMSuite/4DSTEM-Studio/commit/a595cbe0342af370d825f7157940c54766f927bc))
+* take CuboKit 0.12.1 and DiffractoKit 0.18.1 (SiGe Bragg origin, ellipse on crystalline rings) ([#492](https://github.com/EMSuite/4DSTEM-Studio/issues/492)) ([d7ccc0f](https://github.com/EMSuite/4DSTEM-Studio/commit/d7ccc0f91a218c80608de9509c28a1554a634b43))
+* take EMSuiteUI 0.12.4 (run bar follows its count, EDS Auto ID Kα rule, sidebar rows press to VoiceOver) ([#491](https://github.com/EMSuite/4DSTEM-Studio/issues/491)) ([0e7d228](https://github.com/EMSuite/4DSTEM-Studio/commit/0e7d228c743efce6ef78637b3507b805cdb07ccf))
+* take FormatoKit 0.18.0, SpectroKit 0.16.0 and EMSuiteUI 0.13.0 (DM4 read memory, Auto ID near misses) ([#493](https://github.com/EMSuite/4DSTEM-Studio/issues/493)) ([2c16eb6](https://github.com/EMSuite/4DSTEM-Studio/commit/2c16eb63cfb7916177809bbe2928dd0ee46ef2f5))
+
 ## [5.4.1](https://github.com/macEMSuite/mac4DSTEM/compare/v5.4.0...v5.4.1) (2026-11-16)
 
 

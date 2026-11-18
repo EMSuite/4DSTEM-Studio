@@ -67,17 +67,17 @@ def main(argv):
     item = f"""<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
-    <title>mac4DSTEM</title>
+    <title>4DSTEM Studio</title>
     <link>https://mac4dstem.com/</link>
     <item>
-      <title>mac4DSTEM {version}</title>
+      <title>4DSTEM Studio {version}</title>
       <pubDate>{formatdate(usegmt=True)}</pubDate>
       <sparkle:version>{version}</sparkle:version>
       <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>{floor}</sparkle:minimumSystemVersion>
       <sparkle:fullReleaseNotesLink>https://github.com/EMSuite/4DSTEM-Studio/releases/tag/{tag}</sparkle:fullReleaseNotesLink>
       <description sparkle:format="plain-text">{escape(notes)}</description>
-      <enclosure url="https://github.com/EMSuite/4DSTEM-Studio/releases/download/{tag}/mac4DSTEM-{version}.dmg" type="application/octet-stream" {attributes}/>
+      <enclosure url="https://github.com/EMSuite/4DSTEM-Studio/releases/download/{tag}/4DSTEM-Studio-{version}.dmg" type="application/octet-stream" {attributes}/>
     </item>
   </channel>
 </rss>

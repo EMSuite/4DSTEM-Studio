@@ -8,7 +8,7 @@ resolve_mac4dstem_developer_dir
 
 OUT="${1:-$ROOT/build/release}"
 ARCHIVE="$OUT/mac4DSTEM.xcarchive"
-APP="$ARCHIVE/Products/Applications/mac4DSTEM.app"
+APP="$ARCHIVE/Products/Applications/$(sed -n 's/^MACEM_APP_NAME_NO = //p' "$ROOT/Config/Version.xcconfig").app"   # "4DSTEM Studio.app" (#496)
 rm -rf "$ARCHIVE"
 mkdir -p "$OUT"
 # The download's build number is its version (#122): Sparkle compares the feed's sparkle:version with CFBundleVersion, and
@@ -101,5 +101,5 @@ fi
 /usr/libexec/PlistBuddy -c 'Print :com.apple.security.temporary-exception.mach-lookup.global-name' "$OUT/entitlements.plist" \
   | grep -q -- '-spki' || { echo "FAIL: the download cannot reach Sparkle's installer (mach-lookup exception)" >&2; exit 1; }
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
-ditto -c -k --keepParent "$APP" "$OUT/mac4DSTEM-$VERSION-pre-notarization.zip"
+ditto -c -k --keepParent "$APP" "$OUT/4DSTEM-Studio-$VERSION-pre-notarization.zip"
 echo "$APP"

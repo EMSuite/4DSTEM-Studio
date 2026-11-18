@@ -1184,7 +1184,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mac4DSTEM.app/Contents/MacOS/mac4DSTEM";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/4DSTEM Studio.app/Contents/MacOS/4DSTEM Studio";
 			};
 			name = Debug;
 		};
@@ -1203,7 +1203,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mac4DSTEM.app/Contents/MacOS/mac4DSTEM";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/4DSTEM Studio.app/Contents/MacOS/4DSTEM Studio";
 			};
 			name = Release;
 		};
@@ -1222,7 +1222,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mac4DSTEM.app/Contents/MacOS/mac4DSTEM";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/4DSTEM Studio.app/Contents/MacOS/4DSTEM Studio";
 			};
 			name = Develop;
 		};

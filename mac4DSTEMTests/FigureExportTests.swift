@@ -494,7 +494,7 @@ final class FigureExportTests: XCTestCase {
 
         state.preferences.figureFormat = .png; state.preferences.exportScale = .two
         let png = try state.figureFile(chosen: ids)
-        XCTAssertEqual(png.contentType, .png); XCTAssertEqual(png.suggestedName, "mac4DSTEM_figure")
+        XCTAssertEqual(png.contentType, .png); XCTAssertEqual(png.suggestedName, "4DSTEM Studio_figure")
         XCTAssertEqual(Array(png.data.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
         let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithData(png.data as CFData, nil)!, 0, nil))
         XCTAssertEqual(image.width, Int(plan.size.width) * 2)

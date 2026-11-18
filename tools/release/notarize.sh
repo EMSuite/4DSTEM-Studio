@@ -4,7 +4,7 @@ set -euo pipefail
 resolve_mac4dstem_developer_dir
 : "${NOTARY_PROFILE:?Set NOTARY_PROFILE to a notarytool keychain profile name}"
 
-TARGET="${1:?usage: notarize.sh path/to/mac4DSTEM.app [output.zip]  |  path/to/mac4DSTEM.dmg}"
+TARGET="${1:?usage: notarize.sh "path/to/4DSTEM Studio.app" [output.zip]  |  path/to/4DSTEM-Studio.dmg}"
 
 # A .dmg is submitted as-is and stapled in place; an .app has to be zipped for
 # submission, and the ticket is stapled to the bundle rather than to the zip.
@@ -25,7 +25,7 @@ APP="$TARGET"
 # Named after the bundle's own version, not a hardcoded one (1.0 shipped
 # under that name; 2.5.0 must not).
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
-OUT="${2:-${APP:h}/mac4DSTEM-$VERSION.zip}"
+OUT="${2:-${APP:h}/${${APP:t:r}// /-}-$VERSION.zip}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 

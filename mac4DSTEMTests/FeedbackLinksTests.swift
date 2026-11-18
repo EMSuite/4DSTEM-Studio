@@ -10,9 +10,9 @@ final class FeedbackLinksTests: XCTestCase {
         let parts = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
         XCTAssertEqual(parts.scheme, "mailto")
         XCTAssertEqual(parts.path, "mail@mac4dstem.com")
-        XCTAssertEqual(parts.queryItems?.first { $0.name == "subject" }?.value, "mac4DSTEM feedback")
+        XCTAssertEqual(parts.queryItems?.first { $0.name == "subject" }?.value, "4DSTEM Studio feedback")
         let body = try XCTUnwrap(parts.queryItems?.first { $0.name == "body" }?.value)
-        XCTAssertTrue(body.hasSuffix("mac4DSTEM 5.2.1 (41), macOS 26.1.0"), body)
+        XCTAssertTrue(body.hasSuffix("4DSTEM Studio 5.2.1 (41), macOS 26.1.0"), body)
         XCTAssertTrue(body.hasPrefix("\n\n"), "room to write above the versions")
     }
 

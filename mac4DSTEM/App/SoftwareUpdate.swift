@@ -106,7 +106,7 @@ struct SoftwareUpdateSettingsSection: View {
             Toggle("Check for updates automatically", isOn: $update.automaticallyChecks)
                 .disabled(!update.isRunning)
                 .accessibilityIdentifier("settings.general.automaticUpdates")
-                .help("Once a day mac4DSTEM asks mac4dstem.com whether a newer version exists. Nothing else is sent.")
+                .help("Once a day \(AppName.display) asks mac4dstem.com whether a newer version exists. Nothing else is sent.")
         }
     }
 }

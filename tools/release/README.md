@@ -51,20 +51,21 @@ notarizes and staples the DMG. It needs a clean working tree, the
 (`DEVELOPER_ID_APPLICATION` overrides the name), a `notarytool` keychain
 profile (default `macem-notary`, `NOTARY_PROFILE` overrides it) and `dmgbuild`
 in `build/dmg-venv` (the first run in a fresh checkout creates it). Each run writes a new folder
-`build/release/<date-time>/` holding the archive, `mac4DSTEM-<version>.dmg`
-and a byte-identical `mac4DSTEM.dmg` for the
-`releases/latest/download/mac4DSTEM.dmg` link, and prints the DMG's SHA-256
+`build/release/<date-time>/` holding the archive, `4DSTEM-Studio-<version>.dmg`,
+a byte-identical `4DSTEM-Studio.dmg` for the
+`releases/latest/download/4DSTEM-Studio.dmg` link and a byte-identical `mac4DSTEM.dmg` for links to the old name (#496), and prints the DMG's SHA-256
 and size. It pushes and uploads nothing. The sections below describe the
 same steps one at a time.
 
 ## Updates in the download: Sparkle (#122)
 
-The website DMG updates itself with Sparkle 2 (mac4DSTEM > Check for Updates…, `App/SoftwareUpdate.swift`); the App Store
+The website DMG updates itself with Sparkle 2 (4DSTEM Studio > Check for Updates…, `App/SoftwareUpdate.swift`); the App Store
 build has no updater, because the store updates it and refuses an app that updates itself. Decided 2026-11-11:
 
-- **One name per build.** The store build is **4DSTEM Studio** (`4DSTEM Studio.app`, its executable, CFBundleName and
-  CFBundleDisplayName), because App Review refuses "Mac" in an App Store app's name (guideline 5.2.5, 5.2.0 rejected
-  2026-11-16); the website DMG stays mac4DSTEM. `Config/Version.xcconfig` sets both (`MACEM_APP_NAME_YES`/`_NO`), the module
+- **One name.** Both builds are **4DSTEM Studio** (`4DSTEM Studio.app`, its executable, CFBundleName and
+  CFBundleDisplayName): App Review refuses "Mac" in an App Store app's name (guideline 5.2.5, 5.2.0 rejected
+  2026-11-16), and the website DMG followed in 5.4.3 (#496). An installed `mac4DSTEM.app` updates in place and keeps its
+  file name; Info-Direct.plist's `SUBundleName` is the name a normalizing Sparkle installs to (#497). `Config/Version.xcconfig` sets both (`MACEM_APP_NAME_YES`/`_NO`), the module
   stays `mac4DSTEM`, the bundle identifier is unchanged, and `AppName.display` puts the build's name in the app's
   sentences. `build-app-store.sh` checks the product carries the name, without "mac", under the same identifier.
 - **One switch.** `MACEM_STORE_BUILD` (NO unless the store script sets YES) picks `Info.plist` or `Info-Direct.plist`,
@@ -149,7 +150,7 @@ codesign --force --sign "Developer ID Application: Paul Lobpreis (3B8SMSSAX4)" -
 codesign -dvv "$TMPDIR/signtest"            # Authority=Developer ID Application …, a Timestamp line
 build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update "$TMPDIR/signtest"   # prints sparkle:edSignature="…"
 build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update --verify "$TMPDIR/signtest" <the signature>
-codesign -d -r- /Applications/mac4DSTEM.app   # a website install: the requirement names the team, not a certificate
+codesign -d -r- "/Applications/4DSTEM Studio.app"   # a website install: the requirement names the team, not a certificate
 ```
 
 ## App Store package: `tools/release.sh --store`
@@ -181,7 +182,7 @@ approval. The listing texts and every other field are in `docs/app-store/`.
 1. Merge the Release PR; release-please tags `vX.Y.Z` and writes the GitHub release.
 2. Check out the tag in its own worktree and run `tools/release.sh`; verify the DMG (`xcrun stapler validate`,
    `spctl -a -t open --context context:primary-signature -v`, the version, SHA-256) and attach
-   `mac4DSTEM-X.Y.Z.dmg` and `mac4DSTEM.dmg` to the GitHub release.
+   `4DSTEM-Studio-X.Y.Z.dmg`, `4DSTEM-Studio.dmg` and `mac4DSTEM.dmg` to the GitHub release.
 3. In the same worktree run `tools/release.sh --store --upload`. The release owner starts the first run, since it
    creates the distribution certificates on the account. The upload needs an App Store Connect team API key (role
    App Manager); the account must have API access enabled under Users and Access > Integrations first. The key file
@@ -219,9 +220,10 @@ run, which is why CI does not.
 
 - `build-developer-id.sh` starts with `rm -rf "$ARCHIVE"` on `build/release/mac4DSTEM.xcarchive`: copy the archive before a second run.
 - `make-dmg.sh` also requires `DEVELOPER_ID_APPLICATION` (it signs the mounted image): export it once and run every release script in the same shell.
-- **The GitHub release carries the DMG twice** — `mac4DSTEM-<version>.dmg` and a byte-identical
-  `mac4DSTEM.dmg`: mac4dstem.com links `releases/latest/download/mac4DSTEM.dmg`, so the release must be
-  marked latest and carry that exact asset name, and the website is pushed only after it is published.
+- **The GitHub release carries the DMG three times** — `4DSTEM-Studio-<version>.dmg` and byte-identical
+  `4DSTEM-Studio.dmg` and `mac4DSTEM.dmg`: mac4dstem.com links `releases/latest/download/…`, and links to the old name
+  live on elsewhere (#496), so the release must be marked latest and carry those exact asset names, and the website is
+  pushed only after it is published.
 
 ## Developer ID archive
 
@@ -245,11 +247,11 @@ awaits acceptance at developer.apple.com/account), then:
 ```sh
 export NOTARY_PROFILE=macem-notary
 tools/release/notarize.sh \
-  build/release/mac4DSTEM.xcarchive/Products/Applications/mac4DSTEM.app
+  "build/release/mac4DSTEM.xcarchive/Products/Applications/4DSTEM Studio.app"
 ```
 
 The script submits with `notarytool --wait`, staples and validates the ticket,
-runs Gatekeeper assessment, and produces `mac4DSTEM-<version>.zip`. Preserve the archive,
+runs Gatekeeper assessment, and produces `4DSTEM-Studio-<version>.zip`. Preserve the archive,
 notary submission ID/log, commit hash, and final SHA-256 together as release
 provenance: a release is written to `build/release/`; keep it outside the repository once
 published, since it cannot be regenerated. Test the ZIP on a clean account before publishing. The floor is
@@ -263,7 +265,7 @@ which meant the one artefact users actually download had no written procedure.
 
 ```sh
 tools/release/make-dmg.sh \
-  build/release/mac4DSTEM.xcarchive/Products/Applications/mac4DSTEM.app
+  "build/release/mac4DSTEM.xcarchive/Products/Applications/4DSTEM Studio.app"
 ```
 
 **Order matters, and getting it wrong produces a download that fails on first

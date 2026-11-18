@@ -33,11 +33,11 @@ xcodebuild \
   CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
   build -quiet
 
-APP="$WORK/DerivedData/Build/Products/Release/mac4DSTEM.app"
+APP="$WORK/DerivedData/Build/Products/Release/4DSTEM Studio.app"
 # The app embeds none of its own HDF5 libraries since 2026-10-15: they are FormatoKit's (0.4.0) three frameworks, which Xcode embeds in
 # Contents/Frameworks and signs with the app's identity (the resource bundle FormatoKit_FormatoHDF5.bundle of 0.3.0 is gone).
 FRAMEWORKS="$APP/Contents/Frameworks"
-EXECUTABLE="$APP/Contents/MacOS/mac4DSTEM"
+EXECUTABLE="$APP/Contents/MacOS/4DSTEM Studio"
 INFO="$APP/Contents/Info.plist"
 
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO")" = \

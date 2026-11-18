@@ -1,15 +1,15 @@
-<p align="center"><img src="docs/banner.png" width="100%" alt="mac4DSTEM: four-dimensional STEM analysis, native on Apple silicon"></p>
+<p align="center"><img src="docs/banner.png" width="100%" alt="4DSTEM Studio: four-dimensional STEM analysis, native on Apple silicon"></p>
 
-# mac4DSTEM
+# 4DSTEM Studio
 
 4D-STEM analysis on the Mac: virtual images, calibration, strain, orientation, phase and EDS spectrum images, worked
 on interactively instead of in scripts.
 
-mac4DSTEM is the companion to [macEM](https://github.com/EMSuite/Electron-Microscopy-Studio). Both are free, open source and built for
+4DSTEM Studio is the companion to [Electron Microscopy Studio](https://github.com/EMSuite/Electron-Microscopy-Studio). Both are free, open source and built for
 Apple silicon.
 
 <p align="center">
-  <img src="docs/images/strain-map-workspace.png" alt="mac4DSTEM showing a diffraction pattern with detected Bragg disks and a lattice fit, beside the resulting strain map" width="100%">
+  <img src="docs/images/strain-map-workspace.png" alt="4DSTEM Studio showing a diffraction pattern with detected Bragg disks and a lattice fit, beside the resulting strain map" width="100%">
 </p>
 
 ## Download
@@ -50,7 +50,7 @@ the reason. The rest is computed by the suite's Swift packages, each checked aga
 [SpectroKit](https://github.com/EMSuite/SpectroKit) (EDS),
 [FormatoKit](https://github.com/EMSuite/FormatoKit) (file readers),
 [ImagoKit](https://github.com/EMSuite/ImagoKit) (FFT and image maths) and
-[MacEMUI](https://github.com/EMSuite/EMSuiteUI) (the window and controls both apps share). Every export names the method a
+[EMSuiteUI](https://github.com/EMSuite/EMSuiteUI) (the window and controls both apps share). Every export names the method a
 result came from and its reference.
 
 Which function is checked against what, and to which tolerance, is in [`docs/parity.md`](docs/parity.md); speed
@@ -59,7 +59,7 @@ measurements are in [`docs/performance.md`](docs/performance.md).
 ## Building it yourself
 
 You need Xcode 26.6 or later on an Apple silicon Mac. Open `mac4DSTEM.xcodeproj`, pick the `mac4DSTEM` scheme and press ⌘R. The
-first build fetches the kits and MacEMUI from GitHub at the versions in `Package.resolved`. The tests run with
+first build fetches the kits and EMSuiteUI from GitHub at the versions in `Package.resolved`. The tests run with
 `tools/run-tests.sh unit`. How the code is organised is in [`docs/architecture.md`](docs/architecture.md), and how a
 release is built and notarised is in [`tools/release/README.md`](tools/release/README.md).
 
@@ -72,7 +72,7 @@ more, and [`SECURITY.md`](SECURITY.md) says how to report a security problem. Wh
 
 ## Citing
 
-If you use mac4DSTEM in published work, please cite it and py4DSTEM, where the methods come from. Both are in
+If you use 4DSTEM Studio in published work, please cite it and py4DSTEM, where the methods come from. Both are in
 [`CITATION.cff`](CITATION.cff).
 
 ## Licence

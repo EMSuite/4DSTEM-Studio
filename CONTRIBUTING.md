@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for looking. mac4DSTEM is a scientific instrument as much as an
+Thanks for looking. 4DSTEM Studio is a scientific instrument as much as an
 application: a wrong number that looks plausible is worse than a crash, so the
 conventions below are mostly about making correctness checkable by someone
 other than the author.

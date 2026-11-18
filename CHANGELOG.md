@@ -10,6 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). App
 - **Runs on macOS 26** (was macOS 27) on Apple Silicon. Figure export writes through SwiftUI's `FileDocument`; the toolbar's Save
   button takes its low priority on macOS 26.1 and newer. MacEMUI 0.3.2. CI builds and runs the unit tests again, on Xcode 26.6.
 
+## [5.4.3](https://github.com/EMSuite/4DSTEM-Studio/compare/v5.4.2...v5.4.3) (2026-11-18)
+
+
+### Bug Fixes
+
+* the website download is named 4DSTEM Studio, on screen and in its files ([#498](https://github.com/EMSuite/4DSTEM-Studio/issues/498)) ([4160928](https://github.com/EMSuite/4DSTEM-Studio/commit/4160928e2137a8844341e2e10fd43d99b39b554a))
+
 ## [5.4.2](https://github.com/EMSuite/4DSTEM-Studio/compare/v5.4.1...v5.4.2) (2026-11-18)
 
 

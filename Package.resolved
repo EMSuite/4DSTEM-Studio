@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mac4DSTEM/CuboKit",
       "state" : {
-        "revision" : "fe380f5bfd7a9e943f853f6aee1598fef1820a8b",
-        "version" : "0.11.1"
+        "revision" : "bfb70ea97db87196351f4cc29c7738221c39f9b0",
+        "version" : "0.12.1"
       }
     },
     {
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mac4DSTEM/DiffractoKit",
       "state" : {
-        "revision" : "d991501a6e68f8b8ed199d5270161948145c8a20",
-        "version" : "0.18.0"
+        "revision" : "06ee1878aac94c530ca8f6e582115ab70fb3b4cc",
+        "version" : "0.18.1"
       }
     },
     {

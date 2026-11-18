@@ -340,16 +340,21 @@ package final class DiskCentreLabelStore {
         return nil
     }
 
-    /// Restore the labels a sidecar carries (reopen, promote). Same cube-path rule as `load`; then the labels apply
-    /// only in the view they were clicked in (frame tag; an absent frame by bounds). Otherwise the store stays empty
-    /// — the sidecar keeps them, nothing is applied silently — and `importRefusal` says why. Returns whether applied.
+    /// Restore the labels a sidecar carries (reopen, promote). The cube must be the one the sidecar sits beside: the same
+    /// path, or the same file name when the folder moved (the recorded file is gone and `filePath` is on disk; the labels
+    /// record an absolute path, and a sidecar found beside `filePath` belongs to it by name, as `SessionSourceStamp`
+    /// decides for the session; 4DSTEM-Studio#467: labels written before a folder rename never came back). A same-named
+    /// cube whose recorded file still exists, or a path not on disk, is refused. Then the labels apply only in the view they were clicked in
+    /// (frame tag; an absent frame by bounds). Otherwise the store stays empty — the sidecar keeps them, nothing is
+    /// applied silently — and `importRefusal` says why. Returns whether applied. An applied restore is bound to
+    /// `filePath`, so the next save records where the cube is now.
     @discardableResult
     package func restore(from data: Data, expecting filePath: String, frame expectedFrame: String,
                          scanY: Int, scanX: Int, detectorY: Int, detectorX: Int) throws -> Bool {
         // Every way out below that applies nothing leaves the sidecar's labels unrestored: flag it first.
         sidecarHoldsUnrestoredLabels = true
         let decoded = try Self.decode(data)
-        guard decoded.filePath == filePath else {
+        guard decoded.filePath == filePath || Self.isTheSameFileMoved(recorded: decoded.filePath, current: filePath) else {
             throw LabelError.datasetMismatch(expected: filePath, found: decoded.filePath)
         }
         if let line = Self.viewRefusal(decoded.frame, decoded.positions, fileName: "The saved disk-centre labels",
@@ -359,12 +364,19 @@ package final class DiskCentreLabelStore {
             return false
         }
         sidecarHoldsUnrestoredLabels = false
-        self.filePath = decoded.filePath
+        self.filePath = filePath
         self.datasetPath = decoded.datasetPath
         ingredient = decoded.ingredient
         seed = decoded.seed
         positions = decoded.positions
         return true
+    }
+
+    /// The recorded cube moved to `current`: the same file name, the recorded path gone, the current one on disk.
+    static func isTheSameFileMoved(recorded: String, current: String) -> Bool {
+        let fileManager = FileManager.default
+        return URL(fileURLWithPath: recorded).lastPathComponent == URL(fileURLWithPath: current).lastPathComponent
+            && !fileManager.fileExists(atPath: recorded) && fileManager.fileExists(atPath: current)
     }
 
     /// A refusal decided outside the store (the file could not be read): one line, nothing changed.

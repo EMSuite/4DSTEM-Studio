@@ -185,6 +185,48 @@ final class SaveOverSourceSafetyTests: XCTestCase {
         XCTAssertFalse(target.sidecarHoldsUnrestoredLabels, "an applied restore owes the session file nothing")
     }
 
+    /// Labels written before the dataset's folder moved restore beside the moved file and are bound to its new path, so the
+    /// next save records it (4DSTEM-Studio#467: the folder rename to EMSuite left every saved label unrestored). Another
+    /// file name, or the same name while the recorded file still exists, is refused. Mutation: the exact-path comparison
+    /// back -> red; drop the existence checks -> red.
+    func testLabelsRestoreBesideTheSameFileAfterItsFolderMoved() throws {
+        let moved = directory.appendingPathComponent("new", isDirectory: true)
+        try FileManager.default.createDirectory(at: moved, withIntermediateDirectories: true)
+        let cube = moved.appendingPathComponent("cube.h5")
+        try Data([1]).write(to: cube)
+        let gone = directory.appendingPathComponent("old/cube.h5").path   // the folder before the rename, not on disk
+
+        let source = DiskCentreLabelStore()
+        source.reset(filePath: gone, datasetPath: "/data")
+        source.add(.init(row: 1, col: 1), ry: 0, rx: 0)
+        let saved = try source.encodedJSON(frame: "native")
+
+        let target = DiskCentreLabelStore()
+        target.reset(filePath: cube.path, datasetPath: "/data")
+        XCTAssertTrue(try target.restore(from: saved, expecting: cube.path, frame: "native",
+                                         scanY: 3, scanX: 3, detectorY: 8, detectorX: 8))
+        XCTAssertEqual(target.centres(ry: 0, rx: 0), [.init(row: 1, col: 1)])
+        XCTAssertEqual(target.filePath, cube.path)
+        XCTAssertEqual(try DiskCentreLabelStore.decode(target.encodedJSON()).filePath, cube.path)
+
+        // Another file name is refused.
+        let other = moved.appendingPathComponent("other.h5")
+        try Data([1]).write(to: other)
+        target.reset(filePath: other.path, datasetPath: "/data")
+        XCTAssertThrowsError(try target.restore(from: saved, expecting: other.path, frame: "native",
+                                                scanY: 3, scanX: 3, detectorY: 8, detectorX: 8))
+        XCTAssertTrue(target.isEmpty)
+
+        // The same name while the recorded file still exists is another cube: refused.
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("old", isDirectory: true),
+                                                withIntermediateDirectories: true)
+        try Data([1]).write(to: URL(fileURLWithPath: gone))
+        target.reset(filePath: cube.path, datasetPath: "/data")
+        XCTAssertThrowsError(try target.restore(from: saved, expecting: cube.path, frame: "native",
+                                                scanY: 3, scanX: 3, detectorY: 8, detectorX: 8))
+        XCTAssertTrue(target.isEmpty)
+    }
+
     /// The app's own save path: with the store flagged and a new label clicked, Save Calibration keeps the sidecar's
     /// labels byte-identical and says so. Mutation: drop `|| labelsWithheld` in `saveCalibrationToSessionSidecar` -> red.
     func testASaveKeepsLabelsTheViewDidNotRestore() async throws {

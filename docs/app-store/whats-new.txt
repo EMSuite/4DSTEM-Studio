@@ -1,10 +1,3 @@
-Version 5.4.2 is a stability release.
+Version 5.4.3 is a maintenance release.
 
-• Origin from Bragg Peaks finds the direct beam on spot patterns whose first-order disks outshine it, such as Si/SiGe.
-• Fit Ellipse on a mean pattern with sharp crystalline rings keeps the ring fit instead of an amorphous-ring model that could distort it.
-• Saved disk-centre labels come back after the dataset's folder is renamed or moved.
-• The run progress bar follows its count smoothly.
-• EDS: Auto ID quantifies an element found by its L line on its Kα when the spectrum holds it well excited, and offers its near misses (such as carbon below 0.45 keV) as one-click additions. Long DM4 reads use less memory.
-• VoiceOver reads the workspace list as buttons.
-
-Results that change: the Bragg-peak origin on spot patterns where a disk outshines the beam, ellipse fits on crystalline mean patterns, and EDS Auto ID element lists.
+• The download from mac4dstem.com is now named 4DSTEM Studio, like the App Store version. Settings and recent datasets carry over, and in-app updates keep working; a copy that updates itself keeps its old file name in Applications for now.

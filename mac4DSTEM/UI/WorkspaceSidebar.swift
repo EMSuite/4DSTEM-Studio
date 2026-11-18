@@ -48,7 +48,8 @@ struct WorkspaceSidebar: View {
                 tag: { WorkspaceRoute.workspace($0) },
                 isAvailable: { !appState.isWorkspaceWithheld($0) },
                 unavailableHelp: { "\($0.title) works on a 4D-STEM scan; this window holds a spectrum image only." },
-                badge: { $0 == .results ? appState.sessionInventory.results.count : 0 }
+                badge: { $0 == .results ? appState.sessionInventory.results.count : 0 },
+                selection: appState.workspaceRoute   // rows are buttons to VoiceOver and its press chooses the room (EMSuiteUI#131)
             ) {
                 if let hint = ProductWorkflow.nextStepHint(
                     for: appState.navigation.workspaceArea,

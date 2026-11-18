@@ -31,9 +31,10 @@ final class SoftwareUpdateTests: XCTestCase {
         XCTAssertEqual(key, "j4qRIz2RC40tuHy7FRngpvq0OHuJWLjAT7v/Mtx49qE=", "the public half of Paul's EdDSA key (made 2026-11-13, #285)")
         XCTAssertEqual(direct.removeValue(forKey: "SUEnableInstallerLauncherService") as? Bool, true, "the sandboxed installer")
         XCTAssertEqual(direct.removeValue(forKey: "SUEnableSystemProfiling") as? Bool, false, "no system profile is sent")
+        XCTAssertEqual(direct.removeValue(forKey: "SUBundleName") as? String, "4DSTEM Studio", "the file an update installs to (#497)")
         XCTAssertNil(direct["SUEnableAutomaticChecks"], "Sparkle asks the person before it checks by itself")
         XCTAssertEqual(NSDictionary(dictionary: direct), NSDictionary(dictionary: store),
-                       "Info-Direct.plist is Info.plist plus the four Sparkle keys")
+                       "Info-Direct.plist is Info.plist plus the five Sparkle keys")
         XCTAssertTrue(store.keys.allSatisfy { !$0.hasPrefix("SU") }, "the store build names no updater")
     }
 
@@ -83,7 +84,7 @@ final class SoftwareUpdateTests: XCTestCase {
             XCTAssertTrue(appcast.contains(part), "appcast.sh no longer runs \(part)")
         }
         let feed = try text("tools/release/feed.py")
-        for part in ["sparkle:version", "sparkle:minimumSystemVersion", "releases/download/{tag}/mac4DSTEM-{version}.dmg"] {
+        for part in ["sparkle:version", "sparkle:minimumSystemVersion", "releases/download/{tag}/4DSTEM-Studio-{version}.dmg"] {
             XCTAssertTrue(feed.contains(part), "feed.py no longer writes \(part)")
         }
         let store = try text("tools/release/build-app-store.sh")

@@ -42,16 +42,17 @@ final class AppStoreReleaseTests: XCTestCase {
     }
 
     /// App Review refuses "Mac" in an App Store app's name (guideline 5.2.5, 5.2.0 rejected 16 Nov 2026). The store build is
-    /// "4DSTEM Studio"; the website download keeps mac4DSTEM. Mutation: "mac" back in the store name, PRODUCT_NAME back to
-    /// the target name, or the module name left to follow the product - red.
+    /// "4DSTEM Studio", and since 5.4.3 the website download is too (#496). Mutation: "mac" back in either name, PRODUCT_NAME
+    /// back to the target name, or the module name left to follow the product - red.
     func testTheStoreBuildCarriesANameWithoutMac() throws {
         let config = try String(contentsOf: root.appendingPathComponent("Config/Version.xcconfig"), encoding: .utf8)
         func setting(_ key: String) -> String? {
             config.split(separator: "\n").first { $0.hasPrefix("\(key) = ") }.map { String($0.dropFirst(key.count + 3)) }
         }
         XCTAssertEqual(setting("MACEM_APP_NAME_YES"), "4DSTEM Studio")
-        XCTAssertEqual(setting("MACEM_APP_NAME_NO"), "mac4DSTEM", "the website download keeps its name")
+        XCTAssertEqual(setting("MACEM_APP_NAME_NO"), "4DSTEM Studio", "the website download carries the same name (#496)")
         XCTAssertFalse(try XCTUnwrap(setting("MACEM_APP_NAME_YES")).lowercased().contains("mac"))
+        XCTAssertFalse(try XCTUnwrap(setting("MACEM_APP_NAME_NO")).lowercased().contains("mac"))
 
         let project = try String(contentsOf: root.appendingPathComponent("mac4DSTEM.xcodeproj/project.pbxproj"), encoding: .utf8)
         let appConfigurations = project.components(separatedBy: "isa = XCBuildConfiguration;")
@@ -74,9 +75,20 @@ final class AppStoreReleaseTests: XCTestCase {
     func testTheAppNameComesFromTheBundle() {
         XCTAssertEqual(AppName.display(from: ["CFBundleDisplayName": "4DSTEM Studio", "CFBundleName": "x"]), "4DSTEM Studio")
         XCTAssertEqual(AppName.display(from: ["CFBundleName": "4DSTEM Studio"]), "4DSTEM Studio")
-        XCTAssertEqual(AppName.display(from: ["CFBundleDisplayName": ""]), "mac4DSTEM")
-        XCTAssertEqual(AppName.display(from: nil), "mac4DSTEM")
-        XCTAssertEqual(AppName.display, "mac4DSTEM", "the test host is the website flavour")
+        XCTAssertEqual(AppName.display(from: ["CFBundleDisplayName": ""]), "4DSTEM Studio")
+        XCTAssertEqual(AppName.display(from: nil), "4DSTEM Studio")
+        XCTAssertEqual(AppName.display, "4DSTEM Studio", "the test host is the website flavour, named 4DSTEM Studio (#496)")
+    }
+
+    /// The website download's running bundle says 4DSTEM Studio, and Sparkle's SUBundleName names the file an update installs
+    /// to (#496, #497). Mutation: MACEM_APP_NAME_NO back to mac4DSTEM, or SUBundleName dropped or misspelt - red.
+    func testTheWebsiteBuildIsNamed4DSTEMStudio() throws {
+        let info = try XCTUnwrap(Bundle.main.infoDictionary)
+        XCTAssertEqual(info["CFBundleName"] as? String, "4DSTEM Studio")
+        XCTAssertEqual(info["CFBundleDisplayName"] as? String, "4DSTEM Studio")
+        XCTAssertEqual(Bundle.main.bundleURL.lastPathComponent, "4DSTEM Studio.app")
+        XCTAssertEqual(info["SUBundleName"] as? String, "4DSTEM Studio")
+        XCTAssertEqual(info["CFBundleIdentifier"] as? String, "com.mac4dstem.mac4DSTEM", "installed copies keep updating")
     }
 
     /// The store build's door registers as one word: its name "4DSTEM Studio" has a space, and the copied connection command

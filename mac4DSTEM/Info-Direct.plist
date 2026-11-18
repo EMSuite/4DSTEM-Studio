@@ -88,6 +88,10 @@
 	     the key is the public half of the EdDSA pair whose private half stays in Paul's login keychain and signs each DMG
 	     (tools/release/appcast.sh). The installer launcher is the sandboxed app's way to install. No SUEnableAutomaticChecks:
 	     Sparkle asks the person once, on the second launch, before it checks by itself. No system profile is sent. -->
+	<!-- The file an update installs to (#497): Sparkle names it "<SUBundleName>.app" when its normalizing installer runs.
+	     It is the full name, so a copy that was mac4DSTEM.app ends up as 4DSTEM Studio.app. -->
+	<key>SUBundleName</key>
+	<string>4DSTEM Studio</string>
 	<key>SUFeedURL</key>
 	<string>https://mac4dstem.com/appcast/mac4dstem.xml</string>
 	<key>SUPublicEDKey</key>

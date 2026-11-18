@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Build the drag-to-Applications disk image that users actually download.
 #
-# Takes a *stapled* mac4DSTEM.app and produces a signed, compressed DMG. The
+# Takes a *stapled* 4DSTEM Studio.app and produces a signed, compressed DMG. The
 # image is signed here but NOT notarized here — run notarize.sh on the result,
 # so the download itself carries a stapled ticket and first launch works with
 # no network. Stapling the app alone is not enough: Gatekeeper assesses the
@@ -25,7 +25,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 resolve_mac4dstem_developer_dir
 : "${DEVELOPER_ID_APPLICATION:?Set DEVELOPER_ID_APPLICATION to the full Developer ID Application certificate name}"
 
-APP="${1:?usage: make-dmg.sh path/to/mac4DSTEM.app [output.dmg]}"
+APP="${1:?usage: make-dmg.sh "path/to/4DSTEM Studio.app" [output.dmg]}"
 [ -d "$APP" ] || { echo "No such app bundle: $APP" >&2; exit 1; }
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
@@ -35,7 +35,8 @@ VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/
 ICON_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$APP/Contents/Info.plist")"
 BADGE="$APP/Contents/Resources/$ICON_NAME.icns"
 [ -f "$BADGE" ] || { echo "No icon at $BADGE — the app did not ship the icon its Info.plist names." >&2; exit 1; }
-OUT="${2:-$ROOT/build/release/mac4DSTEM-$VERSION.dmg}"
+APP_NAME="$(basename "$APP" .app)"   # "4DSTEM Studio" (#496)
+OUT="${2:-$ROOT/build/release/${APP_NAME// /-}-$VERSION.dmg}"
 BACKGROUND="$ROOT/tools/release/dmg-background.png"
 [ -f "$BACKGROUND" ] || { echo "Missing background: $BACKGROUND" >&2; exit 1; }
 
@@ -84,7 +85,7 @@ mkdir -p "$(dirname "$OUT")"
 rm -f "$OUT"
 
 DMG_APP="$APP" DMG_BACKGROUND="$BACKGROUND" DMG_BADGE_ICON="$BADGE" \
-  "$DMGBUILD" -s "$WORK/settings.py" "mac4DSTEM $VERSION" "$OUT"
+  "$DMGBUILD" -s "$WORK/settings.py" "$APP_NAME $VERSION" "$OUT"
 
 codesign --force --sign "$DEVELOPER_ID_APPLICATION" --timestamp "$OUT"
 codesign --verify --strict --verbose=2 "$OUT"

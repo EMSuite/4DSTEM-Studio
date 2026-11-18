@@ -13,8 +13,9 @@
 # Needs the "Developer ID Application" certificate in the login keychain, a notarytool keychain profile (default
 # macem-notary; override with NOTARY_PROFILE). dmgbuild lives in build/dmg-venv; the first run in a fresh checkout creates
 # it (tools/release/ensure-dmgbuild.sh, needs python3 and PyPI).
-# Output: build/release/<stamp>/mac4DSTEM-<version>.dmg, a copy named mac4DSTEM.dmg for the
-# releases/latest/download/mac4DSTEM.dmg link, and mac4dstem.xml, the website's update feed (tools/release/appcast.sh).
+# Output: build/release/<stamp>/4DSTEM-Studio-<version>.dmg, a copy named 4DSTEM-Studio.dmg for the
+# releases/latest/download/4DSTEM-Studio.dmg link, a copy named mac4DSTEM.dmg so links to the old name keep working (#496),
+# and mac4dstem.xml, the website's update feed (tools/release/appcast.sh).
 # The steps are tools/release/{build-developer-id,notarize,make-dmg,appcast}.sh.
 set -euo pipefail
 
@@ -70,28 +71,31 @@ fi
 
 echo "== Archive ($(git -C "$ROOT" rev-parse --short HEAD))"
 "$ROOT/tools/release/build-developer-id.sh" "$OUT" > "$OUT/archive.log" 2>&1 || { tail -30 "$OUT/archive.log"; exit 1; }
-APP="$OUT/mac4DSTEM.xcarchive/Products/Applications/mac4DSTEM.app"
+APP_NAME="$(sed -n 's/^MACEM_APP_NAME_NO = //p' "$ROOT/Config/Version.xcconfig")"   # "4DSTEM Studio" (#496)
+FILE_NAME="${APP_NAME// /-}"                                                         # "4DSTEM-Studio"
+APP="$OUT/mac4DSTEM.xcarchive/Products/Applications/$APP_NAME.app"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 [[ "$VERSION" == "$EXPECTED" ]] || { echo "The built app says $VERSION but the tag is $TAG." >&2; exit 1; }
-echo "mac4DSTEM $VERSION"
+echo "$APP_NAME $VERSION"
 
 echo "== Notarize the app"
-"$ROOT/tools/release/notarize.sh" "$APP" "$OUT/mac4DSTEM-$VERSION.zip"
+"$ROOT/tools/release/notarize.sh" "$APP" "$OUT/$FILE_NAME-$VERSION.zip"
 
 echo "== DMG"
-DMG="$OUT/mac4DSTEM-$VERSION.dmg"
+DMG="$OUT/$FILE_NAME-$VERSION.dmg"
 "$ROOT/tools/release/make-dmg.sh" "$APP" "$DMG"
 
 echo "== Notarize the DMG"
 "$ROOT/tools/release/notarize.sh" "$DMG"
-cp "$DMG" "$OUT/mac4DSTEM.dmg"
+cp "$DMG" "$OUT/$FILE_NAME.dmg"
+cp "$DMG" "$OUT/mac4DSTEM.dmg"   # the old name, for links that still use it (#496)
 
 echo "== Update feed (Sparkle, #122)"
 "$ROOT/tools/release/appcast.sh" "$DMG" "$VERSION" "$OUT/mac4dstem.xml" "$ROOT/docs/app-store/whats-new.txt"
 
 echo
 echo "Done: $DMG"
-echo "Also: $OUT/mac4DSTEM.dmg (for releases/latest/download/mac4DSTEM.dmg)"
+echo "Also: $OUT/$FILE_NAME.dmg and $OUT/mac4DSTEM.dmg (for releases/latest/download/$FILE_NAME.dmg and the old name's link)"
 echo "SHA-256: $(shasum -a 256 "$DMG" | cut -d' ' -f1)"
 echo "Size: $(stat -f%z "$DMG") bytes"
 echo "Feed: $OUT/mac4dstem.xml (commit it to the website as appcast/mac4dstem.xml once the DMGs are on the release)"

@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "000000000000000100000000"
-               BuildableName = "mac4DSTEM.app"
+               BuildableName = "4DSTEM Studio.app"
                ReferencedContainer = "container:mac4DSTEM.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -57,7 +57,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000000"
-            BuildableName = "mac4DSTEM.app"
+            BuildableName = "4DSTEM Studio.app"
             ReferencedContainer = "container:mac4DSTEM.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -86,7 +86,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000000"
-            BuildableName = "mac4DSTEM.app"
+            BuildableName = "4DSTEM Studio.app"
             ReferencedContainer = "container:mac4DSTEM.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

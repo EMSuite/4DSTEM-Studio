@@ -1,9 +1,22 @@
 # CI — the aggregate claim, made mechanical (v2 S21, the archived notes §8).
 #
-# MAIN: a push to main runs only the Linux jobs. `unit`, `core` and `inventory` ran on the pull request that made the
-# commit; running them again on main took the same macOS slots a second time, and GitHub gives the org five at once
-# (12 Nov 2026: PR `unit` jobs waited 13-22 min for a slot). They run on tags, by hand and in the nightly, which is
+# MAIN: a push to main runs only the Linux jobs. The `unit` job (inventory, core, unit) ran on the pull request that made
+# the commit; running it again on main took the same macOS slot a second time, and GitHub gives the org five at once
+# (12 Nov 2026: PR `unit` jobs waited 13-22 min for a slot). It runs on tags, by hand and in the nightly, which is
 # where a break between two PRs that each passed alone shows.
+#
+# ONE MACOS JOB: a pull request runs one macOS job, `unit`, whose steps are the inventory, the core build and the XCTest
+# suite, cheapest first, so a red inventory still fails in about a minute and the log names the step that failed. Three
+# jobs per PR (until 23 Nov 2026) let only one or two PRs build at once on the org's five macOS runners (the suite's
+# engineering-process plan, process item 3; Electron Microscopy Studio made the same change in its #768). The required
+# check is the job, `unit (XCTest)`.
+#
+# DOCS ONLY: a pull request that changes only the root's Markdown files (README, CONTRIBUTING, ...), files under docs/
+# or the issue templates runs no macOS job. The Linux job `changes` lists the pull request's files and says whether any
+# needs the Mac; `unit` is then skipped, and GitHub counts a job skipped by its `if` as passing, so the required check
+# `unit (XCTest)` is met with no stand-in. A doc that the job's tests or gates read (its path named anywhere under
+# mac4DSTEMTests*/, tools/run-tests.sh or tools/lib/) counts as code, so a pull request that edits it runs `unit`. What the
+# skip gives up is the inventory's live-docs check on that pull request; the nightly runs it on main.
 #
 # WHAT RUNS on every pull request, tag and nightly — the jobs below (a push to main: MAIN above), each a
 # gate a public checkout can reproduce. `scientific` (up to three hours on the one
@@ -100,25 +113,81 @@ env:
   DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
 
 jobs:
-  unit:
-    name: unit (XCTest)
-    # Not on a push to main: the PR run tested the change; nightly and tags run it (MAIN in the header).
-    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
-    runs-on: macos-26
-    timeout-minutes: 90
+  changes:
+    # DOCS ONLY in the header: whether this pull request changes anything the macOS job checks. Pull requests only; on every
+    # other event `unit` runs as before.
+    name: changes (does the PR need the macOS job)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      macos: ${{ steps.files.outputs.macos }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The pull request's merge commit and its first parent, the base: their difference is the PR's files.
+          fetch-depth: 2
+      - name: List the files and decide
+        id: files
+        run: |
+          set -euo pipefail
+          macos=false
+          dirs=$(ls -d mac4DSTEMTests* tools/run-tests.sh tools/lib 2>/dev/null || true)
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            if [[ "$f" != */* && "$f" == *.md ]] || [[ "$f" == .github/ISSUE_TEMPLATE/* ]]; then
+              echo "docs only: $f"
+            elif [[ "$f" == docs/* ]]; then
+              # A doc a test or a tool reads is code to them.
+              if [ -n "$dirs" ] && git grep -q -F "$f" -- $dirs; then
+                echo "needs macOS: $f (a test or a tool names it)"; macos=true
+              else
+                echo "docs only: $f"
+              fi
+            else
+              echo "needs macOS: $f"; macos=true
+            fi
+          done < <(git diff --name-only --no-renames HEAD^1 HEAD)
+          echo "macos=$macos" | tee -a "$GITHUB_OUTPUT"
+
+  unit:
+    # The one macOS job of a pull request: inventory, core, then the XCTest suite (ONE MACOS JOB in the header). Its name
+    # is the required check's, kept from when it ran the suite alone.
+    name: unit (XCTest)
+    needs: changes
+    # Not on a push to main: the PR run tested the change; nightly and tags run it (MAIN in the header). Not on a docs-only
+    # pull request (DOCS ONLY in the header). `!cancelled()` runs it although `changes` is skipped (every event but a pull
+    # request) or failed (then its answer is empty and the job runs, the safe side).
+    if: ${{ !cancelled() && needs.changes.outputs.macos != 'false' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')) }}
+    runs-on: macos-26
+    # The three former jobs' timeouts (unit 90, core 30, inventory 10), summed.
+    timeout-minutes: 130
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The C5 growth rule reads HEAD^ on a clean tree. The default depth
+          # of 1 does not have it, and the read used to fall through to zero,
+          # so the inventory could never pass (found 2026-09-09).
+          fetch-depth: 2
       - name: Toolchain on record
         run: |
           sw_vers
           xcode-select -p
           xcodebuild -version
+          swift --version
       - name: Ensure the Metal toolchain component
         run: |
           if ! xcrun -sdk macosx metal --version >/dev/null 2>&1; then
             sudo xcodebuild -downloadComponent MetalToolchain
           fi
           xcrun -sdk macosx metal --version
+      - name: Resolve the kit pins
+        # The redistributed-binaries check reads FormatoKit's libhdf5 from the pinned checkout.
+        run: swift package resolve
+      - name: Run the inventory (cheapest first)
+        run: tools/run-tests.sh inventory
+      - name: Build the package layers standalone (core)
+        run: tools/run-tests.sh core
       - name: Run the unit gate
         run: tools/run-tests.sh unit
 
@@ -176,42 +245,6 @@ jobs:
         # PYTHON is tools/lib/python.sh's documented override; vendor-reader
         # uses bare python3, which setup-python also puts on PATH.
         run: PYTHON="$(command -v python)" tools/run-tests.sh scientific
-
-  inventory:
-    name: inventory (repo review)
-    # Not on a push to main: the PR run tested the change; nightly and tags run it (MAIN in the header).
-    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
-    # The org's Mac runner while the org variable MACEM_MAC_RUNNER is set (never for a fork PR); else GitHub's macos-26.
-    runs-on: ${{ vars.MACEM_MAC_RUNNER && !github.event.pull_request.head.repo.fork && fromJSON(vars.MACEM_MAC_RUNNER) || 'macos-26' }}
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          # The C5 growth rule reads HEAD^ on a clean tree. The default depth
-          # of 1 does not have it, and the read used to fall through to zero,
-          # so this job could never pass (found 2026-09-09).
-          fetch-depth: 2
-      - name: Resolve the kit pins
-        # The redistributed-binaries check reads FormatoKit's libhdf5 from the pinned checkout.
-        run: swift package resolve
-      - name: Run the inventory
-        run: tools/run-tests.sh inventory
-
-  core:
-    name: core (DSTEMCore + DSTEMSession package build)
-    # Not on a push to main: the PR run tested the change; nightly and tags run it (MAIN in the header).
-    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
-    # The org's Mac runner while the org variable MACEM_MAC_RUNNER is set (never for a fork PR); else GitHub's macos-26.
-    runs-on: ${{ vars.MACEM_MAC_RUNNER && !github.event.pull_request.head.repo.fork && fromJSON(vars.MACEM_MAC_RUNNER) || 'macos-26' }}
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-      - name: Toolchain on record
-        run: |
-          xcode-select -p
-          swift --version
-      - name: Build the package layers standalone
-        run: tools/run-tests.sh core
 
   kit-boundary:
     name: kit boundary (no numerics frameworks in the app)

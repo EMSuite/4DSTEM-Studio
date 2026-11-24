@@ -159,7 +159,10 @@ jobs:
     # pull request (DOCS ONLY in the header). `!cancelled()` runs it although `changes` is skipped (every event but a pull
     # request) or failed (then its answer is empty and the job runs, the safe side).
     if: ${{ !cancelled() && needs.changes.outputs.macos != 'false' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')) }}
-    runs-on: macos-26
+    # A same-repo pull request: the org's Mac runner while the org variable MACEM_MAC_RUNNER is set (GitHub's five macOS
+    # machines for the org were the queue, 24 Nov 2026); a fork PR, tags and the nightly: GitHub's macos-26, the macOS 26
+    # runtime proof. Deleting the variable puts every run back on macos-26 with no PR.
+    runs-on: ${{ github.event_name == 'pull_request' && vars.MACEM_MAC_RUNNER && !github.event.pull_request.head.repo.fork && fromJSON(vars.MACEM_MAC_RUNNER) || 'macos-26' }}
     # The three former jobs' timeouts (unit 90, core 30, inventory 10), summed.
     timeout-minutes: 130
     steps:

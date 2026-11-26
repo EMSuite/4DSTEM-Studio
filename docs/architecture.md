@@ -132,7 +132,7 @@ CSV, py4DSTEM `BraggVectors`, calibrated reduced `DataCube` with the recipe.
 5. **Compute.** Per-mode analysis in `Core/Analysis/` and `Core/Crystal/`.
    Most of the numerics are the kits' (CuboKit, DiffractoKit, ImagoKit), each
    with a CPU path on Accelerate and a Metal path where size pays. The app's
-   own GPU work goes through MacEMUI's `ShellMetal` (`MetalEngine`, whose
+   own GPU work goes through EMSuiteUI's `ShellMetal` (`MetalEngine`, whose
    calls are **synchronous and blocking**, `commit()` + `waitUntilCompleted()`:
    call it only from a background `Task`); the app has no Metal kernels of
    its own.
@@ -168,10 +168,10 @@ Placement is wiring.
 | Putting in… | goes under… |
 |---|---|
 | App entry, window state (`AppState`), pending load, workspace vocabulary | `mac4DSTEM/App/` |
-| The agent door: the local, read-only API an agent on this Mac looks through (`docs/agent-door.md`) | `mac4DSTEM/App/AgentDoor/` (the app's tools); the door and its MCP bridge are MacEMUI's `ShellAgentDoor` and `AgentBridge/` |
+| The agent door: the local, read-only API an agent on this Mac looks through (`docs/agent-door.md`) | `mac4DSTEM/App/AgentDoor/` (the app's tools); the door and its MCP bridge are EMSuiteUI's `ShellAgentDoor` and `AgentBridge/` |
 | Session state with no UI: replay, sidecars, gates, products, residency, recovery | `mac4DSTEM/Session/` (package `DSTEMSession`) |
 | App-side reader adapters over FormatoKit, calibration model, EMD writer, product model | `mac4DSTEM/Core/Data/` |
-| Cancellation (the Metal engine is MacEMUI's `ShellMetal`, the FFTs ImagoKit's) | `mac4DSTEM/Core/Compute/` |
+| Cancellation (the Metal engine is EMSuiteUI's `ShellMetal`, the FFTs ImagoKit's) | `mac4DSTEM/Core/Compute/` |
 | Analysis algorithms (virtual detector, solvers, disks, strain, DPC, parallax, ptycho) | `mac4DSTEM/Core/Analysis/` |
 | Crystal model, CIF and Materials Project import, the ACOM orientation plan and backend choice (cells, presets, scattering factors and the CPU and Metal matcher are DiffractoKit's) | `mac4DSTEM/Core/Crystal/` |
 | Learned stages: the Core ML inference class and its scan orchestration (C7) | `mac4DSTEM/Core/ML/`; the pinned asset and its record JSON in `mac4DSTEM/Resources/DiskDetector/` (a folder resource, compiled at load); its session owner `Session/LearnedDetection.swift` |
@@ -336,7 +336,7 @@ Most harnesses are zsh `run.sh` scripts that compile a handful of production
 first for a dependency-closed file list per named group (see "Project
 structure", above). One needing libhdf5 (FormatoKit's three frameworks, assembled side by side from the SwiftPM artifacts by `tools/lib/hdf5-dir.sh`, ad-hoc
 signed already) points `FORMATO_HDF5_PATH` at `FormatoLibHDF5.framework/FormatoLibHDF5` there; one needing GPU kernels takes them
-from MacEMUI's `ShellMetal`. `tools/harnesses/package-test/run.sh` runs a full
+from EMSuiteUI's `ShellMetal`. `tools/harnesses/package-test/run.sh` runs a full
 `xcodebuild -configuration Release` at the release archive's own
 destination/architecture pin, because a prior gate on a generic destination
 once stayed green an hour before an archive build failed.
@@ -373,7 +373,7 @@ deadlock and never held across an `await`. The HDF5, SZ and AEC binaries are For
 - Session rehydration is pixel and metadata level; transient arrays are not reconstructed.
 - Origin coarse search deviates from py4DSTEM (binned block-sum argmax); the
   probe-size fallback can look usable where py4DSTEM would return NaN.
-- No non-Metal fallback; `MetalEngine` (MacEMUI) fails fatally without a device.
+- No non-Metal fallback; `MetalEngine` (EMSuiteUI) fails fatally without a device.
 - R–Q rotation has an inherent 180° ambiguity (Flip 180° in Calibration).
 - The MIB and EMPAD readers are less tested than the EMD and DM ones: no real vendor acquisition is in the fixtures.
 - Bundle identifier `com.mac4dstem.mac4DSTEM` keys the sandbox container and

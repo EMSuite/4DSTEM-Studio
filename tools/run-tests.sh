@@ -213,21 +213,21 @@ inventory() {
     (( ${support[(Ie)$name]} )) || { echo "  UNCLASSIFIED $name"; rc=1; }
   done
 
-  # UI journeys (process/ui-testing-2026-10-21.md §4): every accessibility identifier a journey uses exists in the app's sources (or MacEMUI's), so a
+  # UI journeys (process/ui-testing-2026-10-21.md §4): every accessibility identifier a journey uses exists in the app's sources (or EMSuiteUI's), so a
   # renamed identifier fails here before it fails on screen. `workspace.<area>` is built from the area's raw value in the source.
   echo "== UI test identifiers exist in the app sources"
   local id
   local -a macemui_sources=()
   local d
-  for d in "$ROOT/../MacEMUI/Sources" "$ROOT/.build/checkouts/MacEMUI/Sources"; do
+  for d in "$ROOT/../EMSuiteUI/Sources" "$ROOT/.build/checkouts/EMSuiteUI/Sources"; do
     [[ -d "$d" ]] && { macemui_sources=("$d"); break; }
   done
-  # Without MacEMUI's sources every identifier of the window shell reads as missing; say why (mac4DSTEM#86).
-  (( ${#macemui_sources} )) || echo "  NOTE  no MacEMUI sources ($ROOT/../MacEMUI/Sources, $ROOT/.build/checkouts/MacEMUI/Sources); run swift package resolve"
+  # Without EMSuiteUI's sources every identifier of the window shell reads as missing; say why (mac4DSTEM#86).
+  (( ${#macemui_sources} )) || echo "  NOTE  no EMSuiteUI sources ($ROOT/../EMSuiteUI/Sources, $ROOT/.build/checkouts/EMSuiteUI/Sources); run swift package resolve"
   for id in $(grep -rhoE '"[a-z][A-Za-z]*\.[A-Za-z][A-Za-z0-9.]*"' "$ROOT/mac4DSTEMUITests" 2>/dev/null | tr -d '"' | sort -u); do
     [[ "$id" == workspace.* || "$id" == task.* || "$id" == detector.preset.* || "$id" == edx.export.* || "$id" == *.xcresult ]] && continue   # built from an enum raw value in the source
-    # the window shell's identifiers (toolbar, sidebar, inspector frames) are MacEMUI's since 2026-10-22
-    # MacEMUI: the sibling checkout on the developer's Mac, else the copy `swift package resolve` puts in .build/checkouts (CI).
+    # the window shell's identifiers (toolbar, sidebar, inspector frames) are EMSuiteUI's (MacEMUI until 2026-11) since 2026-10-22
+    # EMSuiteUI: the sibling checkout on the developer's Mac, else the copy `swift package resolve` puts in .build/checkouts (CI).
     grep -rqF "\"$id\"" "$ROOT/mac4DSTEM" "${macemui_sources[@]}" 2>/dev/null || { echo "  MISSING identifier $id"; rc=1; }
   done
 

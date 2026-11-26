@@ -129,7 +129,9 @@ extension Mac4DSTEMAgentDoor {
             There is no single right value for any of these: the defaults are scaled to the detector, and the right \
             threshold depends on the dataset's dynamic range. Find it by looking, as above, and say what you chose and why. \
             Only then, with the person's word, `run_task` over the whole scan; `get_window` disk_detection.scan_summary \
-            then gives disks per position, positions without disks and positions at max_peaks.
+            then gives disks per position, positions without disks and positions at max_peaks. `get_detected_disks` \
+            with x0, y0, x1 and y1 reads a rectangle of positions, `export_bragg_vectors` writes every position in one \
+            file, and `get_result_values` gives any result's numbers as Float32 (never read values back from a picture).
             """
 
         private static let phaseMappingText = """

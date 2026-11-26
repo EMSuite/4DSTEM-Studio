@@ -66,15 +66,23 @@ extension AppState {
     /// learned path takes its radius from that kernel's reference. Nothing
     /// calls this but the click; no default moves.
     func useProbeRadius(_ radius: Float) async {
-        guard radius.isFinite, radius > 0 else { return }
+        guard applyProbeRadius(radius) == nil else { return }
+        if probeKernel?.source == .synthetic { await generateProbeKernel() }
+    }
+
+    /// `useProbeRadius`'s instant part: the radius and the disk settings that follow it, without the kernel rebuild; the
+    /// refusal in words (also shown), or nil once taken. The agent door answers with what it changed (#515).
+    @discardableResult
+    func applyProbeRadius(_ radius: Float) -> String? {
+        guard radius.isFinite, radius > 0 else { return "The probe radius is a positive number of pixels." }
         if let descriptor, let refusal = Self.probeRadiusRefusal(radius: radius, qy: descriptor.qy, qx: descriptor.qx) {
             presentComputeFailure(SimpleError(refusal))
-            return
+            return refusal
         }
         calibrationSession.calibration.probeRadius = radius
         calibrationSession.provenance.probe = .manual
         refreshDiskDefaultsForMeasuredProbe()
-        if probeKernel?.source == .synthetic { await generateProbeKernel() }
+        return nil
     }
 
     /// Why a probe radius is not taken, or nil. A Bragg disk wider than half the pattern leaves no room for a second one:
@@ -256,11 +264,15 @@ extension AppState {
             return
         }
         diskDetection.liveDetectionInFlight = true
+        let scan = currentPatternScan
         await performLiveDetection()
         diskDetection.liveDetectionInFlight = false
         if diskDetection.liveDetectionPending {
             diskDetection.liveDetectionPending = false
+            detectedPatternScan = nil   // not ready until the re-run lands (#330)
             Task { await detectCurrentPattern() }
+        } else {
+            detectedPatternScan = scan
         }
     }
 

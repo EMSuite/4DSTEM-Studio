@@ -189,8 +189,8 @@ extension Mac4DSTEMAgentDoor {
                   summary: "Presses one of the Reconstruct workspace's buttons: the parallax stages in order (prepare_preview, "
                       + "align_next_level, reset_alignment, fit_aberrations, correct_phase, upsample_bf, depth_stack), "
                       + "use_parallax_fit (fills ptychography's probe from the parallax fit; check the rotation branch's sign), and "
-                      + "reconstruct_object (single-slice ptychography). A long step answers at once; get_window says busy until it "
-                      + "ends and get_log how.",
+                      + "reconstruct_object (single-slice ptychography). A long step answers at once with its run_id; get_window's "
+                      + "operation.finished_run_id reaches it when the step ends, and operation.last_run says how.",
                   input: .window,
                   parameters: [AgentParameter("step", .choice(ReconstructionStep.allCases.map(\.rawValue)), summary: "The button.",
                                               required: true)],
@@ -202,6 +202,7 @@ extension Mac4DSTEMAgentDoor {
                 return .refusal(status: 400, message: "Name a step.")
             }
             state.statusText = "An agent pressed \(step.rawValue) in Reconstruct."
+            var runID: Int?
             switch step {
             case .resetAlignment:
                 state.resetParallaxAlignment()
@@ -212,14 +213,16 @@ extension Mac4DSTEMAgentDoor {
                     return .refusal(status: 409, message: "There is no parallax aberration fit yet (fit_aberrations).")
                 }
                 state.usePtychographyProbeFromParallaxFit()
-            case .preparePreview: Task { _ = await state.prepareParallaxPreview() }
-            case .alignNextLevel: Task { _ = await state.alignParallaxNextLevel() }
-            case .correctPhase: Task { _ = await state.correctParallaxPhase() }
-            case .upsampleBF: Task { _ = await state.upsampleParallaxBF() }
-            case .depthStack: Task { _ = await state.computeParallaxDepthSections() }
-            case .reconstructObject: Task { _ = await state.runSingleslicePtychography() }
+            case .preparePreview: runID = state.agentRun(step.rawValue) { _ = await state.prepareParallaxPreview() }
+            case .alignNextLevel: runID = state.agentRun(step.rawValue) { _ = await state.alignParallaxNextLevel() }
+            case .correctPhase: runID = state.agentRun(step.rawValue) { _ = await state.correctParallaxPhase() }
+            case .upsampleBF: runID = state.agentRun(step.rawValue) { _ = await state.upsampleParallaxBF() }
+            case .depthStack: runID = state.agentRun(step.rawValue) { _ = await state.computeParallaxDepthSections() }
+            case .reconstructObject: runID = state.agentRun(step.rawValue) { _ = await state.runSingleslicePtychography() }
             }
-            return .json(["pressed": step.rawValue, "settings": reconstructionSettings(of: state)])
+            var answer: [String: Any] = ["pressed": step.rawValue, "settings": reconstructionSettings(of: state)]
+            if let runID { answer["run_id"] = runID }
+            return .json(answer)
         },
     ]
 

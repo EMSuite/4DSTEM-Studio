@@ -26,30 +26,47 @@ extension Mac4DSTEMAgentDoor {
         guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: folder.missingMessage)) }
         switch fileName(given, default: fallback, extension: ext) {
         case .failure(let refusal): return .failure(ToolRefusal(status: 400, message: refusal.message))
-        case .success(let name):
-            let target = root.appendingPathComponent(name)
-            guard (try? FileManager.default.attributesOfItem(atPath: target.path)) == nil else {
-                return .failure(ToolRefusal(status: 409, message: "\(name) exists in the Agent folder and is never replaced: choose another name."))
-            }
-            return .success(target)
+        case .success(let name): return newFileTarget(name, in: root)
         }
     }
 
     /// Writes a new file of the Agent folder that a writer makes by path (HDF5), as exclusively as `Data.write(.withoutOverwriting)`
-    /// writes the PNGs (#310): the writer fills a file in a scratch folder on the same volume, which then takes `target`'s name
-    /// with `renamex_np(RENAME_EXCL)`, so a file or link that appeared at `target` after the check is never replaced or followed.
+    /// writes the PNGs (#310): the writer fills a file in this Mac's temporary folder, whose bytes then go into `target` opened
+    /// with O_CREAT | O_EXCL | O_NOFOLLOW, so a file or link that appeared at `target` after the check is never replaced or followed.
+    ///
+    /// #514: the file was built on the Agent folder's own volume and published there with `renamex_np(RENAME_EXCL)`. On an exFAT
+    /// drive the export failed with "Operation not supported": exFAT has neither that rename nor, likely, the lock HDF5 takes on
+    /// the file it writes. The scratch now lives on the temporary folder's volume (APFS: both work), and the target needs only
+    /// O_EXCL, which every volume macOS writes has. A copy that fails leaves no part file behind.
     nonisolated static func writeNewFile(at target: URL, _ write: (URL) throws -> Void) throws {
-        let scratchFolder = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask,
-                                                        appropriateFor: target.deletingLastPathComponent(), create: true)
+        let scratchFolder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agent-export-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratchFolder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratchFolder) }   // try? OK: a leftover scratch folder holds no result
         let scratch = scratchFolder.appendingPathComponent(target.lastPathComponent)
         try write(scratch)
-        guard renamex_np(scratch.path, target.path, UInt32(RENAME_EXCL)) == 0 else {
+        try copyAsNewFile(from: scratch, to: target)
+    }
+
+    /// `source`'s bytes as a NEW file at `target` (O_EXCL, links not followed); `target` is removed again when the copy fails.
+    nonisolated static func copyAsNewFile(from source: URL, to target: URL) throws {
+        let fd = open(target.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o644)
+        guard fd >= 0 else {
             let code = errno
-            if code == EEXIST {
-                throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: target.path])
-            }
+            if code == EEXIST { throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: target.path]) }
             throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
+        }
+        let output = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        do {
+            let input = try FileHandle(forReadingFrom: source)
+            defer { try? input.close() }
+            while let chunk = try input.read(upToCount: 8 << 20), !chunk.isEmpty { try output.write(contentsOf: chunk) }
+            try output.synchronize()
+            try output.close()
+        } catch {
+            try? output.close()
+            unlink(target.path)   // the file this call created, never another's: O_EXCL made it ours
+            throw error
         }
     }
 
@@ -80,11 +97,12 @@ extension Mac4DSTEMAgentDoor {
                       + "the view, an EMD RealSlice .h5; for the phase map, the phase label, verdict, distance, contrast and matched count of every "
                       + "position), bundle (every strain and orientation field of the session, one .h5) or "
                       + "figure (the result and the pattern side by side, in the format Settings names). Needs \"Let agents save "
-                      + "results there\"; never replaces a file. A long write answers at once; get_log says when it is done.",
+                      + "results there\"; never replaces a file. It answers once the file is written, or with the error when it is "
+                      + "not; get_window's operation.last_export keeps the outcome.",
                   input: .window,
                   parameters: [
                       AgentParameter("what", .choice(["data", "bundle", "figure"]), summary: "What to write.", required: true),
-                      AgentParameter("name", .text, summary: "The file name, without folders; the extension is added."),
+                      AgentParameter("name", .text, summary: "The file name, sub-folders with /; the extension is added."),
                       AgentParameter("figure_panels", .text, summary: "Figure only: the panels, comma-separated ids (result, pattern, "
                                          + "map.eds); leave out for every panel there is."),
                       AgentParameter("figure_detector", .boolean, summary: "Figure only: outline the virtual detector on the pattern."),
@@ -151,26 +169,23 @@ extension Mac4DSTEMAgentDoor {
             case .success(let url): target = url
             }
             let calibration = state.sessionPixelCalibration(descriptor: descriptor)
-            let token = state.beginCancellableOperation("Export data", status: "Writing \(target.lastPathComponent)…", totalUnits: maps.count)
-            let source = descriptor.filePath
-            Task { @MainActor in
-                defer { state.finishCancellableOperation(token) }
-                do {
-                    try await Task.detached(priority: .userInitiated) {
-                        try Mac4DSTEMAgentDoor.writeNewFile(at: target) { scratch in
-                            try BraggVectorEMDWriter.writeScientificBundle(maps: maps, calibration: calibration, to: scratch,
-                                                                           sourcePath: source, cancellation: token)
-                        }
-                    }.value
-                    guard state.isCurrentOperation(token) else { return }
-                    state.recordExportRun(format: what == "bundle" ? "emd_scientific_bundle" : "emd_realslice",
-                                          fileName: target.lastPathComponent, productKind: maps.first?.kind)
-                    state.statusText = "An agent exported \(maps.count) field(s) → \(target.lastPathComponent) in the Agent folder."
-                } catch {
-                    state.statusText = "An agent's export failed: \(error.localizedDescription)"
+            // Written before the answer (#514), so the answer is the outcome: a result's fields are scan-sized maps, a fraction of a
+            // second to write. The window is not busy (checked above), so no read holds the HDF5 lock for long.
+            do {
+                try writeNewFile(at: target) { scratch in
+                    try BraggVectorEMDWriter.writeScientificBundle(maps: maps, calibration: calibration, to: scratch,
+                                                                   sourcePath: descriptor.filePath)
                 }
+            } catch {
+                state.agentExportFailed(target.lastPathComponent, error)
+                return .refusal(status: 500, message: "\(target.lastPathComponent) was not written: \(error.localizedDescription)")
             }
-            return .json(["writing": target.lastPathComponent, "fields": maps.map(\.kind)])
+            state.recordExportRun(format: what == "bundle" ? "emd_scientific_bundle" : "emd_realslice",
+                                  fileName: target.lastPathComponent, productKind: maps.first?.kind)
+            state.agentLastExport = AgentExportOutcome(file: target.lastPathComponent, state: .written)
+            state.statusText = "An agent exported \(maps.count) field(s) → \(target.lastPathComponent) in the Agent folder."
+            return .json(["saved": folder.relativePath(of: target), "fields": maps.map(\.kind),
+                          "bytes": (try? FileManager.default.attributesOfItem(atPath: target.path)[.size] as? Int) ?? NSNull()])
         },
         AgentTool(name: "compare_results", title: "Compare saved results",
                   summary: "Loads saved results of this session into the comparison's A and B, as Set as A and Set as B do, or clears "
@@ -198,8 +213,10 @@ extension Mac4DSTEMAgentDoor {
                 loads.append((result, slot))
             }
             state.statusText = agentChangeLine("the comparison", call.arguments)
-            Task { for (result, slot) in loads { await state.loadSavedSessionResult(result, into: slot) } }
-            return .json(["loading": loads.map { ["slot": $0.1 == .a ? "a" : "b", "id": $0.0.id] },
+            let id = state.agentRun("compare_saved_results") {
+                for (result, slot) in loads { await state.loadSavedSessionResult(result, into: slot) }
+            }
+            return .json(["loading": loads.map { ["slot": $0.1 == .a ? "a" : "b", "id": $0.0.id] }, "run_id": id,
                           "saved_results": savedResults(of: state)])
         },
         AgentTool(name: "show_quality_field", title: "Inspect quality field",
@@ -241,8 +258,9 @@ extension Mac4DSTEMAgentDoor {
             if case .failure(let refusal) = state.replay.lineage.rewindPlan(to: step) {
                 return .refusal(status: 404, message: refusal.description)
             }
-            Task { await state.rewindLineage(to: step) }
-            return .json(["rewinding_to": step, "note": "get_window's status says when it is done, or why it was refused."])
+            let id = state.agentRun("rewind_lineage") { await state.rewindLineage(to: step) }
+            return .json(["rewinding_to": step, "run_id": id,
+                          "note": "get_window's operation.last_run says when it is done; its status_line says why if refused."])
         },
         AgentTool(name: "reopen_full_extent", title: "Reopen at Full Extent",
                   summary: "Reopens a cropped or binned dataset at its full extent and replays the recorded recipe on it, as Reopen at "
@@ -252,8 +270,8 @@ extension Mac4DSTEMAgentDoor {
             guard !state.agentBusy else { return busyRefusal }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             state.statusText = "An agent pressed Reopen at Full Extent."
-            Task { await state.promoteAndReplayRecipe() }
-            return .json(["started": true])
+            let id = state.agentRun("reopen_full_extent") { await state.promoteAndReplayRecipe() }
+            return .json(["started": true, "run_id": id])
         },
     ]
 
@@ -276,5 +294,32 @@ extension Mac4DSTEMAgentDoor {
 
     static func savedResults(of state: AppState) -> [[String: Any]] {
         state.sessionInventory.results.map { ["id": $0.id, "name": $0.displayName, "kind": $0.kind] }
+    }
+}
+
+/// How the agent door's last export ended (#514), for get_window's `operation.last_export`.
+struct AgentExportOutcome: Equatable {
+    enum State: String { case writing, written, failed, cancelled }
+    let file: String
+    let state: State
+    var error: String?
+    let at = Date()
+
+    var json: [String: Any] {
+        ["file": file, "state": state.rawValue, "error": AgentJSON.orNull(error),
+         "at": ISO8601DateFormatter().string(from: at)]
+    }
+}
+
+extension AppState {
+    /// An export the door started did not write its file (#514): the agent's next get_window says so, and the person sees it where
+    /// they look, the alert the Export menu's own failures raise (`present`), unless the room already shows it (`alert` false).
+    func agentExportFailed(_ file: String, _ error: Error, alert: Bool = true) {
+        agentLastExport = AgentExportOutcome(file: file, state: .failed, error: error.localizedDescription)
+        if alert {
+            present(SimpleError("An agent's export of \(file) failed: \(error.localizedDescription)"))
+        } else {
+            statusText = "An agent's export of \(file) failed: \(error.localizedDescription)"
+        }
     }
 }

@@ -751,6 +751,8 @@ extension AppState {
         resultPresentation.setBraggPeakCount(nil)
         currentPeaks = []
         currentDiskDiagnostics = nil
+        currentPatternScan = nil
+        detectedPatternScan = nil
         // L3 step 3 — "a real-space crop makes existing scan-indexed results
         // AMBIGUOUS, not stale" — is satisfied here rather than by a second
         // mechanism, and deliberately so. Changing the load specification is a
@@ -1365,9 +1367,11 @@ extension AppState {
 
         do {
             let epoch = datasetSession.epoch
-            let pattern = try await fourD.pattern(ry: selectedScan.y, rx: selectedScan.x)
+            let scan = selectedScan
+            let pattern = try await fourD.pattern(ry: scan.y, rx: scan.x)
             guard epoch == datasetSession.epoch else { return }
             currentPattern = pattern
+            currentPatternScan = scan
             patternVersion &+= 1
             showReadout(OpeningAnalysis.patternReadout(selectedScan))   // a readout, not an event
             await detectCurrentPattern()

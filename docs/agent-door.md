@@ -206,3 +206,40 @@ one pane's zoom (`pane` pattern, result or comparison; `zoom` fit, in or out, as
 result's display `orientation` (0, 90, 180, 270) and `mirrored` (display only, not the R–Q rotation), the pattern's
 `fit_overlay`, and the comparison's `same_scale`. Nothing computed changes. `get_window`'s `view.display` says each pane's zoom
 (null when the pane is not on screen) and the rest.
+
+## For scripts (issues #330, #514, #515)
+
+- **Exports answer with their outcome (#514).** `export_result` writes its file before it answers: `saved` with the bytes, or
+  the call is an error that names why (a read-only folder, a full disk). `get_window`'s `operation.last_export` keeps the last
+  export's file, its state (`writing`, `written`, `failed`, `cancelled`) and its error; `preprocess`, which runs on, is read
+  there. A failed export also raises the window's alert, as the Export menu's own failures do. The .h5 is built in this Mac's
+  temporary folder and copied into the Agent folder as a new file, so a drive without exclusive renames or file locks (exFAT)
+  takes it.
+- **Runs say when they end (#330).** Every tool that starts a run (`run_task`, `run_calibration`, `build_probe_kernel`,
+  `set_probe_radius`, `run_reconstruction_step`, `find_matrix_zone_axis`, `open_file`, `open_demo`, `rewind_lineage`,
+  `reopen_full_extent`, loading saved results to compare) answers a `run_id`. `get_window`'s `operation.finished_run_id`
+  reaches that id when the run ends, and `operation.last_run` holds its state (`running`, `finished`, `failed`), its error, the
+  status line it ended on (a cancel or a refusal says so there), its length in seconds and `changed_disk_settings`, each disk
+  setting it moved with `from` and `to`. A script waits on the id, never on `busy` alone.
+- **The pattern says when it belongs to the position (#330).** `select_scan_position` answers before the pattern loads.
+  `get_detected_disks` and `get_window`'s `pattern` carry `ready`: true once the pattern on screen is the selected position's
+  and, in the Disks task with a kernel, its live detection has finished on it; `pattern_scan_position` names the position the
+  disks were found on.
+- **Origin and result numbers (#330).** `get_window`'s calibration gives `origin_fit_rms_px` (the status line's fit RMS) and
+  `origin_method`: `centre_of_mass`, `friedel`, `bragg_peaks` or `manual` from the run in force, else `file`, `session` or null
+  for the detector's middle. The displayed result carries `statistics` over its valid finite pixels: `count_finite`, `mean`,
+  `std` (population, numpy's default ddof 0), `min` and `max`; null for a colour result.
+- **A fresh start on a file (#330).** `open_file` with `without_session` true opens the file with its saved session left aside,
+  as Reopen Without Session does: the session file is neither read nor changed.
+- **Numbers as numbers (#515).** `get_result_values` gives the displayed result's fields (those `export_result` data writes,
+  then its quality fields) as Float32: `format` npy saves numpy's .npy into the Agent folder, base64 answers the raw
+  little-endian bytes inline up to 4 MB; rows are scan rows. `export_bragg_vectors` writes every position's disks in one file:
+  h5 (py4DSTEM's BraggVectors in EMD 1.0, as the session file keeps them) or csv (`scan_x, scan_y, x_px, y_px, intensity`).
+  `get_detected_disks` with `x0`, `y0`, `x1`, `y1` reads a rectangle of up to 10 000 positions from the whole-scan detection.
+- **Side effects in the answer (#515).** `set_probe_radius` answers `changed_disk_settings` (each setting the radius moved, with
+  `from` and `to`), and a synthetic kernel's rebuild is a run with its own `run_id`; `build_probe_kernel`'s changes are in
+  `operation.last_run`, as every run's are.
+- **A deeper Agent folder (#515).** `list_agent_folder` names the folder's `absolute_path` and takes `path` (one subfolder),
+  `pattern` (a shell glob on the file name, or on the whole path when it holds a `/`), `offset` and `limit`; `total` counts
+  every match and `more` says a next page exists. Every save name may hold sub-folders (`maps/run 1/strain`): each part follows
+  the file-name rule, the folders are made, and one that leads out of the Agent folder by a link is refused.

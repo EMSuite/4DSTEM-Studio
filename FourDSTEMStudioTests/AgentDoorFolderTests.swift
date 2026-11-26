@@ -78,6 +78,47 @@ final class AgentDoorFolderTests: XCTestCase {
         let files = try XCTUnwrap((try JSONSerialization.jsonObject(with: Data(listed.text.utf8)) as? [String: Any])?["files"] as? [[String: Any]])
         XCTAssertEqual(files.compactMap { $0["path"] as? String }, ["a.dm4", "sub/b.h5", "taken.png"])
         XCTAssertEqual(files.first?["bytes"] as? Int, 1)
+
+        // #515: a subfolder, a glob, pages, and the absolute path.
+        func paths(_ arguments: [String: Any]) async throws -> (paths: [String], answer: [String: Any]) {
+            let listed = try await call("list_agent_folder", arguments)
+            XCTAssertFalse(listed.refused, listed.text)
+            let answer = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(listed.text.utf8)) as? [String: Any])
+            let files = try XCTUnwrap(answer["files"] as? [[String: Any]])
+            return (files.compactMap { $0["path"] as? String }, answer)
+        }
+        let all = try await paths([:])
+        XCTAssertTrue((all.answer["absolute_path"] as? String ?? "").hasSuffix("/Agent"), "\(all.answer)")
+        XCTAssertEqual(all.answer["total"] as? Int, 3)
+        let found0 = try await paths(["pattern": "*.h5"]).paths
+        XCTAssertEqual(found0, ["sub/b.h5"])
+        let found1 = try await paths(["pattern": "sub/*"]).paths
+        XCTAssertEqual(found1, ["sub/b.h5"])
+        let found2 = try await paths(["path": "sub"]).paths
+        XCTAssertEqual(found2, ["sub/b.h5"])
+        let page = try await paths(["offset": 1, "limit": 1])
+        XCTAssertEqual(page.paths, ["sub/b.h5"])
+        XCTAssertEqual(page.answer["more"] as? Bool, true)
+        let out = try await call("list_agent_folder", ["path": "../Elsewhere"])
+        XCTAssertTrue(out.refused, out.text)
+    }
+
+    /// #515: a save may name sub-folders inside the Agent folder; they are made, and one that leads out by a link is refused.
+    /// Mutation: the target's folder not checked after it is made - red at the link.
+    func testSavesMayNameSubFoldersInsideTheFolder() throws {
+        Mac4DSTEMAgentDoor.folder.use(folder: root)
+        Mac4DSTEMAgentDoor.savesAllowed = true
+        let saved = Mac4DSTEMAgentDoor.saveNewFile(Data("x".utf8), named: "maps/run 1/table", default: "x", extension: "csv")
+        XCTAssertEqual(try? saved.get(), "maps/run 1/table.csv")
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("maps/run 1/table.csv")), Data("x".utf8))
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("away"), withDestinationURL: outside)
+        let leaked = Mac4DSTEMAgentDoor.saveNewFile(Data("x".utf8), named: "away/table", default: "x", extension: "csv")
+        guard case .failure(let refusal) = leaked else { return XCTFail("a save followed a link out of the folder") }
+        XCTAssertTrue(refusal.message.contains("outside the Agent folder"), refusal.message)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.appendingPathComponent("table.csv").path))
+        let deeper = Mac4DSTEMAgentDoor.saveNewFile(Data("x".utf8), named: "away/new/table", default: "x", extension: "csv")
+        guard case .failure = deeper else { return XCTFail("a save made folders through a link out of the folder") }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.appendingPathComponent("new").path))
     }
 
     /// Opening acts: refused until runs are allowed, and refused for anything outside the folder or missing.
@@ -104,6 +145,24 @@ final class AgentDoorFolderTests: XCTestCase {
         let aFolder = try await call("open_file", ["path": "sub"])
         XCTAssertTrue(aFolder.refused)
         withExtendedLifetime(state) {}
+    }
+
+    /// #330: without_session leaves the saved session aside for that open (Reopen Without Session's one-shot skip), and the
+    /// answer names its run. Mutation: the argument ignored - red.
+    func testOpeningWithoutTheSessionSetsTheOneShotSkip() async throws {
+        let state = AppState()
+        door.enroll(state) { [weak state] in state?.agentSummary() ?? [:] }
+        Mac4DSTEMAgentDoor.folder.use(folder: root)
+        door.runsAllowed = true
+        let skips = state.agentRunSerial
+        let opened = try await call("open_file", ["path": "a.dm4", "without_session": true])
+        XCTAssertFalse(opened.refused, opened.text)
+        let answer = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(opened.text.utf8)) as? [String: Any])
+        XCTAssertEqual(answer["without_session"] as? Bool, true)
+        XCTAssertEqual(answer["run_id"] as? Int, skips + 1)
+        // The file is not a real dm4, so the open fails before any session is read: the skip still names this file.
+        for _ in 0..<500 where (state.agentFinishedRunID ?? 0) < skips + 1 { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(state.ignoreSessionForDatasetID?.hasSuffix("/a.dm4") == true, "\(state.ignoreSessionForDatasetID ?? "nil")")
     }
 
     /// #313: during an analysis, open_file is refused with a sentence that names the run, and the run goes on; the window's own
@@ -168,7 +227,14 @@ final class AgentDoorFolderTests: XCTestCase {
         XCTAssertEqual(try? Mac4DSTEMAgentDoor.fileName(nil, default: "scan (2)/a_result").get(), "scan _2__a_result.png")
         XCTAssertEqual(try? Mac4DSTEMAgentDoor.fileName("", default: ".hidden").get(), "_hidden.png")
         XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("../x", default: "x").get())
-        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a/b", default: "x").get())
+        // #515: sub-folders, each part by the same rule.
+        XCTAssertEqual(try? Mac4DSTEMAgentDoor.fileName("a/b", default: "x").get(), "a/b.png")
+        XCTAssertEqual(try? Mac4DSTEMAgentDoor.fileName("maps/run 1/strain.png", default: "x").get(), "maps/run 1/strain.png")
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a/../b", default: "x").get())
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("/abs/b", default: "x").get())
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a//b", default: "x").get())
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a/.hidden/b", default: "x").get())
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a/", default: "x").get())
         XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName(".x", default: "x").get())
     }
 }

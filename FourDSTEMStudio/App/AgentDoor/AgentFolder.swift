@@ -111,28 +111,54 @@ final class AgentFolder {
         return candidate.path == url.path || candidate.path.hasPrefix(root)
     }
 
-    /// The files in the folder and its subfolders (hidden ones and packages' insides left out), at most `limit`, sorted by path:
-    /// relative path, size in bytes and modification date (ISO 8601).
-    func listing(limit: Int = 2000) -> (files: [[String: Any]], truncated: Bool)? {
+    /// One page of the files in the folder and its subfolders (hidden ones and packages' insides left out), sorted by path:
+    /// relative path, size in bytes and modification date (ISO 8601). `under` keeps one subfolder; `pattern` is a shell glob
+    /// (`*.h5`, `maps/*_strain.*`) matched against the file name, or against the whole relative path when it holds a `/`
+    /// (#515). `offset` and `limit` page through the sorted list; `total` counts every match, so a script knows when it has all.
+    func listing(under: String? = nil, pattern: String? = nil, offset: Int = 0,
+                 limit: Int = 2000) -> Result<(files: [[String: Any]], total: Int, truncated: Bool), AgentFolderRefusal>? {
         guard let url else { return nil }
+        var start = url
+        if let under, !under.trimmingCharacters(in: .whitespaces).isEmpty {
+            switch resolve(under) {
+            case .failure(let refusal): return .failure(refusal)
+            case .success(let folder):
+                var isFolder: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isFolder), isFolder.boolValue else {
+                    return .failure(AgentFolderRefusal("There is no folder \(under) in the Agent folder."))
+                }
+                start = folder
+            }
+        }
         let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
-        guard let walk = FileManager.default.enumerator(at: url, includingPropertiesForKeys: keys,
+        guard let walk = FileManager.default.enumerator(at: start, includingPropertiesForKeys: keys,
                                                         options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return nil }
-        let dates = ISO8601DateFormatter()
-        var files: [[String: Any]] = []
+        var found: [(path: String, values: URLResourceValues)] = []
         var truncated = false
         for case let file as URL in walk {
             guard let values = try? file.resourceValues(forKeys: Set(keys)), values.isRegularFile == true else { continue }
             let inside = Self.canonical(file)
             guard contains(inside) else { continue }   // a link that leads out is not listed
-            guard files.count < limit else { truncated = true; break }
-            var entry: [String: Any] = ["path": relativePath(of: inside), "bytes": values.fileSize ?? 0]
-            if let date = values.contentModificationDate { entry["modified"] = dates.string(from: date) }
-            files.append(entry)
+            let path = relativePath(of: inside)
+            if let pattern, !pattern.isEmpty {
+                let subject = pattern.contains("/") ? path : inside.lastPathComponent
+                guard fnmatch(pattern, subject, 0) == 0 else { continue }
+            }
+            guard found.count < Self.walkLimit else { truncated = true; break }
+            found.append((path, values))
         }
-        files.sort { ($0["path"] as? String ?? "") < ($1["path"] as? String ?? "") }
-        return (files, truncated)
+        found.sort { $0.path < $1.path }
+        let dates = ISO8601DateFormatter()
+        let page = found.dropFirst(max(offset, 0)).prefix(max(limit, 0)).map { item -> [String: Any] in
+            var entry: [String: Any] = ["path": item.path, "bytes": item.values.fileSize ?? 0]
+            if let date = item.values.contentModificationDate { entry["modified"] = dates.string(from: date) }
+            return entry
+        }
+        return .success((Array(page), found.count, truncated))
     }
+
+    /// The most files one listing walks before it stops and says `truncated` (the page is cut from these).
+    static let walkLimit = 200_000
 
     /// `file`'s path below the folder.
     func relativePath(of file: URL) -> String {

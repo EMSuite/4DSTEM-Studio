@@ -42,9 +42,20 @@ extension Mac4DSTEMAgentDoor {
                 return .refusal(status: 400, message: "The radius is a positive number of pixels that fits the detector\(limit).")
             }
             state.statusText = "An agent set the probe radius: \(numberText(Double(radius))) px."
-            Task { await noteDiskSettingChanges(of: state, by: "The probe radius") { await state.useProbeRadius(radius) } }
-            return .json(["probe_radius_px": Double(radius),
-                          "rebuilds_kernel": state.probeKernel?.source == .synthetic])
+            // The radius and the disk settings that follow it change now, so the answer names them (#515); a synthetic kernel
+            // is rebuilt after, as a run.
+            let before = state.diskDetection.diskParams
+            if let refusal = state.applyProbeRadius(radius) { return .refusal(status: 409, message: refusal) }
+            let after = state.diskDetection.diskParams
+            if let line = diskChangeLine(from: before, to: after, by: "The probe radius") { state.statusText = line }
+            var answer: [String: Any] = ["probe_radius_px": Double(radius), "changed_disk_settings": diskChanges(from: before, to: after),
+                                         "rebuilds_kernel": state.probeKernel?.source == .synthetic]
+            if state.probeKernel?.source == .synthetic {
+                answer["run_id"] = state.agentRun("set_probe_radius") {
+                    await noteDiskSettingChanges(of: state, by: "Build Kernel") { await state.generateProbeKernel() }
+                }
+            }
+            return .json(answer)
         },
         AgentTool(name: "build_probe_kernel", title: "Build kernel",
                   summary: "Builds the probe kernel, as Build Kernel does: synthetic (a disk at the probe radius), current_pattern (the "
@@ -71,7 +82,7 @@ extension Mac4DSTEMAgentDoor {
                 return .refusal(status: 404, message: "No pattern is on screen to build the kernel from.")
             }
             state.statusText = "An agent pressed Build Kernel (\(source.rawValue))."
-            Task {
+            let id = state.agentRun("build_probe_kernel") {
                 await noteDiskSettingChanges(of: state, by: "Build Kernel") {
                     switch source {
                     case .synthetic: await state.generateProbeKernel()
@@ -81,7 +92,8 @@ extension Mac4DSTEMAgentDoor {
                 }
             }
             var answer: [String: Any] = ["building": source.rawValue,
-                                         "mode": source == .synthetic ? "sigmoid_trench" : ModeChoice(mode).rawValue]
+                                         "mode": source == .synthetic ? "sigmoid_trench" : ModeChoice(mode).rawValue,
+                                         "run_id": id]
             if source == .synthetic, call.arguments["mode"] != nil {   // said, not ignored silently (#266)
                 answer["note"] = "mode applies to current_pattern and file_probe only; a synthetic kernel is always sigmoid_trench."
             }
@@ -148,6 +160,16 @@ extension Mac4DSTEMAgentDoor {
     /// A number as door text: six significant digits with a point, never the Mac's decimal comma (`String(format:)` without a
     /// locale is POSIX), so a Float setting reads 0.0005, not 0.000500000024.
     static func numberText(_ value: Double) -> String { String(format: "%.6g", value) }
+
+    /// Each disk setting that moved, as {"from", "to"}: what a changing tool answers (#515) and `last_run` keeps (#330).
+    static func diskChanges(from before: DiskDetectionParams, to after: DiskDetectionParams) -> [String: [String: Double]] {
+        var changes: [String: [String: Double]] = [:]
+        for setting in DiskSetting.all {
+            let old = setting.read(before), new = setting.read(after)
+            if old != new { changes[setting.parameter.name] = ["from": old, "to": new] }
+        }
+        return changes
+    }
 
     /// "<action> also changed disk detection: name old → new, ...", or nil when nothing changed.
     static func diskChangeLine(from before: DiskDetectionParams, to after: DiskDetectionParams, by action: String) -> String? {

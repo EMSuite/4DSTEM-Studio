@@ -133,7 +133,8 @@ extension Mac4DSTEMAgentDoor {
                       + "does: scan and detector crop, detector binning, scan stride and the hot-pixel filter. The source never "
                       + "changes. Where: ask the person in the chat first. Then either name (a new file in the Agent folder; needs "
                       + "\"Let agents save results there\") or ask_person true (the Mac's Save dialog, the person picks). open_after "
-                      + "true opens the copy in this window when it is written. It answers at once; get_window says busy until done.",
+                      + "true opens the copy in this window when it is written. It answers at once; get_window says busy until done, and its "
+                      + "operation.last_export says whether the copy was written or why not.",
                   input: .window,
                   parameters: reductionParameters + [
                       AgentParameter("scan_stride", .integer(1...1024), summary: "Keep every n-th scan position."),
@@ -177,23 +178,25 @@ extension Mac4DSTEMAgentDoor {
                 switch fileName(a["name"], default: suggested, extension: "h5") {
                 case .failure(let refusal): return .refusal(status: 400, message: refusal.message)
                 case .success(let name):
-                    let target = root.appendingPathComponent(name)
-                    guard (try? FileManager.default.attributesOfItem(atPath: target.path)) == nil else {
-                        return .refusal(status: 409, message: "\(name) exists in the Agent folder and is never replaced: choose another name.")
+                    switch newFileTarget(name, in: root) {
+                    case .success(let target): destination = target
+                    case .failure(let refusal): return .refusal(status: refusal.status, message: refusal.message)
                     }
-                    destination = target
                 }
             }
             let openAfter = a["open_after"] == "true"
             state.statusText = "An agent started preprocessing into \(quotedAgentText(destination.lastPathComponent))."
+            state.agentLastExport = AgentExportOutcome(file: destination.lastPathComponent, state: .writing)
             state.writePreprocessed(pending: pending, to: destination) { outcome in
                 switch outcome {
                 case .wrote(let message):
+                    state.agentLastExport = AgentExportOutcome(file: destination.lastPathComponent, state: .written)
                     state.statusText = "An agent preprocessed: " + message
                     if openAfter { Task { await state.openFileAsync(url: destination) } }
                 case .failed(let message):
-                    state.statusText = "An agent's preprocessing failed: " + message
+                    state.agentExportFailed(destination.lastPathComponent, SimpleError(message), alert: false)   // the sheet shows it
                 case .cancelled:
+                    state.agentLastExport = AgentExportOutcome(file: destination.lastPathComponent, state: .cancelled)
                     state.statusText = "An agent's preprocessing was cancelled."
                 }
             }

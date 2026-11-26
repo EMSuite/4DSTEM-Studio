@@ -116,13 +116,14 @@ extension Mac4DSTEMAgentDoor {
                 return .refusal(status: 400, message: "Name the step.")
             }
             let session = state.calibrationSession
+            var runID: Int?
             switch step {
             case .origin:
                 if let method = call.arguments["origin_method"].flatMap(OriginMethod.init(rawValue:)) { session.originMethod = method }
-                Task { await state.calibrateOrigin() }
+                runID = state.agentRun(step.rawValue) { await state.calibrateOrigin() }
             case .originFromBraggPeaks:
                 // One call, as the row's button (#511): Detect All Disks when no current detection exists, then the origin.
-                Task { await state.originFromBraggPeaksInOneStep() }
+                runID = state.agentRun(step.rawValue) { await state.originFromBraggPeaksInOneStep() }
             case .ellipse:
                 let inner = call.arguments["fit_inner_px"].flatMap(Double.init) ?? session.ellipseFitInnerRadius
                 let outer = call.arguments["fit_outer_px"].flatMap(Double.init) ?? session.ellipseFitOuterRadius
@@ -131,15 +132,15 @@ extension Mac4DSTEMAgentDoor {
                 }
                 session.ellipseFitInnerRadius = inner
                 session.ellipseFitOuterRadius = outer
-                Task { await state.calibrateEllipse() }
+                runID = state.agentRun(step.rawValue) { await state.calibrateEllipse() }
             case .rotation:
-                Task { await state.calibrateRotation() }
+                runID = state.agentRun(step.rawValue) { await state.calibrateRotation() }
             case .qFromMaterial:
                 guard state.hasCurrentBraggVectors, state.resolvedACOMModel != nil else {
                     return .refusal(status: 409, message: "This needs detected disks (run_task in Disks) and ACOM's phase model "
                         + "(set_acom phase_cif).")
                 }
-                Task { await state.calibrateQFromCrystal() }
+                runID = state.agentRun(step.rawValue) { await state.calibrateQFromCrystal() }
             case .restoreFittedOrigin:
                 state.restoreFittedOrigin()
             case .fitDistortionFromSpots:
@@ -149,7 +150,7 @@ extension Mac4DSTEMAgentDoor {
                         ? " Through the door: add_phase (the first phase is the matrix) or set_acom phase_cif names the matrix crystal." : ""
                     return .refusal(status: 409, message: blocker + door)
                 }
-                Task { await state.fitDistortionFromSpots() }
+                runID = state.agentRun(step.rawValue) { await state.fitDistortionFromSpots() }
             case .applySpotDistortion:
                 guard state.spotDistortion.pending != nil else {
                     return .refusal(status: 409, message: "There is no spot distortion fit to apply (fit_distortion_from_spots).")
@@ -183,7 +184,9 @@ extension Mac4DSTEMAgentDoor {
                 state.applyManualEllipse(a: a, b: b, thetaDegrees: call.arguments["ellipse_theta_deg"].flatMap(Double.init) ?? 0)
             }
             state.statusText = "An agent started \(step.title)."
-            return .json(["started": step.rawValue])
+            var answer: [String: Any] = ["started": step.rawValue]
+            if let runID { answer["run_id"] = runID }
+            return .json(answer)
         },
     ]
 

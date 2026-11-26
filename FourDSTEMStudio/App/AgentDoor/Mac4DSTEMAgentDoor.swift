@@ -80,7 +80,7 @@ enum Mac4DSTEMAgentDoor {
     static var allTools: [AgentTool] {
         guideTools + tools + runTools + kernelTools
             + scanMapTools + taskTools + folderTools
-            + calibrationTools + phaseTools + analysisTools + imagingTools + precipitateTools + preprocessTools + actionTools + resultTools
+            + calibrationTools + phaseTools + analysisTools + imagingTools + precipitateTools + preprocessTools + actionTools + resultTools + valueTools
             + edsTools
             + personTools
             + phaseLibraryTools
@@ -158,9 +158,25 @@ enum Mac4DSTEMAgentDoor {
             return .json(values)
         },
         AgentTool(name: "get_detected_disks", title: "Detected disks",
-                  summary: "The detected Bragg disks of the pattern on screen: position in detector pixels and correlation intensity.",
-                  input: .window) { call in
+                  summary: "The detected Bragg disks of the pattern on screen: position in detector pixels and correlation intensity; "
+                      + "ready says they belong to the selected scan position. With x0, y0, x1 and y1 it reads a rectangle of scan "
+                      + "positions (corners included, at most 10 000) from the whole-scan detection instead; export_bragg_vectors "
+                      + "writes every position.",
+                  input: .window,
+                  parameters: [
+                      AgentParameter("x0", .integer(0...100_000), summary: "Rectangle: first scan column."),
+                      AgentParameter("y0", .integer(0...100_000), summary: "Rectangle: first scan row."),
+                      AgentParameter("x1", .integer(0...100_000), summary: "Rectangle: last scan column."),
+                      AgentParameter("y1", .integer(0...100_000), summary: "Rectangle: last scan row."),
+                  ]) { call in
             guard let state = call.window?.state as? AppState else { return Mac4DSTEMAgentDoor.notAWindow }
+            let corners = ["x0", "y0", "x1", "y1"].map { call.arguments[$0].flatMap(Int.init) }
+            if corners.contains(where: { $0 != nil }) {
+                guard let x0 = corners[0], let y0 = corners[1], let x1 = corners[2], let y1 = corners[3] else {
+                    return .refusal(status: 400, message: "A rectangle needs x0, y0, x1 and y1.")
+                }
+                return Mac4DSTEMAgentDoor.peaksInRectangle(of: state, x0: x0, y0: y0, x1: x1, y1: y1)
+            }
             return .json(state.agentPeaks)
         },
         AgentTool(name: "get_lineage", title: "Recipe and lineage",

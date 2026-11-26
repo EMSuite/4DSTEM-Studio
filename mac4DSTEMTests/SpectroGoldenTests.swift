@@ -391,6 +391,8 @@ final class SpectroGoldenTests: XCTestCase {
         try XCTSkipIf(ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 27, "baseline recorded on macOS 27; bit-exact only there")
         let scenarios = try await SpectroGolden.scenarios()
         XCTAssertEqual(scenarios.count, 7)
+        // Every moved scenario goes into one failure message: the CI summary prints only the first message of a test.
+        var moved: [String] = []
         for s in scenarios {
             let url = SpectroGolden.baselineDirectory.appendingPathComponent(s.name + ".txt")
             let recorded = try String(contentsOf: url, encoding: .utf8)
@@ -405,7 +407,8 @@ final class SpectroGoldenTests: XCTestCase {
                 case let .insert(offset, line, _): changes.append("+ \(offset + 1) \(line)")
                 }
             }
-            XCTFail("\(s.name) moved, \(changes.count) line change(s):\n" + changes.prefix(300).joined(separator: "\n"))
+            moved.append("\(s.name) moved, \(changes.count) line change(s):\n" + changes.prefix(300).joined(separator: "\n"))
         }
+        if !moved.isEmpty { XCTFail(moved.joined(separator: "\n")) }
     }
 }

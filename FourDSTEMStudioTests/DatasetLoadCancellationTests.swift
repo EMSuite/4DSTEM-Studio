@@ -1,0 +1,198 @@
+//
+//  DatasetLoadCancellationTests.swift
+//  Cancelling an open. Requested by the release owner 2026-08-18: picking the
+//  wrong file left quitting the app as the only exit.
+//
+//  The property that matters is not "the button works" — it is that a cancelled
+//  open leaves NOTHING behind that looks loaded. A half-loaded dataset showing
+//  dimensions and a calibration for a cube whose pixels were never read would be
+//  worse than having no cancel at all, because every number computed afterwards
+//  would be about data the app never finished reading.
+//
+
+import XCTest
+import DSTEMCore
+import DSTEMSession
+@testable import FourDSTEMStudio
+
+@MainActor
+final class DatasetLoadCancellationTests: XCTestCase {
+
+    private func loadedState() async -> AppState {
+        let state = AppState()
+        await state.openDemoFixture()
+        return state
+    }
+
+    func testTheAffordanceIsOfferedOnlyWhileALoadIsRunning() async {
+        let state = AppState()
+        XCTAssertFalse(state.datasetSession.canCancelLoad,
+                       "nothing is loading, so there is nothing to cancel")
+        XCTAssertFalse(state.datasetSession.isLoading)
+
+        // After a completed load the offer is withdrawn — a Cancel that lingers
+        // on a finished open would cancel nothing and say otherwise.
+        let loaded = await loadedState()
+        XCTAssertTrue(loaded.hasDataset)
+        XCTAssertFalse(loaded.datasetSession.canCancelLoad)
+    }
+
+    func testCancellingWhenNothingIsLoadingDoesNothing() async {
+        let state = await loadedState()
+        let descriptorBefore = state.descriptor
+        state.cancelDatasetLoad()
+        XCTAssertEqual(state.descriptor?.datasetPath, descriptorBefore?.datasetPath,
+                       "a stray cancel must not tear down a dataset that finished loading")
+        XCTAssertTrue(state.hasDataset)
+    }
+
+    func testTheDemoFixtureIsNeverRemembered() async {
+        // Named for what it actually checks. The demo source is synthetic and
+        // touches no disk, so it has no file to remember; this pins that the
+        // demo path does not accidentally write a Recents entry pointing at
+        // nothing.
+        let state = AppState()
+        let before = state.recents.entries.count
+        await state.openDemoFixture()
+        XCTAssertTrue(state.hasDataset)
+        XCTAssertEqual(state.recents.entries.count, before)
+    }
+
+    // MARK: - The property that matters
+
+    func testDiscardingALoadLeavesNothingThatLooksLoaded() async {
+        // THE INVARIANT. Everything above tests the affordance; this tests the
+        // consequence, which is the part that could produce a wrong number.
+        // Driven through `discardPartialLoad` directly rather than by racing a
+        // cancel against a demo load that finishes in milliseconds — the timing
+        // is not the property, the resulting state is.
+        let state = AppState()
+        await state.openDemoFixture()
+        XCTAssertTrue(state.hasDataset, "precondition: something to discard")
+        XCTAssertNotNil(state.descriptor)
+
+        let recentsBefore = state.recents.entries.map(\.id)
+        await state.discardPartialLoad()
+
+        // The welcome screen is driven by `hasDataset`, which is
+        // `descriptor?.is4D` — so this is the single condition that decides
+        // whether the app looks loaded.
+        XCTAssertFalse(state.hasDataset)
+        XCTAssertNil(state.descriptor)
+        XCTAssertTrue(state.datasetSession.datasets.isEmpty)
+        XCTAssertNil(state.datasetSession.preview)
+
+        // A discarded load is not remembered — the release owner's call.
+        XCTAssertEqual(state.recents.entries.map(\.id), recentsBefore)
+
+        // NOT ASSERTED HERE, deliberately: `residency.isResident`,
+        // `residency.byteCount` and `loadedView.isFullExtent`. All three are
+        // ALREADY in their post-discard state after a demo open — residency is
+        // dormant by decision, and a demo load is full extent — so asserting
+        // them would pass whether or not `discardPartialLoad` touched them.
+        // Controls proved exactly that: deleting the residency release and the
+        // `loadedView.reset()` from the teardown left this test green.
+        //
+        // They are still released, because a real cancelled open CAN hold a
+        // resident buffer and a cropped view. Pinning that needs a fixture that
+        // reaches those states first, which this one cannot — recorded in
+        // docs/open-items.md rather than papered over with an assertion that
+        // looks like coverage.
+    }
+
+    func testDiscardingClearsTheCalibrationRatherThanLeavingItBehind() async {
+        // A calibration read from a file whose cube was never finished is the
+        // most dangerous thing to leave behind: it is exactly the kind of value
+        // that reads as trustworthy and describes data the app does not have.
+        let state = AppState()
+        await state.openDemoFixture()
+        XCTAssertNotNil(state.calibrationSession.calibration.origin,
+                        "precondition: the demo fixture carries origin maps")
+
+        await state.discardPartialLoad()
+        XCTAssertNil(state.calibrationSession.calibration.origin)
+        XCTAssertNil(state.calibrationSession.calibration.qPixelSize)
+        XCTAssertEqual(state.calibrationSession.calibration.originProvenance, .geometricDefault)
+    }
+
+    func testDiscardingClearsTheSidecarInventoryBehindTheResultsBadge() async {
+        // Drive 1 step 9 (2026-09-29): after Cancel the welcome screen still
+        // showed the sidebar Results badge, because the badge counts
+        // `sessionInventory.results` and only the next open cleared it.
+        let state = AppState()
+        await state.openDemoFixture()
+        state.sessionInventory = SessionSidecarInventory(
+            hasSidecar: true, hasBraggVectors: true, hasCalibration: true,
+            results: [SessionResultDescriptor(
+                id: "r1", kind: "phase_map", displayName: "Phase map",
+                valueUnits: "", width: 4, height: 4, storage: .scalarFloat32,
+                pixelSizeRow: nil, pixelSizeColumn: nil, pixelUnits: nil, provenance: [:]
+            )],
+            currentResultID: "r1"
+        )
+        XCTAssertEqual(state.sessionInventory.results.count, 1, "precondition: a badge to clear")
+
+        await state.discardPartialLoad()
+        XCTAssertEqual(state.sessionInventory, .empty)
+        XCTAssertTrue(state.sessionInventory.results.isEmpty)
+    }
+
+    func testCancellationIsMonotonicAndIdempotent() {
+        let token = AnalysisCancellationToken()
+        XCTAssertFalse(token.isCancelled)
+        token.cancel()
+        token.cancel()
+        XCTAssertTrue(token.isCancelled, "cancellation never un-cancels")
+    }
+}
+
+// MARK: - Concurrent opens (2026-09-11)
+
+/// Why `AppState.openFile` refuses a second load, recorded here because
+/// `AppState.swift` is under the C5 line budget and this file is not.
+///
+/// The bundled HDF5 is built `Threadsafety: OFF`: `nm -m libhdf5.dylib` shows
+/// `_H5E_stack_g` as `(__DATA,__common) external` — a plain process global with
+/// no thread-local storage. It is the same global `BraggVectorEMDWriter` names
+/// in its note on why concurrent use crashes rather than racing benignly. Two
+/// loads in flight reach that one non-reentrant library from two tasks.
+///
+/// This guard is the CHEAP half. It removes the gestures that reach the hazard
+/// fastest — a second open, and "New Dataset Window" during a load — and it
+/// does NOT make concurrent HDF5 safe: two windows both computing still can.
+/// The real fix is one actor owning the library handle (`docs/open-items.md`,
+/// 2026-09-11). So this is not a UX nicety and must not be tidied away as one;
+/// deleting it re-arms a process abort with no autosave behind it.
+///
+/// Broken before it was trusted: with the guard removed the first test below
+/// failed and the second still passed (negative control, 2026-09-11).
+@MainActor
+final class ConcurrentOpenRefusalTests: XCTestCase {
+
+    func testASecondOpenIsRefusedWhileOneIsInFlight() {
+        let state = AppState()
+        state.datasetSession.beginLoading("Opening…")
+        let before = state.statusText
+
+        state.openFile(url: URL(fileURLWithPath: "/nonexistent/second.h5"))
+
+        XCTAssertNotEqual(state.statusText, before,
+                          "the refusal must say something; a silent no-op looks like a hang")
+        XCTAssertTrue(state.statusText.contains("Already opening"),
+                      "the status line must name the reason, got: \(state.statusText)")
+    }
+
+    func testAnOpenIsAllowedWhenNothingIsLoading() {
+        let state = AppState()
+        XCTAssertFalse(state.datasetSession.isLoading)
+        let before = state.statusText
+
+        state.openFile(url: URL(fileURLWithPath: "/nonexistent/first.h5"))
+
+        // The load is allowed through: it fails later, on the missing file,
+        // which is a different message than the refusal above.
+        XCTAssertFalse(state.statusText.contains("Already opening"),
+                       "a first open must not be refused as a duplicate")
+        _ = before
+    }
+}

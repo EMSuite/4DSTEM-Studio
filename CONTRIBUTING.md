@@ -25,10 +25,10 @@ one.
 ## Building and testing
 
 You need a full Xcode 27 or Xcode 26.6 (the Command Line Tools alone cannot build this project) on an Apple silicon Mac;
-the app's minimum system is macOS 26. Open `mac4DSTEM.xcodeproj` and build the `mac4DSTEM` scheme, or from the shell:
+the app's minimum system is macOS 26. Open `FourDSTEMStudio.xcodeproj` and build the `mac4DSTEM` scheme, or from the shell:
 
 ```sh
-xcodebuild -project mac4DSTEM.xcodeproj -scheme mac4DSTEM -destination 'platform=macOS' build
+xcodebuild -project FourDSTEMStudio.xcodeproj -scheme FourDSTEMStudio -destination 'platform=macOS' build
 tools/run-tests.sh unit         # the unit tests: run these before you open a pull request
 tools/run-tests.sh core         # checks that Core/ never reaches up into the app
 tools/run-tests.sh inventory    # repository checks (notices, large files, harness list)

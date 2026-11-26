@@ -21,8 +21,8 @@ resolve_mac4dstem_developer_dir
 mac4dstem_sources "$REPO" analysis calibration
 xcrun swiftc -package-name mac4DSTEM -O -o "$WORK/harness" main.swift \
   "${MAC4DSTEM_SOURCES[@]}" \
-  "$REPO/mac4DSTEM/Core/ML/LearnedDiskDetector.swift" \
-  "$REPO/mac4DSTEM/Core/ML/LearnedDiskDetection.swift" \
+  "$REPO/FourDSTEMStudio/Core/ML/LearnedDiskDetector.swift" \
+  "$REPO/FourDSTEMStudio/Core/ML/LearnedDiskDetection.swift" \
   -framework Accelerate -framework Metal -framework MetalKit -framework CoreML
 
 mac4dstem_copy_bundles "$WORK"   # MacEMUI_ShellMetal.bundle: MetalEngine's Metal library
@@ -34,5 +34,5 @@ cd "$WORK"
 if [[ -n "${CI:-}" ]]; then
   echo "    learned half: SKIPPED on CI (no Neural Engine on the runner; the app refuses the learned detector without one — runs locally before every release)"
 else
-  ./harness learned "$REPO/mac4DSTEM/Resources/DiskDetector/disk-detector-heatmap-256.mlpackage"
+  ./harness learned "$REPO/FourDSTEMStudio/Resources/DiskDetector/disk-detector-heatmap-256.mlpackage"
 fi

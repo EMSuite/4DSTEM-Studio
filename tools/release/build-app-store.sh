@@ -28,7 +28,7 @@ BUILD_ARGS=()
 # MACEM_STORE_BUILD=YES is the one switch the store build flips: the Sparkle updater (#122) compiles only when it is
 # not set, because the App Store refuses an app that updates itself.
 xcodebuild archive \
-  -project "$ROOT/mac4DSTEM.xcodeproj" -scheme mac4DSTEM \
+  -project "$ROOT/FourDSTEMStudio.xcodeproj" -scheme FourDSTEMStudio \
   -configuration Release -destination "$MAC4DSTEM_RELEASE_DESTINATION" \
   -archivePath "$ARCHIVE" \
   "$MAC4DSTEM_ARCH_PIN" \
@@ -89,7 +89,7 @@ done
 ! /usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$APP/Contents/Info.plist" >/dev/null 2>&1 \
   || { echo "FAIL: the store build's Info.plist names an update feed (it read Info-Direct.plist)" >&2; exit 1; }
 if grep -q 'temporary-exception' "$OUT/store-entitlements.plist"; then
-  echo "FAIL: the store build carries a temporary entitlement exception (it read mac4DSTEM-Direct.entitlements)" >&2; exit 1
+  echo "FAIL: the store build carries a temporary entitlement exception (it read FourDSTEMStudio-Direct.entitlements)" >&2; exit 1
 fi
 
 echo "$PKG"

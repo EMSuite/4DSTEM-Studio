@@ -3,7 +3,7 @@
 <!-- The App Store privacy manifest (mac4DSTEM#119). mac4DSTEM tracks nothing and collects nothing (website privacy.html).
      Required-reason APIs: UserDefaults (preferences, recent datasets) and file size/stat calls on files the user opened
      (fstat, attributesOfItem in the readers and the kits). The same manifest ships in the Quick Look extensions and the HDF5
-     helper; mac4DSTEMTests/PrivacyManifestTests.swift checks every bundle. -->
+     helper; FourDSTEMStudioTests/PrivacyManifestTests.swift checks every bundle. -->
 <plist version="1.0">
 <dict>
 	<key>NSPrivacyTracking</key>

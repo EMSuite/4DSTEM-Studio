@@ -1,12 +1,12 @@
 # Unused-code scan (Periphery). The suite template, adapted for an app: Periphery builds the Xcode project's
-# mac4DSTEM scheme itself (the app, its package layers and its tests), so the app target is scanned too, not only Package.swift.
+# FourDSTEMStudio scheme itself (the app, its package layers and its tests), so the app target is scanned too, not only Package.swift.
 # No --retain-public: an app has no outside consumers.
 # Weekly: keeps one open issue, "Periphery weekly scan", up to date with the findings. Findings are for triage; nothing is
 # deleted here.
 # On a pull request that touches Swift: the same scan without the findings .periphery-baseline.json records (triaged and
 # kept) and without Codable properties. A finding that is left is new: it is annotated on the PR as a warning and the job
 # stays green. Delete the code or, for a false positive, write the baseline again in the same PR:
-#   periphery scan --project mac4DSTEM.xcodeproj --schemes mac4DSTEM --retain-codable-properties \
+#   periphery scan --project FourDSTEMStudio.xcodeproj --schemes FourDSTEMStudio --retain-codable-properties \
 #     --write-baseline .periphery-baseline.json -- CODE_SIGNING_ALLOWED=NO
 name: Periphery
 
@@ -37,7 +37,7 @@ jobs:
         run: brew install periphery && periphery version
       - name: Build and scan the Xcode project
         run: |
-          periphery scan --project mac4DSTEM.xcodeproj --schemes mac4DSTEM --format csv --relative-results \
+          periphery scan --project FourDSTEMStudio.xcodeproj --schemes FourDSTEMStudio --format csv --relative-results \
             -- CODE_SIGNING_ALLOWED=NO > periphery.csv
           echo "count=$(( $(wc -l < periphery.csv) - 1 ))" >> "$GITHUB_ENV"
       - name: Update the issue
@@ -75,7 +75,7 @@ jobs:
         run: brew install periphery && periphery version
       - name: Build and scan against the baseline
         run: |
-          periphery scan --project mac4DSTEM.xcodeproj --schemes mac4DSTEM --retain-codable-properties \
+          periphery scan --project FourDSTEMStudio.xcodeproj --schemes FourDSTEMStudio --retain-codable-properties \
             --baseline .periphery-baseline.json --format github-actions --relative-results \
             -- CODE_SIGNING_ALLOWED=NO | tee periphery.txt
           count=$(grep -c '^::warning' periphery.txt || true)

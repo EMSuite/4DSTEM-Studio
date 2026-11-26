@@ -14,7 +14,7 @@ SIGN_UPDATE="$ROOT/build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_updat
 # sign_update prints the enclosure's two attributes: sparkle:edSignature="…" length="…".
 ATTRIBUTES="$("$SIGN_UPDATE" "$DMG")"
 [[ "$ATTRIBUTES" == *'sparkle:edSignature="'*'length="'* ]] || { echo "sign_update printed no signature: $ATTRIBUTES" >&2; exit 1; }
-FLOOR="$(grep -m1 'MACOSX_DEPLOYMENT_TARGET = ' "$ROOT/mac4DSTEM.xcodeproj/project.pbxproj" | sed 's/.*= \(.*\);/\1/')"
+FLOOR="$(grep -m1 'MACOSX_DEPLOYMENT_TARGET = ' "$ROOT/FourDSTEMStudio.xcodeproj/project.pbxproj" | sed 's/.*= \(.*\);/\1/')"
 
 # The release notes (#374): the store's What's New text when it names this version, else the CHANGELOG section cleaned.
 /usr/bin/python3 -I "$ROOT/tools/release/feed.py" "$ROOT/CHANGELOG.md" "$VERSION" "$FLOOR" "$ATTRIBUTES" "$FEED" "${NOTES:-}"

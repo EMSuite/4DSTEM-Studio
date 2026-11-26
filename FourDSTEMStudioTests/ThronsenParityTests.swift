@@ -1,0 +1,442 @@
+//
+//  ThronsenParityTests.swift
+//  Role: the precipitation workflow against Thronsen et al. (Ultramicroscopy 255, 2024, 113861), dataset A, with the PAPER'S metric: the
+//        share of positions whose phase label equals the manually built ground truth (Table 3: NMF 98.50, vector matching 98.46,
+//        template matching 98.25, ANN 99.04 %), next to the adopted T4 bar (ADR 040, 041: 1.31 % per-position error at stride 3).
+//        Then the objects (tasks 39 to 41) of the truth map and of our map through the same pipeline: counts, the Feret length and the
+//        edge-corrected areal density, reported as ratios "derived truth, not published". N_V, composition and strain are not
+//        checkable here (the dataset has no thickness and no EDS); the paper reports none of the four object quantities.
+//  Gate:  heavy, real data (References/mac4DSTEM/thronsen-datasetA, CC BY 4.0, outside the repo): skipped unless MAC4DSTEM_THRONSEN=1
+//        (run it with `env TEST_RUNNER_MAC4DSTEM_THRONSEN=1 MAC4DSTEM_UNIT_ONLY=ThronsenParityTests tools/run-tests.sh unit`). The configuration is the T4 run's, as the probe
+//        `--thronsen ... --reach 0.68 --rule known-variants --or --min-relative 0.0015 --min-intensity 0` ran it: probe radius 2 px,
+//        Q 0.01904 per px, detection floor 0.15 % (ADR 041), the known-variants rule with the paper's orientation relationships.
+//  Crystals and phase recipe: the archived probe's `thronsen.swift` (their Table 2), copied here with that provenance.
+//
+
+import XCTest
+import DSTEMCore
+import DSTEMSession
+import DiffractoCore
+import DiffractoOrientation
+import ImagoCore
+@testable import FourDSTEMStudio
+
+enum ThronsenReference {
+    /// T1, Al₂CuLi: P6/mmm, a = 4.94775 Å, c = 14.14499 Å (their Table 2).
+    static let t1 = CrystalPresets.structure(a: 4.94775, b: 4.94775, c: 14.14499, alphaDeg: 90, betaDeg: 90, gammaDeg: 120, sites: t1Sites)
+    static let t1Sites: [AtomSite] = [
+            AtomSite(z: 13, fractional: [0.333333, 0.000000, 0.000000]), AtomSite(z: 13, fractional: [0.666667, 0.000000, 0.000000]),
+            AtomSite(z: 13, fractional: [0.000000, 0.333333, 0.000000]), AtomSite(z: 13, fractional: [0.000000, 0.666667, 0.000000]),
+            AtomSite(z: 13, fractional: [0.666667, 0.666667, 0.000000]), AtomSite(z: 13, fractional: [0.333333, 0.333333, 0.000000]),
+            AtomSite(z: 13, fractional: [0.000000, 0.000000, 0.406200]), AtomSite(z: 13, fractional: [0.000000, 0.000000, 0.593800]),
+            AtomSite(z: 29, fractional: [0.666667, 0.333333, 0.161200]), AtomSite(z: 29, fractional: [0.333333, 0.666667, 0.838800]),
+            AtomSite(z: 29, fractional: [0.333333, 0.666667, 0.161200]), AtomSite(z: 29, fractional: [0.666667, 0.333333, 0.838800]),
+            AtomSite(z: 29, fractional: [0.500000, 0.000000, 0.323700]), AtomSite(z: 29, fractional: [0.500000, 0.000000, 0.676300]),
+            AtomSite(z: 29, fractional: [0.000000, 0.500000, 0.323700]), AtomSite(z: 29, fractional: [0.000000, 0.500000, 0.676300]),
+            AtomSite(z: 29, fractional: [0.500000, 0.500000, 0.323700]), AtomSite(z: 29, fractional: [0.500000, 0.500000, 0.676300]),
+            AtomSite(z: 3, fractional: [0.000000, 0.000000, 0.199300]), AtomSite(z: 3, fractional: [0.000000, 0.000000, 0.800700]),
+            AtomSite(z: 3, fractional: [0.333333, 0.666667, 0.500000]), AtomSite(z: 3, fractional: [0.666667, 0.333333, 0.500000]),
+    ]
+
+    /// The same T1 with the Al site the paper's Table 2 is read to give, (0, 1/2, 0.406) and its P6/mmm images, in place of the (0, 0, 0.4062)
+    /// pair above (an assumption about the table's orbit: the sites listed are the three images of (0, 1/2, z) at z and 1 - z).
+    static let t1TableAl = CrystalPresets.structure(
+        a: 4.94775, b: 4.94775, c: 14.14499, alphaDeg: 90, betaDeg: 90, gammaDeg: 120,
+        sites: t1Sites.filter { !($0.z == 13 && $0.fractional[0] == 0 && $0.fractional[1] == 0) }
+            + [0.4062, 0.5938].flatMap { z in
+                [AtomSite(z: 13, fractional: [0.0, 0.5, z]), AtomSite(z: 13, fractional: [0.5, 0.0, z]), AtomSite(z: 13, fractional: [0.5, 0.5, z])]
+            })
+
+    /// θ′, Al₂Cu: I-4m2, a = 4.04 Å, c = 5.80 Å (their Table 2).
+    static let thetaPrime = CrystalPresets.structure(
+        a: 4.04, b: 4.04, c: 5.80,
+        sites: [
+            AtomSite(z: 13, fractional: [0.0, 0.0, 0.0]), AtomSite(z: 13, fractional: [0.5, 0.5, 0.5]),
+            AtomSite(z: 13, fractional: [0.0, 0.0, 0.5]), AtomSite(z: 13, fractional: [0.5, 0.5, 0.0]),
+            AtomSite(z: 29, fractional: [0.0, 0.5, 0.25]), AtomSite(z: 29, fractional: [0.5, 0.0, 0.75]),
+        ])
+
+    static func phases() -> [PhaseDefinition] {
+        let theta: [OrientationRelationship] = [
+            OrientationRelationship(candidate: .plane(SIMD3(0, 0, 2)), matrix: .plane(SIMD3(2, 0, 0))),
+            OrientationRelationship(candidate: .plane(SIMD3(0, 0, 2)), matrix: .plane(SIMD3(0, 2, 0))),
+        ]
+        let face: [OrientationRelationship] = [
+            OrientationRelationship(candidate: .plane(SIMD3(2, 0, 0)), matrix: .plane(SIMD3(2, 0, 0))),
+            OrientationRelationship(candidate: .plane(SIMD3(2, 0, 0)), matrix: .plane(SIMD3(0, 2, 0))),
+        ]
+        let t1Pairs: [OrientationRelationship] = [
+            OrientationRelationship(candidate: .direction(SIMD3(2, 1, 0)), matrix: .direction(SIMD3(1, -1, 0))),
+            OrientationRelationship(candidate: .direction(SIMD3(2, 1, 0)), matrix: .direction(SIMD3(1, 1, 0))),
+        ]
+        return [
+            PhaseDefinition(id: "al", displayName: "Al", crystal: CrystalPresets.aluminum, role: .matrix, zoneAxes: [SIMD3(0, 0, 1)]),
+            PhaseDefinition(id: "theta-edge", displayName: "θ′ edge-on", crystal: thetaPrime, role: .candidate,
+                            zoneAxes: [SIMD3(1, 0, 0)], orientationRelationships: theta, excitationSlabInvAngstrom: 0.3),
+            PhaseDefinition(id: "theta-face", displayName: "θ′ face-on", crystal: thetaPrime, role: .candidate,
+                            zoneAxes: [SIMD3(0, 0, 1)], orientationRelationships: face, excitationSlabInvAngstrom: 0.3),
+            PhaseDefinition(id: "t1", displayName: "T1", crystal: t1, role: .candidate,
+                            zoneAxes: [SIMD3(0, -4, 1)], orientationRelationships: t1Pairs),
+        ]
+    }
+
+    /// Their label for the app's verdict: 0 Al, 1 θ′ edge-on, 2 θ′ face-on, 3 T1, -1 not indexed or no data.
+    static func label(of result: PhaseVectorResult, phaseNames: [String]) -> Int {
+        switch result.verdict {
+        case .matrix: return 0
+        case .indexed:
+            let name = phaseNames.indices.contains(Int(result.phaseIndex)) ? phaseNames[Int(result.phaseIndex)] : ""
+            switch name { case "θ′ edge-on": return 1; case "θ′ face-on": return 2; case "T1": return 3; default: return -1 }
+        case .notIndexed, .noData: return -1
+        }
+    }
+}
+
+final class ThronsenParityTests: XCTestCase {
+    private static let organization = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    private static var references: URL {
+        let root = ProcessInfo.processInfo.environment["MACEM_REFERENCES"].map { URL(fileURLWithPath: $0) }
+            ?? organization.appendingPathComponent("References")
+        return root.appendingPathComponent("mac4DSTEM/thronsen-datasetA")
+    }
+    /// The paper's step (PDF page 3: 4.6 nm per position) times the stride. The file's 2.4943 nm is not what Fig. 7 shows: its 400 nm bar and the
+    /// 512-position map put the step at 4.66 +- 0.06 nm (`truth.json`, "scale"), 1.87 times the file's.
+    private static let stridePixelNm = 4.6 * 3
+
+    private struct Truth: Decodable { let labels: [[Int]] }
+
+    private func loadTruth() throws -> (labels: [Int], width: Int, height: Int) {
+        let data = try Data(contentsOf: Self.references.appendingPathComponent("truth_stride3.json"))
+        let rows = try JSONDecoder().decode(Truth.self, from: data).labels
+        return (rows.flatMap { $0 }, rows.first?.count ?? 0, rows.count)
+    }
+
+    /// The T4 run's pipeline on the stride-3 cube: detect at 0.15 %, measure the origin, match with the paper's relationships.
+    private func ourLabels(width: Int, height: Int) async throws -> (labels: [Int], peaks: Int) {
+        let ours = try await ourMap(width: width, height: height)
+        return (ours.map.results.map { ThronsenReference.label(of: $0, phaseNames: ours.map.phaseNames) }, ours.peaks)
+    }
+
+    /// The same run, with the phase map and the library behind the labels (the winning entry per position, the matrix entry).
+    private func ourMap(width: Int, height: Int) async throws -> (map: PhaseMap, library: PhaseReferenceLibrary, peaks: Int) {
+        let path = Self.references.appendingPathComponent("datasetA_stride3.h5").path
+        let reader = try H5Reader(path: path)
+        let primary = try await reader.discoverPrimaryDataset()
+        XCTAssertEqual([primary.ry, primary.rx], [height, width])
+        let qPerPixel = 0.01904
+        let kernel = try XCTUnwrap(ProbeKernel.synthetic(radius: 2, qy: primary.qy, qx: primary.qx))
+        let detector = try XCTUnwrap(DiskDetector(kernel: kernel))
+        var params = DiskDetectionParams()
+        params.minPeakSpacing = 3
+        params.edgeBoundary = 2
+        params.minRelativeIntensity = 0.0015
+        // The T4 run and the 22 Oct object pins used the parabolic subpixel fit. #270 (12 Nov) moved the default to
+        // multicorr (py4DSTEM's), and this test silently followed: 1.41 % and 24/30 objects instead of 1.31 % and 35/26
+        // (#443, measured on Paul's Mac at aae9cc84). Tests that need the parabolic fit state it (#270).
+        params.subpixel = .poly
+        let view = LoadView(fullExtentOf: primary)
+        var peaks: [[BraggPeak]] = []
+        peaks.reserveCapacity(width * height)
+        for ry in 0..<primary.ry { for rx in 0..<primary.rx {
+            peaks.append(detector.detect(pattern: try await reader.readPattern(view, ry: ry, rx: rx), params: params))
+        } }
+        // The origin: centre of mass of the mean of 20 sampled patterns inside the direct beam (the probe's rule).
+        var mean = [Double](repeating: 0, count: primary.qy * primary.qx)
+        for ry in stride(from: 0, to: primary.ry, by: max(1, primary.ry / 20)) {
+            let pattern = try await reader.readPattern(view, ry: ry, rx: primary.rx / 2)
+            for i in 0..<min(mean.count, pattern.count) { mean[i] += Double(pattern[i]) }
+        }
+        var sum = 0.0, sx = 0.0, sy = 0.0
+        let cy = Double(primary.qy - 1) / 2, cx = Double(primary.qx - 1) / 2
+        for y in 0..<primary.qy { for x in 0..<primary.qx {
+            guard ((Double(y) - cy) * (Double(y) - cy) + (Double(x) - cx) * (Double(x) - cx)).squareRoot() <= 6 else { continue }
+            let w = mean[y * primary.qx + x]; sum += w; sy += w * Double(y); sx += w * Double(x)
+        } }
+        let originX = sum > 0 ? Float(sx / sum) : Float(cx), originY = sum > 0 ? Float(sy / sum) : Float(cy)
+
+        var reference = PhaseReferenceSettings()
+        reference.kMaxInvAngstrom = 0.70
+        reference.inPlaneStepDeg = 2
+        reference.minimumIntensityFraction = 0
+        var matching = PhaseVectorSettings()
+        matching.classificationRule = .knownVariants
+        matching.maximumVectorInvAngstrom = 0.68
+        let library = try PhaseReferenceLibrary.build(phases: ThronsenReference.phases(), settings: reference)
+        let bragg = BraggVectors(scanWidth: width, scanHeight: height, peaks: peaks)
+        let map = try XCTUnwrap(PhaseVectorMatcher.map(
+            scan: bragg.phaseScan, scanWidth: width, scanHeight: height, library: library, settings: matching,
+            originX: originX, originY: originY, invAngstromPerPixel: qPerPixel))
+        return (map, library, peaks.reduce(0) { $0 + $1.count })
+    }
+
+    private func objectRows(_ labels: [Int], width: Int, height: Int) throws -> [Int: (counted: Int, edge: Int, medianNm: Double?, densityPerUm2: Double?)] {
+        let kit: [Int32] = labels.map { $0 < 0 ? 9 : ($0 == 4 ? 9 : Int32($0)) }
+        let objects = try PrecipitateSegmentation.classObjects(
+            labels: kit, width: width, height: height,
+            roles: .init(precipitateClasses: [1, 2, 3], matrix: [0], notIndexed: [9]), pixelSize: Self.stridePixelNm, pixelUnit: "nm")
+        var out: [Int: (counted: Int, edge: Int, medianNm: Double?, densityPerUm2: Double?)] = [:]
+        for c in objects.classes {
+            out[Int(c.label)] = (c.density.counted, c.density.edgeExcluded, c.density.medianLength.map { $0 * Self.stridePixelNm },
+                                 c.density.arealDensity.map { $0 * 1e6 })
+        }
+        return out
+    }
+
+    func testDatasetAAgainstThePapersMetricAndTheT4Bar() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["MAC4DSTEM_THRONSEN"] == "1", "heavy real-data run: set MAC4DSTEM_THRONSEN=1 (command in this file's header)")
+        let truth = try loadTruth()
+        XCTAssertEqual(truth.labels.count, 171 * 171)
+        let ours = try await ourLabels(width: truth.width, height: truth.height)
+        let n = truth.labels.count
+        let wrong = zip(ours.labels, truth.labels).filter { $0 != $1 }.count
+        let accuracy = 100 * Double(n - wrong) / Double(n)
+        print(String(format: "THRONSEN accuracy %.4f %% (%d of %d positions differ), %d peaks", accuracy, wrong, n, ours.peaks))
+        var confusion: [String: Int] = [:]
+        for (o, t) in zip(ours.labels, truth.labels) where o != t { confusion["truth \(t) -> ours \(o)", default: 0] += 1 }
+        print("THRONSEN confusion \(confusion.sorted { $0.value > $1.value })")
+        // The paper's four methods at full resolution span 98.25 to 99.04 %; "match, not exceed" (D17) is agreement inside that spread.
+        XCTAssertGreaterThanOrEqual(accuracy, 98.25, "below the weakest of the paper's four methods")
+        XCTAssertLessThanOrEqual(accuracy, 99.04 + 0.5, "better than the best published method by more than the metric can tell: check the truth is not leaking")
+        // The T4 run recorded 1.31 % with the parabolic fit. The 1.41 % read on 14 Nov (#345) was the multicorr default
+        // reaching this test through #270 (#443). A change that moves it again needs a reason.
+        XCTAssertEqual(100 - accuracy, 1.31, accuracy: 0.05)
+
+        let theirs = try objectRows(truth.labels, width: truth.width, height: truth.height)
+        let mine = try objectRows(ours.labels, width: truth.width, height: truth.height)
+        for (label, name) in [(1, "θ′ edge-on"), (2, "θ′ face-on"), (3, "T1")] {
+            let t = try XCTUnwrap(theirs[label]), m = try XCTUnwrap(mine[label])
+            print("THRONSEN objects \(name): truth \(t) ours \(m)")
+            if let tl = t.medianNm, let ml = m.medianNm, let td = t.densityPerUm2, let md = m.densityPerUm2 {
+                print(String(format: "THRONSEN ratio %@ (ours / derived truth, raw, no cleanup): count %.2f, median Feret %.2f, density %.2f",
+                             name, Double(m.counted) / Double(t.counted), ml / tl, md / td))
+            }
+        }
+        // Derived truth, not published (the paper reports no object statistics): the truth map through tasks 39 to 41 at the
+        // stride-3 step, raw (no minimum size). Pinned so a change in the object pipeline shows here; ours pinned the same way.
+        XCTAssertEqual(theirs[1]?.counted, 70); XCTAssertEqual(theirs[2]?.counted, 3); XCTAssertEqual(theirs[3]?.counted, 21)
+        XCTAssertEqual(theirs[3]?.edge, 16)
+        XCTAssertEqual(try XCTUnwrap(theirs[3]?.densityPerUm2), 5.0150, accuracy: 1e-3, "at the paper's 4.6 nm step (it was 17.0566 at the file's 2.4943 nm)")
+        XCTAssertEqual(mine[1]?.counted, 75); XCTAssertEqual(mine[2]?.counted, 35); XCTAssertEqual(mine[3]?.counted, 26)
+    }
+
+    // MARK: - The 2026-10-22 comparison (figure, spread, edge, variants)
+
+    /// The published maps and the truth at full resolution: 5 x 512 x 512 bytes, written by the comparison from the Zenodo hspy files
+    /// (ground truth, NMF, vector matching, template matching, ANN).
+    private func loadPublished() throws -> [[Int8]] {
+        let url = Self.references.appendingPathComponent("published/maps_full.i8")
+        let data = try Data(contentsOf: url)
+        let n = 512 * 512
+        guard data.count == 5 * n else { throw XCTSkip("published/maps_full.i8 is not 5 x 512 x 512") }
+        return (0..<5).map { k in data[(k * n)..<((k + 1) * n)].map { Int8(bitPattern: $0) } }
+    }
+
+    /// The paper's scorer (`determine_accuracy.ipynb`): the share of positions whose label equals the truth's, class 4 and every class counted.
+    /// The four Zenodo maps reproduce Table 3 at full 512 x 512 to 0.01 percentage points. Mutation: the scorer ignoring class 4 or a stride.
+    func testThePublishedMapsReproduceTable3AtFullResolution() throws {
+        let maps: [[Int8]]
+        do { maps = try loadPublished() } catch { throw XCTSkip("the published maps are not on this disk (References/mac4DSTEM/thronsen-datasetA/published/maps_full.i8)") }
+        let truth = maps[0]
+        let table3 = [98.50, 98.46, 98.25, 99.04]   // NMF, vector matching, template matching, ANN
+        for (k, expected) in table3.enumerated() {
+            let wrong = zip(maps[k + 1], truth).filter { $0 != $1 }.count
+            let accuracy = 100 * Double(truth.count - wrong) / Double(truth.count)
+            XCTAssertEqual(accuracy, expected, accuracy: 0.01, "map \(k + 1)")
+        }
+    }
+
+    private struct ObjectLine { var counted: Int; var edge: Int; var small: Int; var medianNm: Double?; var densityPerUm2: Double?; var angles: [Double] }
+
+    /// Objects per precipitate class through the app's pipeline (`classObjects`, the report) at `stepNm` per position and a minimum size.
+    private func objectLines(_ labels: [Int], width: Int, height: Int, stepNm: Double, minimum: Int) throws -> [Int: ObjectLine] {
+        let kit: [Int32] = labels.map { $0 < 0 || $0 == 4 ? 9 : Int32($0) }
+        let objects = try PrecipitateSegmentation.classObjects(labels: kit, width: width, height: height,
+            roles: .init(precipitateClasses: [1, 2, 3], matrix: [0], notIndexed: [9]), pixelSize: stepNm, pixelUnit: "nm")
+        let report = try PrecipitateObjectReport.make(objects: objects, phaseNames: ["Al", "θ′ edge-on", "θ′ face-on", "T1"], matrixPhaseIndex: 0,
+                                                  pixelSize: stepNm, pixelUnit: "nm", minimumAreaPx: minimum)
+        var out: [Int: ObjectLine] = [:]
+        for s in report.summaries {
+            let angles = report.rows.filter { $0.label == s.label && $0.isCounted }.map(\.orientationDegrees)
+            out[Int(s.label)] = ObjectLine(counted: s.countedObjects, edge: s.edgeExcluded, small: s.belowMinimumExcluded,
+                                           medianNm: s.medianLengthPx.map { $0 * stepNm }, densityPerUm2: s.arealDensity.map { $0 * 1e6 }, angles: angles)
+        }
+        return out
+    }
+
+    private func line(_ name: String, _ lines: [Int: ObjectLine]) {
+        for (label, cls) in [(1, "θ′ edge-on"), (2, "θ′ face-on"), (3, "T1")] {
+            guard let l = lines[label] else { continue }
+            print(String(format: "THRONSEN-OBJ %@ | %@ | counted %d edge %d small %d | median Feret %@ nm | density %@ /um2", name, cls, l.counted, l.edge, l.small,
+                         l.medianNm.map { String(format: "%.1f", $0) } ?? "-", l.densityPerUm2.map { String(format: "%.1f", $0) } ?? "-"))
+        }
+    }
+
+    /// Positions with a different truth label within `radius` (Chebyshev) of them: where the maps may reasonably differ.
+    private func nearBoundary(_ truth: [Int], width: Int, height: Int, radius: Int = 2) -> [Bool] {
+        var out = [Bool](repeating: false, count: truth.count)
+        for y in 0..<height { for x in 0..<width {
+            let me = truth[y * width + x]
+            search: for dy in -radius...radius { for dx in -radius...radius {
+                let yy = y + dy, xx = x + dx
+                guard yy >= 0, yy < height, xx >= 0, xx < width else { continue }
+                if truth[yy * width + xx] != me { out[y * width + x] = true; break search }
+            } }
+        } }
+        return out
+    }
+
+    private func isolated(_ labels: [Int], width: Int, height: Int) throws -> Int {
+        let kit: [Int32] = labels.map { $0 < 0 || $0 == 4 ? 9 : Int32($0) }
+        let objects = try PrecipitateSegmentation.classObjects(labels: kit, width: width, height: height,
+            roles: .init(precipitateClasses: [1, 2, 3], matrix: [0], notIndexed: [9]), pixelSize: nil, pixelUnit: nil)
+        return objects.classes.flatMap(\.objects).filter { $0.area == 1 }.count
+    }
+
+    /// T1's Al site: the table reads (0, 1/2, 0.406), ours is (0, 0, 0.4062). Same lattice, so the same spots; only the intensities can move.
+    /// Needs no data: it lists the [0 -4 1] reference vectors of both and holds that the positions agree and prints the strongest ratios.
+    func testT1AlSiteChangesIntensitiesOnlyNotSpotPositions() throws {
+        let settings = PhaseReferenceSettings()
+        func vectors(_ crystal: CrystalStructure) throws -> [ReferenceVector] {
+            let list = try PhaseReferenceLibrary.reflections(of: crystal, kMaxInvAngstrom: settings.kMaxInvAngstrom, phase: "T1")
+            return PhaseReferenceLibrary.projectedVectors(reflections: list, crystal: crystal, zoneAxis: SIMD3(0, -4, 1), settings: settings)
+        }
+        let ours = try vectors(ThronsenReference.t1), table = try vectors(ThronsenReference.t1TableAl)
+        XCTAssertFalse(ours.isEmpty); XCTAssertFalse(table.isEmpty)
+        func key(_ v: ReferenceVector) -> String { "\(v.h) \(v.k) \(v.l)" }
+        let o = Dictionary(uniqueKeysWithValues: ours.map { (key($0), $0) }), t = Dictionary(uniqueKeysWithValues: table.map { (key($0), $0) })
+        let common = Set(o.keys).intersection(t.keys)
+        for k in common { XCTAssertEqual(o[k]!.length, t[k]!.length, accuracy: 1e-9, "same lattice, same |g| for \(k)") }
+        var lines = ["T1-AL-SITE vectors ours \(ours.count), table \(table.count), common \(common.count)"]
+        for v in ours.prefix(12) {
+            let r = t[key(v)].map { String(format: "%.3f", $0.relativeIntensity) } ?? "absent"
+            lines.append(String(format: "T1-AL-SITE (%@) |q| %.4f ours %.3f table %@", key(v), v.length, v.relativeIntensity, r))
+        }
+        print(lines.joined(separator: "\n"))
+    }
+
+    /// Which T1 Al site the data supports: the mean pattern of the positions the truth map labels T1, as a ring profile around the direct beam,
+    /// next to the ring profile each site predicts at [0 -4 1] (Sum of the excited intensities of the reference vectors per radius). Rotation-free,
+    /// so the three in-plane variants of T1 do not need aligning. Prints `T1-SITE r  data  ours  table` per 1-pixel radius.
+    /// Gate: MAC4DSTEM_T1_SITE=1 (reads the stride-3 cube, a minute).
+    func testTheT1RingProfileAgainstBothAlSites() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["MAC4DSTEM_T1_SITE"] == "1", "heavy real-data run: set MAC4DSTEM_T1_SITE=1")
+        let truth = try loadTruth()
+        let path = Self.references.appendingPathComponent("datasetA_stride3.h5").path
+        let reader = try H5Reader(path: path)
+        let primary = try await reader.discoverPrimaryDataset()
+        let view = LoadView(fullExtentOf: primary)
+        let qPerPixel = 0.01904
+        var sumPattern = [Double](repeating: 0, count: primary.qy * primary.qx)
+        var used = 0
+        for ry in 0..<primary.ry { for rx in 0..<primary.rx where truth.labels[ry * truth.width + rx] == 3 {
+            let pattern = try await reader.readPattern(view, ry: ry, rx: rx)
+            for i in 0..<min(sumPattern.count, pattern.count) { sumPattern[i] += Double(pattern[i]) }
+            used += 1
+        } }
+        XCTAssertGreaterThan(used, 50)
+        // The origin: centre of mass inside the direct beam of the T1 mean itself.
+        let cy0 = Double(primary.qy - 1) / 2, cx0 = Double(primary.qx - 1) / 2
+        var w = 0.0, wx = 0.0, wy = 0.0
+        for y in 0..<primary.qy { for x in 0..<primary.qx where ((Double(y) - cy0) * (Double(y) - cy0) + (Double(x) - cx0) * (Double(x) - cx0)).squareRoot() <= 6 {
+            let v = sumPattern[y * primary.qx + x]; w += v; wx += v * Double(x); wy += v * Double(y)
+        } }
+        let ox = wx / w, oy = wy / w
+        let rMax = 40
+        var ring = [Double](repeating: 0, count: rMax), count = [Double](repeating: 0, count: rMax)
+        for y in 0..<primary.qy { for x in 0..<primary.qx {
+            let r = ((Double(y) - oy) * (Double(y) - oy) + (Double(x) - ox) * (Double(x) - ox)).squareRoot()
+            let b = Int(r.rounded()); guard b < rMax else { continue }
+            ring[b] += sumPattern[y * primary.qx + x]; count[b] += 1
+        } }
+        var settings = PhaseReferenceSettings()
+        settings.kMaxInvAngstrom = 0.70; settings.minimumIntensityFraction = 0; settings.maximumVectorsPerEntry = 500
+        func model(_ crystal: CrystalStructure) throws -> [Double] {
+            let list = try PhaseReferenceLibrary.reflections(of: crystal, kMaxInvAngstrom: settings.kMaxInvAngstrom, phase: "T1")
+            var out = [Double](repeating: 0, count: rMax)
+            for v in PhaseReferenceLibrary.projectedVectors(reflections: list, crystal: crystal, zoneAxis: SIMD3(0, -4, 1), settings: settings) {
+                let b = Int((v.length / qPerPixel).rounded()); if b < rMax { out[b] += v.relativeIntensity }
+            }
+            return out
+        }
+        let ours = try model(ThronsenReference.t1), table = try model(ThronsenReference.t1TableAl)
+        var lines = ["T1-SITE positions \(used), origin (\(ox), \(oy)), data = ring sum / positions; model = sum of excited intensities per 1-px radius"]
+        for r in 3..<rMax { lines.append(String(format: "T1-SITE %2d  %12.1f  %6.3f  %6.3f", r, ring[r] / Double(used), ours[r], table[r])) }
+        print(lines.joined(separator: "\n"))
+    }
+
+    /// The comparison itself (heavy, real data, MAC4DSTEM_THRONSEN=1): the object statistics of the truth, the four published maps (full and
+    /// stride 3) and ours, the edge check, the isolated one-position objects, the variants per class from the winning entries, and the Feret-angle
+    /// families. Everything is printed with the THRONSEN prefix for `docs/parity.md`; the assertions pin only what is a fact of the data.
+    func testTheFigureComparisonNumbers() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["MAC4DSTEM_THRONSEN"] == "1", "heavy real-data run: set MAC4DSTEM_THRONSEN=1 (command in this file's header)")
+        let published = try loadPublished()
+        let names = ["truth", "NMF", "vectors", "TMP", "ANN"]
+        let paperStepNm = 4.6
+        let everyThird = { (m: [Int8]) -> [Int] in
+            var out: [Int] = []; for y in Swift.stride(from: 0, to: 512, by: 3) { for x in Swift.stride(from: 0, to: 512, by: 3) { out.append(Int(m[y * 512 + x])) } }; return out
+        }
+        let full = published.map { $0.map(Int.init) }
+        let third = published.map(everyThird)
+        let ours = try await ourMap(width: 171, height: 171)
+        let oursLabels = ours.map.results.map { ThronsenReference.label(of: $0, phaseNames: ours.map.phaseNames) }
+        // Our map for the side-by-side picture (labels as int8, 171 x 171; the path is printed).
+        let dump = NSTemporaryDirectory() + "thronsen-ours-stride3.i8"
+        try Data(oursLabels.map { UInt8(bitPattern: Int8($0)) }).write(to: URL(fileURLWithPath: dump))
+        print("THRONSEN-DUMP \(dump)")
+        // 3. the spread: counts, median Feret, edge-corrected density, with every object and with single-position objects dropped
+        for minimum in [1, 2] {
+            for (k, name) in names.enumerated() {
+                line("\(name) full min\(minimum)", try objectLines(full[k], width: 512, height: 512, stepNm: paperStepNm, minimum: minimum))
+                line("\(name) stride3 min\(minimum)", try objectLines(third[k], width: 171, height: 171, stepNm: paperStepNm * 3, minimum: minimum))
+            }
+            line("ours stride3 min\(minimum)", try objectLines(oursLabels, width: 171, height: 171, stepNm: paperStepNm * 3, minimum: minimum))
+        }
+        // 4. the edge check: our wrong positions within 2 positions of a truth boundary; the one-position objects per map
+        let near3 = nearBoundary(third[0], width: 171, height: 171)
+        let wrongOurs = oursLabels.indices.filter { oursLabels[$0] != third[0][$0] }
+        let nearOurs = wrongOurs.filter { near3[$0] }.count
+        print(String(format: "THRONSEN-EDGE ours stride3: %d wrong, %d within 2 positions of a truth boundary (%.1f %%)", wrongOurs.count, nearOurs, 100 * Double(nearOurs) / Double(max(wrongOurs.count, 1))))
+        let nearFull = nearBoundary(full[0], width: 512, height: 512)
+        for k in 1..<5 {
+            let wrong = full[k].indices.filter { full[k][$0] != full[0][$0] }
+            let near = wrong.filter { nearFull[$0] }.count
+            print(String(format: "THRONSEN-EDGE %@ full: %d wrong, %d within 2 positions of a truth boundary (%.1f %%)", names[k], wrong.count, near, 100 * Double(near) / Double(max(wrong.count, 1))))
+        }
+        for k in 1..<5 {
+            let wrong = third[k].indices.filter { third[k][$0] != third[0][$0] }
+            let near = wrong.filter { near3[$0] }.count
+            print(String(format: "THRONSEN-EDGE %@ stride3: %d wrong, %d within 2 positions of a truth boundary (%.1f %%)", names[k], wrong.count, near, 100 * Double(near) / Double(max(wrong.count, 1))))
+        }
+        for k in 0..<5 {
+            print("THRONSEN-ISOLATED \(names[k]) full: \(try isolated(full[k], width: 512, height: 512)) one-position objects; stride3: \(try isolated(third[k], width: 171, height: 171))")
+        }
+        print("THRONSEN-ISOLATED ours stride3: \(try isolated(oursLabels, width: 171, height: 171)) one-position objects")
+        // 5. variants per class: the distinct in-plane rotations among the winning entries of each class (known-variants rule), and the offset
+        let library = ours.library
+        let matrixEntry = library.entries[ours.map.matrixEntryIndex]
+        print(String(format: "THRONSEN-VARIANT matrix entry in-plane rotation %.1f deg (the paper rotated the stack by -29.65 deg for its ANN)", matrixEntry.inPlaneRotationRad * 180 / .pi))
+        for (label, cls) in [(1, "θ′ edge-on"), (2, "θ′ face-on"), (3, "T1")] {
+            var histogram: [String: Int] = [:]
+            for (i, r) in ours.map.results.enumerated() where oursLabels[i] == label && r.entryIndex >= 0 {
+                let e = library.entries[Int(r.entryIndex)]
+                histogram[String(format: "zone %@ rot %6.1f", e.zoneAxis.description, e.inPlaneRotationRad * 180 / .pi), default: 0] += 1
+            }
+            let total = histogram.values.reduce(0, +)
+            let top = histogram.sorted { $0.value > $1.value }.prefix(6).map { "\($0.key): \($0.value)" }
+            print("THRONSEN-VARIANT \(cls): \(total) positions, \(histogram.count) distinct entries; top \(top)")
+        }
+        // Feret-angle families of the counted objects: truth and ours (derived, not published)
+        func families(_ angles: [Double]) -> String {
+            var bins = [Int](repeating: 0, count: 12)   // 15 degree bins over (-90, 90]
+            for a in angles { bins[min(max(Int((a + 90) / 15), 0), 11)] += 1 }
+            return bins.enumerated().filter { $0.element > 0 }.map { String(format: "%+.0f..%+.0f: %d", Double($0.offset) * 15 - 90, Double($0.offset + 1) * 15 - 90, $0.element) }.joined(separator: ", ")
+        }
+        let truthObjects = try objectLines(third[0], width: 171, height: 171, stepNm: paperStepNm * 3, minimum: 4)
+        let oursObjects = try objectLines(oursLabels, width: 171, height: 171, stepNm: paperStepNm * 3, minimum: 4)
+        for (label, cls) in [(1, "θ′ edge-on"), (2, "θ′ face-on"), (3, "T1")] {
+            print("THRONSEN-ANGLES truth \(cls) (min 4 px, counted): \(families(truthObjects[label]?.angles ?? []))")
+            print("THRONSEN-ANGLES ours \(cls) (min 4 px, counted): \(families(oursObjects[label]?.angles ?? []))")
+        }
+        XCTAssertEqual(published[0].count, 512 * 512)
+    }
+}

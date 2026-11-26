@@ -1,0 +1,256 @@
+import XCTest
+import SwiftUI
+import Observation
+import DSTEMSession
+@testable import FourDSTEMStudio
+@testable import ShellMetal
+
+/// Pins `AppPreferences` (session S21, `ROADMAP.md` "Settings window,
+/// Xcode-style sidebar") and the two seams `AppState` reaches it through:
+/// the primary "Open Dataset…" behaviour and a fresh window's starting
+/// colormap/intensity/engine choice. Every test uses a private
+/// `UserDefaults` suite — never `.standard` — so a run here can never plant
+/// a preference another test, or the real app, reads back (the same hazard
+/// `SessionSidecarLocatorTests` guards against for bookmarks).
+@MainActor
+final class AppPreferencesTests: XCTestCase {
+
+    /// A scratch suite, cleaned up when the test ends — the
+    /// `SessionSidecarLocatorTests` shape.
+    private func scratchDefaults() -> (UserDefaults, () -> Void) {
+        let suite = "mac4dstem.tests.apppreferences.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            XCTFail("could not make a scratch defaults suite")
+            return (.standard, {})
+        }
+        return (defaults, { defaults.removePersistentDomain(forName: suite) })
+    }
+
+    // MARK: Defaults equal today's shipped behaviour
+
+    /// BREAK-FIRST evidence, 2026-09-21: temporarily changed `showScaleBar`'s
+    /// default from `true` to `false` in `AppPreferences.swift` and reran this
+    /// test alone (`-only-testing:FourDSTEMStudioTests/AppPreferencesTests/testEveryKeyDefaultsToTodaysBehaviour`)
+    /// — failed red (exit 65), reverted, reran green. Not vacuous.
+    func testEveryKeyDefaultsToTodaysBehaviour() {
+        let (defaults, cleanup) = scratchDefaults()
+        defer { cleanup() }
+        let prefs = AppPreferences(defaults: defaults)
+
+        XCTAssertEqual(prefs.appearance, .system)
+        XCTAssertEqual(prefs.mapColormap, .viridis)
+        XCTAssertEqual(prefs.diffractionColormap, .viridis)
+        XCTAssertEqual(prefs.intensityDisplay, .log)
+        XCTAssertTrue(prefs.showScaleBar)
+        XCTAssertEqual(prefs.openBehaviour, .direct)
+        XCTAssertEqual(prefs.exportScale, .one, "exported images keep their 1x size until the person asks for more")
+        XCTAssertEqual(prefs.figureFormat, .png)
+        XCTAssertFalse(prefs.keepAwake)
+        XCTAssertTrue(prefs.offerLearnedDetector)
+        XCTAssertFalse(prefs.agentDoorEnabled, "the app listens to nothing until the person turns the agent door on")
+        XCTAssertFalse(prefs.agentRunsEnabled, "an agent only looks until the person lets it run analyses")
+        XCTAssertNil(prefs.agentFolderBookmark, "no Agent folder until the person chooses one")
+        XCTAssertFalse(prefs.agentFolderSavesEnabled, "an agent writes nothing until the person lets it save")
+    }
+
+    // MARK: Round-trip through a private suite
+
+    /// Writes through one instance, reads back through a SECOND instance over
+    /// the SAME suite — proves persistence in the store, not just an
+    /// in-memory property the first instance happened to remember.
+    func testEveryKeyRoundTripsThroughItsOwnSuite() {
+        let (defaults, cleanup) = scratchDefaults()
+        defer { cleanup() }
+        let writer = AppPreferences(defaults: defaults)
+
+        writer.appearance = .dark
+        writer.mapColormap = .rdbu
+        writer.diffractionColormap = .inferno
+        writer.intensityDisplay = .linear
+        writer.showScaleBar = false
+        writer.openBehaviour = .options
+        writer.exportScale = .three
+        writer.figureFormat = .pdf
+        writer.keepAwake = true
+        writer.offerLearnedDetector = false
+
+        let reader = AppPreferences(defaults: defaults)
+        XCTAssertEqual(reader.appearance, .dark)
+        XCTAssertEqual(reader.mapColormap, .rdbu)
+        XCTAssertEqual(reader.diffractionColormap, .inferno)
+        XCTAssertEqual(reader.intensityDisplay, .linear)
+        XCTAssertFalse(reader.showScaleBar)
+        XCTAssertEqual(reader.openBehaviour, .options)
+        XCTAssertEqual(reader.exportScale, .three)
+        XCTAssertEqual(reader.figureFormat, .pdf)
+        XCTAssertTrue(reader.keepAwake)
+        XCTAssertFalse(reader.offerLearnedDetector)
+    }
+
+    func testPreferenceWritesInvalidateObservation() {
+        let (defaults, cleanup) = scratchDefaults()
+        defer { cleanup() }
+        let prefs = AppPreferences(defaults: defaults)
+        let changed = expectation(description: "preference write invalidated observation")
+
+        withObservationTracking {
+            _ = prefs.showScaleBar
+        } onChange: {
+            changed.fulfill()
+        }
+        prefs.showScaleBar = false
+
+        wait(for: [changed], timeout: 1)
+    }
+
+    // MARK: Reset restores every default
+
+    /// BREAK-FIRST evidence, 2026-09-21: temporarily removed a key from
+    /// `Keys.all` (a "skip one key" mutation) and reran this test alone —
+    /// failed red (exit 65), reverted, reran green. The key used then,
+    /// `enginePreference`, was retired 2026-09-28 (clean-up session).
+    func testResetRestoresEveryKeyToItsDefault() {
+        let (defaults, cleanup) = scratchDefaults()
+        defer { cleanup() }
+        let prefs = AppPreferences(defaults: defaults)
+
+        prefs.appearance = .light
+        prefs.mapColormap = .gray
+        prefs.diffractionColormap = .gray
+        prefs.intensityDisplay = .linear
+        prefs.showScaleBar = false
+        prefs.openBehaviour = .options
+        prefs.exportScale = .two
+        prefs.figureFormat = .tiff
+        prefs.keepAwake = true
+        prefs.offerLearnedDetector = false
+
+        prefs.resetAllToDefaults()
+
+        XCTAssertEqual(prefs.appearance, .system)
+        XCTAssertEqual(prefs.mapColormap, .viridis)
+        XCTAssertEqual(prefs.diffractionColormap, .viridis)
+        XCTAssertEqual(prefs.intensityDisplay, .log)
+        XCTAssertTrue(prefs.showScaleBar)
+        XCTAssertEqual(prefs.openBehaviour, .direct)
+        XCTAssertEqual(prefs.exportScale, .one)
+        XCTAssertEqual(prefs.figureFormat, .png)
+        XCTAssertFalse(prefs.keepAwake)
+        XCTAssertTrue(prefs.offerLearnedDetector)
+    }
+
+    /// The case names the person sees and the multiplier the export draws at. Mutation: `pixelScale` returns the case's
+    /// position (0, 1, 2) or `displayName` drops the multiplication sign - red.
+    func testExportScaleCasesNameTheirMultiplier() {
+        XCTAssertEqual(ExportImageScale.allCases.map(\.pixelScale), [1, 2, 3])
+        XCTAssertEqual(ExportImageScale.allCases.map(\.displayName), ["1\u{00D7}", "2\u{00D7}", "3\u{00D7}"])
+    }
+
+    // MARK: Theme → ColorScheme? (pure)
+
+    func testAppearanceMapsToColorSchemeExactly() {
+        XCTAssertNil(AppAppearance.system.colorScheme)
+        XCTAssertEqual(AppAppearance.light.colorScheme, .light)
+        XCTAssertEqual(AppAppearance.dark.colorScheme, .dark)
+    }
+
+    // MARK: AppState reads the defaults at construction
+
+    /// The seam is `AppState.init`, not a re-applied default: a fresh
+    /// window's diffraction/map colormap and intensity display start from
+    /// the preference. Nothing here claims an analysis's own
+    /// colormap choice (a diverging strain/DPC map) is affected — that stays
+    /// untouched, per `AppState+ResultPresentation.swift`/`AppState+DPC.swift`.
+    func testAppStateSeedsItsDisplayDefaultsFromPreferences() {
+        let (defaults, cleanup) = scratchDefaults()
+        defer { cleanup() }
+        let prefs = AppPreferences(defaults: defaults)
+        prefs.diffractionColormap = .inferno
+        prefs.mapColormap = .rdbu
+        prefs.intensityDisplay = .linear
+
+        let appState = AppState(preferences: prefs)
+
+        XCTAssertEqual(appState.patternColormap, .inferno)
+        XCTAssertEqual(appState.resultPresentation.resultColormap, .rdbu)
+        XCTAssertFalse(appState.logScale)
+    }
+
+    /// `requestOpenDataset()` is the shared "Open Dataset…" gesture; the
+    /// separate, always-explicit `requestOpenDatasetWithOptions()` is
+    /// untouched by this preference (asserted second, below).
+    func testRequestOpenDatasetHonoursThePreferenceButOptionsStaysExplicit() {
+        let (defaults, cleanup) = scratchDefaults()
+        defer { cleanup() }
+        let prefs = AppPreferences(defaults: defaults)
+        prefs.openBehaviour = .options
+
+        let appState = AppState(preferences: prefs)
+        appState.requestOpenDataset()
+        XCTAssertTrue(appState.configureOnOpen)
+
+        prefs.openBehaviour = .direct
+        appState.requestOpenDataset()
+        XCTAssertFalse(appState.configureOnOpen)
+
+        appState.requestOpenDatasetWithOptions()
+        XCTAssertTrue(appState.configureOnOpen)
+    }
+
+    // MARK: A bare AppState() must never read the owner's real UserDefaults
+
+    /// Finding C (adversarial review, 2026-09-21): before the fix,
+    /// `AppState.init`'s `preferences` fallback was `AppPreferences()`, whose
+    /// default store is `UserDefaults.standard` — and this test target runs
+    /// HOSTED INSIDE mac4DSTEM.app under the unit gate, so `.standard` IS the
+    /// app's own domain. A colormap the owner changed in Settings would then
+    /// seed every one of the ~123 bare `AppState()`/`AppState(recents:)` call
+    /// sites across FourDSTEMStudioTests. This test plants a marker directly under
+    /// the real `prefs.mapColormap` key `AppPreferences` itself uses
+    /// (`Session/AppPreferences.swift`'s `Keys.mapColormap`), constructs a
+    /// bare `AppState()`, and asserts the marker did NOT seed it — the marker
+    /// is removed in `defer` unconditionally, so a failing assertion here can
+    /// never leave a stray key in the owner's real prefs.
+    ///
+    /// BREAK-FIRST evidence, 2026-09-21: reverted `AppState.init`'s fallback
+    /// to `AppPreferences()` (dropping `scratchPreferencesDefaults()`) and
+    /// reran this test alone
+    /// (`-only-testing:FourDSTEMStudioTests/AppPreferencesTests/testBareAppStateNeverReadsTheOwnersRealUserDefaults`)
+    /// — failed red (exit 65: `resultColormap` came back `.inferno`, the
+    /// planted marker), reverted, reran green.
+    func testBareAppStateNeverReadsTheOwnersRealUserDefaults() {
+        let key = "prefs.mapColormap"
+        let priorValue = UserDefaults.standard.string(forKey: key)
+        UserDefaults.standard.set(ColormapKind.inferno.rawValue, forKey: key)
+        defer {
+            if let priorValue {
+                UserDefaults.standard.set(priorValue, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+
+        let appState = AppState()
+
+        XCTAssertNotEqual(
+            appState.resultPresentation.resultColormap, .inferno,
+            "a bare AppState() must never seed from the real UserDefaults.standard"
+        )
+    }
+
+    /// Removing the Agent folder turns saving off, so a folder chosen later never starts with saving on (#191 screen check).
+    /// Mutation: the didSet dropped - red.
+    func testRemovingTheAgentFolderTurnsSavingOff() throws {
+        let suite = "prefs-agent-folder-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let prefs = AppPreferences(defaults: defaults)
+        prefs.agentFolderBookmark = Data([1, 2, 3])
+        prefs.agentFolderSavesEnabled = true
+        prefs.agentFolderBookmark = nil
+        XCTAssertFalse(prefs.agentFolderSavesEnabled)
+        XCTAssertFalse(AppPreferences(defaults: defaults).agentFolderSavesEnabled, "and it stays off after a relaunch")
+        prefs.agentFolderBookmark = Data([4])
+        XCTAssertFalse(prefs.agentFolderSavesEnabled, "a new folder starts with saving off")
+    }
+}

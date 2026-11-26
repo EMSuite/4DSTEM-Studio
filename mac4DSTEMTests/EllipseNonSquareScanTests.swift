@@ -48,12 +48,14 @@ final class EllipseNonSquareScanTests: XCTestCase {
             XCTAssertEqual(fit.theta, th, accuracy: 0.01)
             XCTAssertEqual(app.calibrationSession.calibration.ellipseTheta, fit.theta)
         }
-        // Old values (7f192da9's EllipseCalibration.swift, standalone -O, same pixels): bit patterns of cqx cqy a b theta res.
+        // Bit patterns of cqx cqy a b theta res. First recorded from the pre-switch code (7f192da9's EllipseCalibration.swift,
+        // standalone -O, same pixels); re-recorded 26 Nov 2026 after DiffractoKit 0.24's ring fit left the central Gaussian
+        // free in sign as py4DSTEM does (DiffractoKit#243): case 2 moved by up to 8e-6 relative, the others by a few ulp.
         let expected: [[UInt64]] = [
-            [4629981658662369884, 4629137681650380847, 4626885692158328426, 4625760090874246504, 4600883453294973430, 4573222263564240288],
-            [4630826244857649607, 4626885599076081185, 4626041530532316234, 4625478833459682102, 4607179251661257553, 4573035947952047484],
-            [4629137384674142927, 4629981786327970412, 4626885640210897348, 4625759179499901574, 4600872130238966553, 4573217646114708752],
-            [4626322768737394462, 4632937431348229012, 4626604513563305054, 4626182430775386306, 4612360510235552389, 4573158931434066744],
+            [4629981658662369881, 4629137681650380854, 4626885692158328426, 4625760090874246504, 4600883453294973432, 4573222263564240291],
+            [4630826244857649606, 4626885599076081178, 4626041530532315323, 4625478833459681286, 4607179251661257652, 4573035947952047526],
+            [4629137384514753817, 4629981786308793612, 4626885689421957633, 4625759219501800009, 4600872131021610889, 4573216621661533156],
+            [4626322768737394470, 4632937431348229012, 4626604513563305070, 4626182430775386321, 4612360510235552402, 4573158931434066736],
         ]
         // Compared as numbers, not parsed back from printed text (the first version split a printed line and dropped its first
         // integer, which only worked while the model name held no integer).

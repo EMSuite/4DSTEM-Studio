@@ -178,6 +178,9 @@ final class MemoryFigureAndMenuRelayTests: XCTestCase {
             PatternFitOverlay.legendText(strain: nil, template: nil, originPoint: (x: 1, y: 2), ellipse: []),
             "✚ fitted origin")
         XCTAssertEqual(
+            PatternFitOverlay.legendText(strain: nil, template: nil, originPoint: (x: 1, y: 2), ellipse: [], originFlagged: true),
+            "✚ origin flagged (centre of mass scattered)", "#511: a flagged centre of mass is not a fitted origin")
+        XCTAssertEqual(
             PatternFitOverlay.legendText(strain: nil, template: nil, originPoint: nil, ellipse: [marker]),
             "◌ fitted ellipse")
     }

@@ -749,6 +749,8 @@ struct PatternFitOverlay: View {
     let patternWidth: Int
     let patternHeight: Int
     let box: CGSize
+    /// The origin in force is a flagged centre of mass (`CalibrationReadinessReport.originIsFlagged`, #511): the key says so.
+    var originFlagged = false
 
     private static let predictionColor = Color.orange
     private static let calibrationColor = Color.red
@@ -773,7 +775,7 @@ struct PatternFitOverlay: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Fit overlay")
         .accessibilityValue(Self.legendText(
-            strain: strain, template: template, originPoint: originPoint, ellipse: ellipse))
+            strain: strain, template: template, originPoint: originPoint, ellipse: ellipse, originFlagged: originFlagged))
     }
 
     // MARK: - Coordinate mapping
@@ -907,6 +909,7 @@ struct PatternFitOverlay: View {
         template: FitOverlays.TemplateOverlay?,
         originPoint: (x: Float, y: Float)?,
         ellipse: [FitOverlays.Marker],
+        originFlagged: Bool = false,
         locale: Locale = .autoupdatingCurrent
     ) -> String {
         if let strain {
@@ -919,7 +922,8 @@ struct PatternFitOverlay: View {
             return "● measured  ✕ template · reliability \(Num.fixed(Double(template.reliability), 2, locale: locale))"
         }
         var parts: [String] = []
-        if originPoint != nil { parts.append("✚ fitted origin") }
+        // A flagged centre of mass is not a fitted origin to trust: the key says so, as the Origin & probe row does (#511).
+        if originPoint != nil { parts.append(originFlagged ? "✚ origin flagged (centre of mass scattered)" : "✚ fitted origin") }
         if !ellipse.isEmpty { parts.append("◌ fitted ellipse") }
         return parts.joined(separator: " · ")
     }

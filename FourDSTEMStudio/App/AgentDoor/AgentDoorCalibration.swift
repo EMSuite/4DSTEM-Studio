@@ -86,7 +86,8 @@ extension Mac4DSTEMAgentDoor {
         },
         AgentTool(name: "run_calibration", title: "Calibrate",
                   summary: "Starts one of Prepare's measured calibration steps, as its button does: origin (Calibrate Origin, also "
-                      + "the probe radius), origin_from_bragg_peaks (after Detect All Disks), ellipse (Fit Ellipse in the fit annulus) "
+                      + "the probe radius), origin_from_bragg_peaks (the spot pattern's origin: runs Detect All Disks first when no current detection exists; the "
+                      + "origin row's flag says when it is needed), ellipse (Fit Ellipse in the fit annulus) "
                       + "rotation (Measure R–Q Rotation; calibrates the origin first if needed), q_from_material (Calibrate from Selected "
                       + "Material: ACOM's phase model against the detected disks), restore_fitted_origin, fit_distortion_from_spots "
                       + "(a single crystal's stretch, shown in get_window, nothing applied), apply_spot_distortion, flip_rotation_180 (Flip 180°: the rotation measurement cannot tell θ from θ + 180°), or manual_ellipse "
@@ -116,10 +117,8 @@ extension Mac4DSTEMAgentDoor {
                 if let method = call.arguments["origin_method"].flatMap(OriginMethod.init(rawValue:)) { session.originMethod = method }
                 Task { await state.calibrateOrigin() }
             case .originFromBraggPeaks:
-                guard state.resultPresentation.braggVectors != nil else {
-                    return .refusal(status: 409, message: "Detect All Disks first: this follows the direct beam among the detected disks.")
-                }
-                Task { await state.calibrateOriginFromBraggPeaks() }
+                // One call, as the row's button (#511): Detect All Disks when no current detection exists, then the origin.
+                Task { await state.originFromBraggPeaksInOneStep() }
             case .ellipse:
                 let inner = call.arguments["fit_inner_px"].flatMap(Double.init) ?? session.ellipseFitInnerRadius
                 let outer = call.arguments["fit_outer_px"].flatMap(Double.init) ?? session.ellipseFitOuterRadius

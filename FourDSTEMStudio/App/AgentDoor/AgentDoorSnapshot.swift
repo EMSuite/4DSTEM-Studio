@@ -234,7 +234,9 @@ extension AppState {
             // gave "0,01904" beside the JSON's 0.01904).
             "items": CalibrationReadinessReport.make(calibration: calibration, provenance: calibrationSession.provenance,
                                                      locale: Mac4DSTEMAgentDoor.textLocale).items.map { item in
-                ["item": item.kind.rawValue, "state": item.status.displayName, "ready": item.status.isReady, "detail": item.detail] as [String: Any]
+                // "flag": what the row's own check flagged (#511), so a scattered centre of mass never reads as measured.
+                ["item": item.kind.rawValue, "state": item.stateText, "ready": item.status.isReady, "detail": item.detail,
+                 "flag": AgentJSON.orNull(item.flag)] as [String: Any]
             },
             "q_pixel_size": AgentJSON.number(calibration.qPixelSize),
             "q_pixel_units": AgentJSON.orNull(calibration.qPixelUnits),

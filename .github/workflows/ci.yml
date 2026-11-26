@@ -51,6 +51,15 @@
 #     2026-09-28 (ADR 040) while the app targeted macOS 27; back since the app
 #     and MacEMUI 0.3.2 deploy to macOS 26 (2026-10-28).
 #
+# LIGHT (as Electron Microscopy Studio's ci.yml, its #1155; release-please.yml dispatches CI on each Release PR with
+# `light`): the Release PR changes only the version files (CHANGELOG.md, .release-please-manifest.json,
+# Config/Version.xcconfig) on top of a main commit whose code already passed `unit (XCTest)`. A push to main runs no `unit`
+# here (MAIN above), so the proof is the pull request that made that commit: its last CI run passed `unit`, or a run on the
+# commit itself did (the nightly, by hand). `changes` checks both; then `unit` is skipped (GitHub counts a skipped job as
+# passing, as in DOCS ONLY) and `scientific` does not run; the Linux jobs run. What a light run gives up, a break between
+# two pull requests that each passed alone, the tag's own `unit` run still catches before anything is notarized. Any other
+# file, a base without that proof, or a branch that is not release-please's: the full by-hand run, as before.
+#
 # XCODE: every job uses Xcode 26.6 (DEVELOPER_DIR below), never the image's
 # default, so an image update cannot change the toolchain on an unchanged tree.
 #
@@ -103,6 +112,11 @@ on:
     tags: ['*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      light:
+        description: "Release PR run: skip the macOS jobs a version bump cannot change when `changes` finds it eligible (LIGHT in the header)"
+        type: boolean
+        default: false
   # Nightly: `scientific` and the macOS gates; the Linux jobs skip the schedule event.
   schedule:
     - cron: "0 2 * * *"
@@ -120,10 +134,10 @@ env:
 
 jobs:
   changes:
-    # DOCS ONLY in the header: whether this pull request changes anything the macOS job checks. Pull requests only; on every
-    # other event `unit` runs as before.
+    # DOCS ONLY in the header: whether this pull request changes anything the macOS job checks. Pull requests, and a light
+    # Release PR run (LIGHT in the header); on every other event `unit` runs as before.
     name: changes (does the PR need the macOS job)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.light)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # actions: read for MAC OR GITHUB (the other runs' jobs); nothing is written.
@@ -131,7 +145,8 @@ jobs:
       contents: read
       actions: read
     outputs:
-      macos: ${{ steps.files.outputs.macos }}
+      macos: ${{ steps.light.outputs.macos || steps.files.outputs.macos }}
+      light: ${{ steps.light.outputs.light }}
       mac: ${{ steps.mac.outputs.mac }}
     steps:
       - uses: actions/checkout@v7
@@ -140,6 +155,7 @@ jobs:
           fetch-depth: 2
       - name: List the files and decide
         id: files
+        if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
           macos=false
@@ -160,6 +176,47 @@ jobs:
             fi
           done < <(git diff --name-only --no-renames HEAD^1 HEAD)
           echo "macos=$macos" | tee -a "$GITHUB_OUTPUT"
+      - name: Light run for a Release PR (LIGHT in the header)
+        id: light
+        if: github.event_name == 'workflow_dispatch' && inputs.light
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          light=false
+          # A unit (XCTest) job that passed in the CI run with this id, or nothing.
+          passed() { gh api "repos/$GITHUB_REPOSITORY/actions/runs/$1/jobs?per_page=100" \
+                       --jq '.jobs[] | select(.name == "unit (XCTest)" and .conclusion == "success") | .id' 2>/dev/null || true; }
+          # The id of the latest ci.yml run on this commit, of this event (any event when empty), or nothing.
+          latest() { gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$1${2:+&event=$2}&per_page=20" \
+                       --jq '.workflow_runs | sort_by(.created_at) | last | .id // empty' 2>/dev/null || true; }
+          if [[ "$GITHUB_REF_NAME" != release-please--* ]]; then
+            echo "not a release-please branch: the full run"
+          else
+            base=$(git rev-parse HEAD^1)
+            others=$(git diff --name-only --no-renames HEAD^1 HEAD | grep -v -x -E 'CHANGELOG.md|\.release-please-manifest\.json|Config/Version\.xcconfig' || true)
+            if [ -n "$others" ]; then
+              echo "the Release PR also changes: $others"; echo "the full run"
+            else
+              ok=""
+              run=$(latest "$base" "")
+              [ -n "$run" ] && ok=$(passed "$run") && [ -n "$ok" ] && echo "the base $base passed unit (XCTest) itself (run $run)"
+              if [ -z "$ok" ]; then
+                # The pull request that made the base: its head's last pull_request run.
+                head=$(gh api "repos/$GITHUB_REPOSITORY/commits/$base/pulls" --jq '[.[] | select(.merged_at != null)] | first | .head.sha // empty' 2>/dev/null || true)
+                run=""; [ -n "$head" ] && run=$(latest "$head" pull_request)
+                [ -n "$run" ] && ok=$(passed "$run")
+                [ -n "$ok" ] && echo "the pull request that made the base $base passed unit (XCTest) on its last run (run $run)"
+              fi
+              if [ -n "$ok" ]; then
+                light=true
+              else
+                echo "no passing unit (XCTest) run for the base $base or its pull request: the full run"
+              fi
+            fi
+          fi
+          echo "light=$light" >> "$GITHUB_OUTPUT"
+          if [ "$light" = true ]; then echo "macos=false" >> "$GITHUB_OUTPUT"; else echo "macos=true" >> "$GITHUB_OUTPUT"; fi
       - name: Mac or GitHub (MAC OR GITHUB in the header)
         id: mac
         if: github.event_name == 'pull_request' && vars.MACEM_MAC_RUNNER != ''
@@ -242,8 +299,10 @@ jobs:
 
   scientific:
     name: scientific (py4DSTEM parity)
-    # Nightly and by hand only: the one Mac runner is the CI bottleneck and this is the slowest, non-required job.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # Nightly and by hand only: the one Mac runner is the CI bottleneck and this is the slowest, non-required job. Not on a
+    # light Release PR run (LIGHT in the header).
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.changes.outputs.light != 'true' }}
     # The org's Mac runner while the org variable MACEM_MAC_RUNNER is set (never for a fork PR); else GitHub's macos-26.
     runs-on: ${{ vars.MACEM_MAC_RUNNER && !github.event.pull_request.head.repo.fork && fromJSON(vars.MACEM_MAC_RUNNER) || 'macos-26' }}
     timeout-minutes: 180

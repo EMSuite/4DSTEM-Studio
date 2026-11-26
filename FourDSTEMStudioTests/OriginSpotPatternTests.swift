@@ -156,16 +156,19 @@ final class OriginSpotPatternTests: XCTestCase {
         session.calibration.qPixelUnits = "A^-1"
         demo.setManualAcceleratingVoltage(200)
         demo.setConvergenceSemiAngle(1)   // expects 3.99 px
-        XCTAssertTrue(try originRow(demo).detail.contains("Expected\u{00A0}probe ≈\u{00A0}3.99\u{00A0}px"), try originRow(demo).detail)
+        let expectedRow = try originRow(demo)
+        XCTAssertTrue(expectedRow.detail.contains("Expected\u{00A0}probe ≈\u{00A0}3.99\u{00A0}px"), expectedRow.detail)
         XCTAssertNotEqual(session.provenance.probe, .manual, "fixture: the demo's radius is measured")
-        XCTAssertNil(try originRow(demo).flag, "a measured radius is the data's own: \(try originRow(demo).detail)")
+        XCTAssertNil(expectedRow.flag, "a measured radius is the data's own: \(expectedRow.detail)")
 
         await demo.useProbeRadius(4.4)   // 10 % off
-        XCTAssertNil(try originRow(demo).flag, try originRow(demo).detail)
+        let near = try originRow(demo)
+        XCTAssertNil(near.flag, near.detail)
         await demo.useProbeRadius(6)     // 50 % off
         let flag = try XCTUnwrap(try originRow(demo).flag)
         XCTAssertTrue(flag.contains("typed probe radius 50 % off"), flag)
-        XCTAssertTrue(try originRow(demo).detail.contains("the typed radius is 50\u{00A0}% off"), try originRow(demo).detail)
+        let far = try originRow(demo)
+        XCTAssertTrue(far.detail.contains("the typed radius is 50\u{00A0}% off"), far.detail)
         XCTAssertEqual(try doorOriginItem(demo)["flag"] as? String, flag)
         XCTAssertEqual(demo.agentCalibration["expected_probe_radius_px"] as? Double ?? 0, 3.987, accuracy: 0.002)
     }

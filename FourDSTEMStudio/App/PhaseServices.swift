@@ -12,6 +12,7 @@
 //
 
 import Foundation
+import ShellLayout
 import ShellPhaseLibrary
 import DiffractoCore
 #if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
@@ -70,7 +71,7 @@ enum PhaseServices {
     }
 
     /// Every library phase as a model, for a saved session's phases to resolve against.
-    static var libraryModels: [CrystalModel] { isLoaded ? library.phases.map(crystalModel) : [] }
+    static var libraryModels: [CrystalModel] { isLoaded ? library.phases.map { crystalModel($0) } : [] }
 
     /// A CIF's text as the library keeps it, when the phase came from one: a saved session then carries the text too.
     static func cifSource(of phase: Phase) -> PhaseSetupRecord.CIFSource? {

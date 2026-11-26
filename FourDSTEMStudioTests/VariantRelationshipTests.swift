@@ -8,8 +8,9 @@ import DSTEMSession
 
 /// #512: the variant count takes any matrix and a relationship typed as a paper states it (two parallel pairs, orix
 /// `Misorientation.from_align_vectors`; the kit keeps the first exact), with the habit and its axis. Nothing is chosen until the person
-/// types one or picks a literature example (β″ Andersen 1998, θ′ and T1 Thronsen 2024, all in Al), which warns on another matrix.
-/// The three examples keep today's numbers: `ObjectVariantsTests` and `DemoV3VariantsTests` run them unchanged.
+/// types one, and no built-in relationship is offered. The three Al relationships of 5.4 (β″ Andersen 1998, θ′ and T1 Thronsen 2024)
+/// stay only so old sessions and recipes replay with today's numbers (`ObjectVariantsTests`, `DemoV3VariantsTests`); a replayed one
+/// warns on another matrix.
 final class VariantRelationshipTests: XCTestCase {
     /// Mutation: `VariantSettings()` keeps β″ as its relationship, or the run guesses one - red.
     func testANewCountHasNoRelationshipAndTheRunSaysWhatIsMissing() throws {
@@ -80,14 +81,15 @@ final class VariantRelationshipTests: XCTestCase {
         XCTAssertEqual(OrientationRelationshipPreset.betaDoublePrimeInAl.pairsText, "[1 0 0] ∥ [3 2 0], [0 1 0] ∥ [0 0 1]")
     }
 
-    /// The door: an example by name, typed pairs with the habit and axis, "none"; missing pieces are refused.
+    /// The door: typed pairs with the habit and axis, "none", and an old recipe's case name; missing pieces are refused. No tool
+    /// offers the old relationships. Mutation: set_precipitates takes variant_example again - red.
     @MainActor
-    func testTheDoorTakesAnExampleTypedPairsAndNone() throws {
+    func testTheDoorTakesTypedPairsNoneAndAnOldRecipe() throws {
         typealias Door = Mac4DSTEMAgentDoor
-        guard case .success(let example) = Door.variantRelationship(["variant_example": "t1InAl"], current: nil) else { return XCTFail() }
-        XCTAssertEqual(example?.example, .t1InAl)
+        let tool = try XCTUnwrap(Door.precipitateTools.first { $0.name == "set_precipitates" })
+        XCTAssertFalse(tool.parameters.contains { $0.name == "variant_example" }, "no built-in relationship is offered")
         guard case .success(let old) = Door.variantRelationship(["orientation_relationship": "thetaPrimeInAl"], current: nil) else { return XCTFail() }
-        XCTAssertEqual(old?.example, .thetaPrimeInAl, "an old caller's case name is the example")
+        XCTAssertEqual(old?.example, .thetaPrimeInAl, "an old recipe's case name replays")
         guard case .success(let typed) = Door.variantRelationship(["orientation_relationship": "(0 0 1) ∥ (1 1 0), [1 0 0] ∥ [1 -1 1]",
                                                                     "variant_habit": "plate", "variant_habit_axis": "[0 0 1]"], current: nil)
         else { return XCTFail() }

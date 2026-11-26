@@ -179,7 +179,7 @@ enum AgentDoorCoverage {
         "precipitates.table": .tool("get_precipitate_objects"),
         "precipitates.variants.agreement": .tool("set_precipitates"),
         "precipitates.variants.colourBy": .tool("set_precipitates"),
-        "precipitates.variants.example": .tool("set_precipitates"),
+        "precipitates.variants.clearRelationship": .tool("set_precipitates"),   // orientation_relationship none
         "precipitates.variants.exampleNote": .tool("set_precipitates"),
         "precipitates.variants.habit": .tool("set_precipitates"),
         "precipitates.variants.habitAxis": .tool("set_precipitates"),

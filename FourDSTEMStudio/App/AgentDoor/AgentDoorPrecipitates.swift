@@ -21,7 +21,7 @@ extension Mac4DSTEMAgentDoor {
                       + "in scan pixels, which phase result the pane shows (phaseMap, objects, distance), the thickness behind N_V "
                       + "(nm, with σ and source words, or the source words from macTEM's EELS method JSON in the Agent folder; "
                       + "clear_thickness takes it away), and variant counting (count_variants, its phase, the orientation relationship "
-                      + "as a paper states it with the habit and its axis, or a literature example, the angle tolerance in degrees and "
+                      + "as a paper states it with the habit and its axis, the angle tolerance in degrees and "
                       + "the least agreement). Nothing is chosen for the relationship: without one the variant run says so. Needs a phase map. get_precipitate_objects reads the "
                       + "objects and N_V.",
                   input: .window,
@@ -48,9 +48,6 @@ extension Mac4DSTEMAgentDoor {
                                          + "plate stands on it."),
                       AgentParameter("variant_habit_axis", .text, summary: "The needle axis or plate normal as a direction of the "
                                          + "precipitate, \"[0 1 0]\"."),
-                      AgentParameter("variant_example", .choice(caseNames(OrientationRelationshipPreset.self)),
-                                     summary: "A literature example (beta'' Andersen 1998, theta' and T1 Thronsen 2024, all in Al): "
-                                         + "fills the relationship; the answer warns when the matrix is not Al."),
                       AgentParameter("angle_tolerance_deg", .number(0.001...90), summary: "A pixel votes only this near a variant."),
                       AgentParameter("agreement_min", .number(0.01...1), summary: "Least share of an object's pixels for its variant."),
                   ],
@@ -100,7 +97,7 @@ extension Mac4DSTEMAgentDoor {
                 let on = v == "true"
                 if on != (state.precipitateVariantSettings != nil) { state.setPrecipitateVariantSettings(on ? VariantSettings() : nil) }
             }
-            let variantKeys = ["variant_phase", "orientation_relationship", "variant_habit", "variant_habit_axis", "variant_example",
+            let variantKeys = ["variant_phase", "orientation_relationship", "variant_habit", "variant_habit_axis",
                                "angle_tolerance_deg", "agreement_min"]
             if variantKeys.contains(where: { a[$0] != nil }) {
                 guard var next = state.precipitateVariantSettings else {
@@ -170,11 +167,10 @@ extension Mac4DSTEMAgentDoor {
         }
     }
 
-    /// The relationship `set_precipitates` asks for (#512): an example; "none"; typed pairs with the habit and its axis (each taken from
-    /// the standing relationship when not given); an old caller's example by its case name in `orientation_relationship`; or, with none
-    /// of these, the standing one.
+    /// The relationship `set_precipitates` asks for (#512): "none"; typed pairs with the habit and its axis (each taken from the
+    /// standing relationship when not given); a 5.4 recipe's Al relationship by its case name in `orientation_relationship`, so old
+    /// recipes replay (no tool offers it); or, with none of these, the standing one.
     static func variantRelationship(_ a: [String: String], current: VariantRelationship?) -> Result<VariantRelationship?, ToolRefusal> {
-        if let example = named(a["variant_example"], OrientationRelationshipPreset.self) { return .success(VariantRelationship(example: example)) }
         let typed = a["orientation_relationship"]?.trimmingCharacters(in: .whitespacesAndNewlines)
         if typed == "none" { return .success(nil) }
         if let typed, let example = named(typed, OrientationRelationshipPreset.self) { return .success(VariantRelationship(example: example)) }

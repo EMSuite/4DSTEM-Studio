@@ -218,12 +218,14 @@ final class PrecipitateJoinsJourney: Journey {
             table.buttons["_XCUI:CloseWindow"].click()
             let toggle = wait(for: "precipitates.variants.section", timeout: 20)
             toggle.click()
-            // Nothing is chosen for the relationship (#512): the demo's beta'' are Andersen's, picked as the literature example.
+            // Nothing is chosen for the relationship (#512): the demo's beta'' follow Andersen et al. (1998), typed as the paper states it.
             XCTAssertTrue(element("precipitates.variants.unavailable").waitForExistence(timeout: 30), "no relationship: the run says so")
-            element("precipitates.variants.example").click()
-            let example = app.menuItems.matching(NSPredicate(format: "title CONTAINS %@", "Andersen 1998")).firstMatch
-            XCTAssertTrue(example.waitForExistence(timeout: 10), "the Example menu has no Andersen 1998")
-            example.click()
+            element("precipitates.variants.habit").click()
+            app.menuItems["Needle"].click()
+            let axis = element("precipitates.variants.habitAxis")
+            axis.click(); axis.typeText("[0 1 0]\r")
+            let pairs = element("precipitates.variants.orPairs")
+            pairs.click(); pairs.typeText("[1 0 0] || [3 2 0], [0 1 0] || [0 0 1]\r")
             XCTAssertTrue(element("precipitates.variants.totals").waitForExistence(timeout: 60)
                           || element("precipitates.variants.unavailable").exists, "the variant run showed neither a legend nor a reason")
             if element("precipitates.variants.unavailable").exists {

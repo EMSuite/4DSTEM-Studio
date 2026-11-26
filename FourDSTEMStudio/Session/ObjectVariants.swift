@@ -22,8 +22,9 @@ import DiffractoCore
 import DiffractoOrientation
 #endif
 
-/// The literature examples the variant block offers (#512): each fills the relationship as its paper states it for aluminium, never a
-/// default. beta'' is a needle; theta' and T1 are plates (suite task 40 follow-up). Picked on another matrix, the block warns.
+/// The three Al relationships of 5.4 (suite task 40), kept only so sessions and recipes saved with them replay with the same numbers
+/// (#512): no menu or tool offers them, and nothing is chosen by default. beta'' is a needle; theta' and T1 are plates. Replayed on
+/// another matrix, the block warns. A general set of classic relationships may come later, for any material.
 package nonisolated enum OrientationRelationshipPreset: String, Codable, Sendable, CaseIterable, Identifiable {
     case betaDoublePrimeInAl = "beta-double-prime-in-al"
     case thetaPrimeInAl = "theta-prime-in-al"
@@ -113,14 +114,14 @@ package nonisolated enum OrientationRelationshipPreset: String, Codable, Sendabl
 
 /// The relationship whose variants are named (#512): two parallel pairs as a paper states them (orix `Misorientation.from_align_vectors`
 /// builds a relationship from two such pairs; the kit's `OrientationRelationship.rotation` keeps the first exact), the habit (needle or
-/// plate) and its axis as a direction of the precipitate (the needle axis or the plate normal). Typed by the person, or filled by a
-/// literature example, which keeps its own statements and its matrix directions and names. Nothing is chosen until one of the two.
+/// plate) and its axis as a direction of the precipitate (the needle axis or the plate normal). Typed by the person; a session saved
+/// with a 5.4 Al relationship replays it as that example, with its own statements and matrix directions. Nothing is chosen until typed.
 package nonisolated struct VariantRelationship: Codable, Hashable, Sendable {
     /// The pairs as typed, in the phase rows' grammar: "(0 0 1) ∥ (1 1 1), [2 1 0] ∥ [1 -1 0]".
     package let pairs: String
     package let habit: OrientationRelationshipPreset.Habit
     package let habitAxis: SIMD3<Int>
-    /// The literature example it is, while nothing of it was changed.
+    /// The replayed 5.4 relationship it is, while nothing of it was changed.
     package let example: OrientationRelationshipPreset?
 
     package init(pairs: String, habit: OrientationRelationshipPreset.Habit, habitAxis: SIMD3<Int>) {
@@ -149,7 +150,7 @@ package nonisolated struct VariantRelationship: Codable, Hashable, Sendable {
 package nonisolated struct VariantSettings: Codable, Hashable, Sendable {
     /// Where the object's orientation comes from. Only the phase map's winning entries are built.
     package var source = "known_variants"
-    /// None until the person types one or picks a literature example (#512): the run then says what is missing.
+    /// None until the person types one (#512): the run then says what is missing.
     package var relationship: VariantRelationship?
     /// A pixel votes only when its nearest variant is this near (degrees); nil is half the library's in-plane step, because no pixel
     /// can say more than its grid does.
@@ -159,7 +160,7 @@ package nonisolated struct VariantSettings: Codable, Hashable, Sendable {
     /// The phase that has the relationship to the matrix (a candidate phase's display name); nil is the first candidate.
     package var phaseName: String?
     package init() {}
-    /// Counting with a literature example's relationship.
+    /// Counting with a 5.4 relationship, as a replayed session does.
     package init(example: OrientationRelationshipPreset) { relationship = VariantRelationship(example: example) }
 
     // MARK: lineage parameters (the sidecar's record of it; settings, not results: replay recomputes)
@@ -334,8 +335,7 @@ package nonisolated enum VariantError: Error, Equatable, LocalizedError {
         switch self {
         case .noStandardSetting: "A phase has no standard orientation setting, so its variants cannot be named."
         case .noMatrixEntry: "The phase map has no fitted matrix orientation to measure the variants from."
-        case .noRelationship: "Type the orientation relationship as a paper states it (two parallel pairs, the habit and its axis), "
-            + "or pick a literature example."
+        case .noRelationship: "Type the orientation relationship as a paper states it: two parallel pairs, the habit and its axis."
         case .pairsDoNotRead(let text): "\"\(text)\" is not two parallel pairs: write them as (h k l) ∥ (h k l), [u v w] ∥ [u v w], "
             + "the precipitate first."
         case .pairsDoNotFixAnOrientation: "These pairs do not fix an orientation: each side needs two vectors that are not parallel."
@@ -591,7 +591,7 @@ package nonisolated enum ObjectVariantJoin {
         /// The matrix directions those indices name ("[100]"), and the habit.
         package var familyNames: [String] = []
         package var habit: OrientationRelationshipPreset.Habit? = nil
-        /// A literature example used on a matrix its paper does not state it for, in words (#512).
+        /// A replayed 5.4 relationship used on a matrix its paper does not state it for, in words (#512).
         package var warning: String? = nil
         /// A map made from the structures: the tolerance used when the user typed none, degrees (the learned relationship's distance to
         /// the named one plus the kit's 3 degrees). nil for typed zone axes, whose default is half the library's in-plane step.

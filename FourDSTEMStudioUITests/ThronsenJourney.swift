@@ -77,6 +77,13 @@ final class ThronsenJourney: Journey {
         return e
     }
 
+    /// Types a relationship as a paper states it (#512): the habit, its axis, then the pairs, which apply it.
+    private func typeRelationship(_ pairs: String, habit: String, axis: String) {
+        pick(habit, in: wait(for: "precipitates.variants.habit"))
+        type(axis, into: wait(for: "precipitates.variants.habitAxis"))
+        type(pairs, into: wait(for: "precipitates.variants.orPairs"))
+    }
+
     /// Replaces a field's text and commits it with Return.
     private func type(_ text: String, into field: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(field.waitForExistence(timeout: 20), "no field for \(text)", file: file, line: line)
@@ -306,25 +313,25 @@ final class ThronsenJourney: Journey {
             record("object table", objectTable)
             objectTable.typeKey("w", modifierFlags: .command)
         }
-        front("variants: θ′ edge-on, θ′ {001} plate preset") {
+        front("variants: θ′ edge-on, (001) ∥ (001), [100] ∥ [100], plates on (001) (Thronsen 2024, typed)") {
             app.windows.firstMatch.click()
             reveal(wait(for: "precipitates.variants.section", timeout: 30)).click()
             pick("[1 0 0]", in: wait(for: "precipitates.variants.phase", timeout: 30))
-            pick("θ′ in Al", in: wait(for: "precipitates.variants.example"))
+            typeRelationship("(0 0 1) || (0 0 1), [1 0 0] || [1 0 0]", habit: "Plate", axis: "[0 0 1]")
             waitIdle("the θ′ variants")
             let legend = app.disclosureTriangles["Variants"].exists ? app.disclosureTriangles["Variants"] : app.buttons["Variants"]
             if legend.exists { expand(reveal(legend)) }
             record("variants theta")
             _ = exportCSV(named: "thronsen-theta-edge-variants.csv")
         }
-        front("variants: θ′ face-on with the same preset") {
+        front("variants: θ′ face-on with the same relationship") {
             pick("[0 0 1]", in: wait(for: "precipitates.variants.phase", timeout: 30))
             waitIdle("the θ′ face-on variants")
             record("variants theta face")
         }
-        front("variants: T1 {111} plate preset") {
+        front("variants: T1, (0001) ∥ (111), [10-10] ∥ [1-10], plates on (0001) (typed)") {
             pick("T1", in: wait(for: "precipitates.variants.phase", timeout: 30))
-            pick("T1 in Al", in: wait(for: "precipitates.variants.example"))
+            typeRelationship("(0 0 1) || (1 1 1), [2 1 0] || [1 -1 0]", habit: "Plate", axis: "[0 0 1]")
             waitIdle("the T1 variants")
             record("variants T1")
             _ = exportCSV(named: "thronsen-T1-variants.csv")

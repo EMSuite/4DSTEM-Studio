@@ -227,7 +227,7 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
     package var variantDirections: [Int]? = nil
     /// Where the variant count read its orientations, when not from the phase map's library entries (a map made from the structures).
     package var variantSourceNote: String? = nil
-    /// A literature example used on a matrix its paper does not state it for (#512), in words; nil otherwise and in a report from before.
+    /// A replayed 5.4 relationship used on a matrix its paper does not state it for (#512), in words; nil otherwise and in a report from before.
     package var variantWarning: String? = nil
 
     package var hasPhysicalScale: Bool { pixelSize != nil && pixelUnit != nil }

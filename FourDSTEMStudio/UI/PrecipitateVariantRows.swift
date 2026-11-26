@@ -151,8 +151,9 @@ nonisolated enum VariantGroupText {
 }
 
 /// The relationship as a paper states it (#512): two parallel pairs in one field, the habit and its axis, committed on Return once
-/// all three are there; or a literature example that fills them, named with its paper. Empty until the person does one of the two.
-/// A field that does not read is named and the standing relationship stays.
+/// all three are there. Empty until the person types one: no built-in relationship is offered, for any material (a session saved
+/// with one of the three Al relationships of 5.4 replays it, and its note names the paper). A field that does not read is named
+/// and the standing relationship stays.
 private struct VariantRelationshipFields: View {
     let relationship: VariantRelationship?
     let commit: (VariantRelationship?) -> Void
@@ -162,31 +163,17 @@ private struct VariantRelationshipFields: View {
     @State private var refusal: String?
 
     var body: some View {
-        InspectorRow("Example") {
-            Menu(relationship?.example?.title ?? "Literature Example") {
-                ForEach(OrientationRelationshipPreset.allCases) { example in
-                    Button(example.title) { commit(VariantRelationship(example: example)) }
-                }
-                if relationship != nil {
-                    Divider()
-                    Button("Clear Relationship") { commit(nil) }
-                }
-            }
-            .fixedSize()
-            .help("Fills the relationship, the habit and its axis as a paper states them for aluminium; on another matrix it warns.")
-            .accessibilityIdentifier("precipitates.variants.example")
+        InspectorRow("Relationship") {
+            TextField("Relationship", text: $pairs, prompt: Text("(h k l) ∥ (h k l), [u v w] ∥ [u v w]"))
+                .labelsHidden()
+                .onSubmit(apply)
+                .accessibilityIdentifier("precipitates.variants.orPairs")
         }
         .onChange(of: relationship, initial: true) { _, new in
             pairs = new?.pairs ?? ""
             habit = new?.habit
             axis = new?.habitAxisText ?? ""
             refusal = nil
-        }
-        InspectorRow("Relationship") {
-            TextField("Relationship", text: $pairs, prompt: Text("(h k l) ∥ (h k l), [u v w] ∥ [u v w]"))
-                .labelsHidden()
-                .onSubmit(apply)
-                .accessibilityIdentifier("precipitates.variants.orPairs")
         }
         .help("Two parallel pairs, the precipitate's first, as a paper states them: planes in ( ), directions in [ ]. The first pair is "
               + "kept exact, the second fixes the rotation about it (orix from_align_vectors). Return applies.")
@@ -214,6 +201,12 @@ private struct VariantRelationshipFields: View {
         if let refusal {
             InspectorNote(refusal).accessibilityIdentifier("precipitates.variants.orRefusal")
         }
+        if relationship != nil {
+            InspectorActionRow {
+                Button("Clear Relationship") { commit(nil) }
+                    .accessibilityIdentifier("precipitates.variants.clearRelationship")
+            }
+        }
     }
 
     private func apply() {
@@ -237,7 +230,7 @@ private struct VariantRelationshipFields: View {
         }
         refusal = nil
         let next = VariantRelationship(pairs: typed, habit: habit, habitAxis: uvw)
-        // Return on an example's own fields keeps the example.
+        // Return on a replayed example's own fields keeps it.
         if let current = relationship, current.pairs == next.pairs, current.habit == habit, current.habitAxis == uvw { return }
         commit(next)
     }

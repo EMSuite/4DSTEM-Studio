@@ -10,6 +10,7 @@ import Foundation
 import ShellAgentDoor
 #if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
 import DSTEMCore
+import DSTEMSession
 #endif
 
 /// One run the door started, as `operation.last_run` reports it.

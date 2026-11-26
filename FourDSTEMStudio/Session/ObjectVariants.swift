@@ -22,7 +22,8 @@ import DiffractoCore
 import DiffractoOrientation
 #endif
 
-/// The orientation relationships the variant block offers. beta'' stays the default; theta' and T1 are plates (suite task 40 follow-up).
+/// The literature examples the variant block offers (#512): each fills the relationship as its paper states it for aluminium, never a
+/// default. beta'' is a needle; theta' and T1 are plates (suite task 40 follow-up). Picked on another matrix, the block warns.
 package nonisolated enum OrientationRelationshipPreset: String, Codable, Sendable, CaseIterable, Identifiable {
     case betaDoublePrimeInAl = "beta-double-prime-in-al"
     case thetaPrimeInAl = "theta-prime-in-al"
@@ -78,25 +79,78 @@ package nonisolated enum OrientationRelationshipPreset: String, Codable, Sendabl
         }
     }
 
+    /// The paper, in the words a note under the relationship uses.
+    package var citation: String {
+        switch self {
+        case .betaDoublePrimeInAl: "Andersen et al., Acta Mater. 46 (1998) 3283"
+        case .thetaPrimeInAl, .t1InAl: "Thronsen et al. (2024)"
+        }
+    }
+    /// The precipitate's name in the paper.
+    package var precipitateName: String {
+        switch self { case .betaDoublePrimeInAl: "\u{03B2}\u{2033}"; case .thetaPrimeInAl: "\u{03B8}\u{2032}"; case .t1InAl: "T1" }
+    }
+    /// The matrix the paper states the relationship for: aluminium, by its atomic number.
+    package var matrixName: String { "Al" }
+    package var matrixElements: Set<Int> { [13] }
+    /// The two statements as the relationship field writes them: "[1 0 0] ∥ [3 2 0], [0 1 0] ∥ [0 0 1]".
+    package var pairsText: String { [statements.0, statements.1].map(OrientationRelationshipVariants.text).joined(separator: ", ") }
+
     /// The family whose direction is most parallel to `axis` (largest |dot|, ±n one family), in `habitFamilies` order.
-    package func family(nearest axis: SIMD3<Double>) -> Int {
-        let unit = simd_length(axis) > 0 ? simd_normalize(axis) : axis
-        let dots = habitFamilies.map { abs(simd_dot(simd_normalize($0), unit)) }
-        return dots.indices.max { dots[$0] < dots[$1] } ?? 0
-    }
+    package func family(nearest axis: SIMD3<Double>) -> Int { VariantSetup.family(nearest: axis, in: habitFamilies) }
     /// The family lying along `axis` (a beam direction) to within a tenth of a degree, or nil when it lies along none.
-    package func family(alongBeam axis: SIMD3<Double>) -> Int? {
-        guard simd_length(axis) > 0 else { return nil }
-        let i = family(nearest: axis)
-        return abs(simd_dot(simd_normalize(habitFamilies[i]), simd_normalize(axis))) > cos(0.1 * .pi / 180) ? i : nil
+    package func family(alongBeam axis: SIMD3<Double>) -> Int? { VariantSetup.family(alongBeam: axis, in: habitFamilies) }
+
+    /// The sentence the block and the door say when this example is used on a matrix the paper does not state it for; nil when the
+    /// matrix is made of the paper's elements only.
+    package func warning(matrix: CrystalStructure, matrixName shown: String) -> String? {
+        let elements = Set(matrix.sites.map(\.z))
+        guard elements.isEmpty || elements != matrixElements else { return nil }
+        return "\(citation) state this relationship for \(precipitateName) in \(matrixName); the matrix here is \(shown). "
+            + "Type the relationship a paper states for this matrix."
     }
+}
+
+/// The relationship whose variants are named (#512): two parallel pairs as a paper states them (orix `Misorientation.from_align_vectors`
+/// builds a relationship from two such pairs; the kit's `OrientationRelationship.rotation` keeps the first exact), the habit (needle or
+/// plate) and its axis as a direction of the precipitate (the needle axis or the plate normal). Typed by the person, or filled by a
+/// literature example, which keeps its own statements and its matrix directions and names. Nothing is chosen until one of the two.
+package nonisolated struct VariantRelationship: Codable, Hashable, Sendable {
+    /// The pairs as typed, in the phase rows' grammar: "(0 0 1) ∥ (1 1 1), [2 1 0] ∥ [1 -1 0]".
+    package let pairs: String
+    package let habit: OrientationRelationshipPreset.Habit
+    package let habitAxis: SIMD3<Int>
+    /// The literature example it is, while nothing of it was changed.
+    package let example: OrientationRelationshipPreset?
+
+    package init(pairs: String, habit: OrientationRelationshipPreset.Habit, habitAxis: SIMD3<Int>) {
+        self.pairs = pairs.trimmingCharacters(in: .whitespacesAndNewlines); self.habit = habit; self.habitAxis = habitAxis; example = nil
+    }
+
+    package init(example: OrientationRelationshipPreset) {
+        pairs = example.pairsText; habit = example.habit; habitAxis = example.habitAxis; self.example = example
+    }
+
+    /// The two statements: the example's own, or the typed pairs when they read as exactly two.
+    package var statements: (OrientationRelationship, OrientationRelationship)? {
+        if let example { return example.statements }
+        guard let parsed = PhaseMappingSlot.parseOrientationRelationships(pairs), parsed.count == 2 else { return nil }
+        return (parsed[0], parsed[1])
+    }
+
+    /// "[u v w]" of the habit axis.
+    package var habitAxisText: String { "[\(habitAxis.x) \(habitAxis.y) \(habitAxis.z)]" }
+
+    /// The menu's and the summary's words: the example's title, or the pairs with the habit.
+    package var title: String { example?.title ?? "\(pairs); \(habit.rawValue) along \(habitAxisText)" }
 }
 
 /// How objects are assigned to variants. Settings, not results: they ride in the sidecar and replay recomputes.
 package nonisolated struct VariantSettings: Codable, Hashable, Sendable {
     /// Where the object's orientation comes from. Only the phase map's winning entries are built.
     package var source = "known_variants"
-    package var orientationRelationship = OrientationRelationshipPreset.betaDoublePrimeInAl
+    /// None until the person types one or picks a literature example (#512): the run then says what is missing.
+    package var relationship: VariantRelationship?
     /// A pixel votes only when its nearest variant is this near (degrees); nil is half the library's in-plane step, because no pixel
     /// can say more than its grid does.
     package var toleranceDegrees: Double?
@@ -105,23 +159,42 @@ package nonisolated struct VariantSettings: Codable, Hashable, Sendable {
     /// The phase that has the relationship to the matrix (a candidate phase's display name); nil is the first candidate.
     package var phaseName: String?
     package init() {}
+    /// Counting with a literature example's relationship.
+    package init(example: OrientationRelationshipPreset) { relationship = VariantRelationship(example: example) }
 
     // MARK: lineage parameters (the sidecar's record of it; settings, not results: replay recomputes)
 
-    package static let keys = ["variant_source", "variant_or", "variant_phase", "variant_tolerance_deg", "variant_agreement_min"]
+    package static let keys = ["variant_source", "variant_or", "variant_or_pairs", "variant_habit", "variant_habit_axis", "variant_phase",
+                               "variant_tolerance_deg", "variant_agreement_min"]
 
+    /// `variant_or`: an example's raw value (the three values sessions from before #512 carry, replayed unchanged), "typed" with the
+    /// pairs, the habit and its axis beside it, or "none".
     package var parameters: [String: String] {
-        var p = ["variant_source": source, "variant_or": orientationRelationship.rawValue, "variant_agreement_min": String(agreementMinimum)]
+        var p = ["variant_source": source, "variant_agreement_min": String(agreementMinimum)]
+        switch relationship {
+        case nil: p["variant_or"] = "none"
+        case let r? where r.example != nil: p["variant_or"] = r.example?.rawValue
+        case let r?:
+            p["variant_or"] = "typed"
+            p["variant_or_pairs"] = r.pairs
+            p["variant_habit"] = r.habit.rawValue
+            p["variant_habit_axis"] = "\(r.habitAxis.x) \(r.habitAxis.y) \(r.habitAxis.z)"
+        }
         if let toleranceDegrees { p["variant_tolerance_deg"] = String(toleranceDegrees) }
         if let phaseName { p["variant_phase"] = phaseName }
         return p
     }
 
     package init?(parameters p: [String: String]) {
-        guard let or = p["variant_or"].flatMap(OrientationRelationshipPreset.init(rawValue:)) else { return nil }
+        guard let or = p["variant_or"] else { return nil }
         self.init()
         source = p["variant_source"] ?? "known_variants"
-        orientationRelationship = or
+        if let example = OrientationRelationshipPreset(rawValue: or) {
+            relationship = VariantRelationship(example: example)
+        } else if or == "typed", let pairs = p["variant_or_pairs"], let habit = p["variant_habit"].flatMap(OrientationRelationshipPreset.Habit.init(rawValue:)),
+                  let axis = p["variant_habit_axis"].flatMap(PhaseMappingSlot.parseZoneAxis) {
+            relationship = VariantRelationship(pairs: pairs, habit: habit, habitAxis: axis)
+        }
         agreementMinimum = p["variant_agreement_min"].flatMap(Double.init) ?? 0.5
         toleranceDegrees = p["variant_tolerance_deg"].flatMap(Double.init)
         phaseName = p["variant_phase"]
@@ -171,27 +244,102 @@ package nonisolated struct VariantSetup: Sendable {
     package let set: OrientationVariantSet
     /// Per variant (kit order): the index into `familyNames` of the matrix direction its habit axis (needle axis or plate normal) lies along.
     package let habitFamily: [Int]
-    package var familyNames: [String] { preset.familyNames }
-    package let preset: OrientationRelationshipPreset
+    /// The matrix directions the habit axis lies along, in the matrix's Cartesian frame, ±n one family: an example's own (the cube axes,
+    /// the four <111>), or for a typed relationship the distinct images of the habit axis over the variants, in the kit's variant order.
+    package let habitFamilies: [SIMD3<Double>]
+    /// Their names as matrix lattice directions ("[100]", "[-111]"), in the same order.
+    package let familyNames: [String]
+    package let relationship: VariantRelationship
 
     package init(precipitate: CrystalStructure, matrix: CrystalStructure, preset: OrientationRelationshipPreset) throws {
+        try self.init(precipitate: precipitate, matrix: matrix, relationship: VariantRelationship(example: preset))
+    }
+
+    package init(precipitate: CrystalStructure, matrix: CrystalStructure, relationship: VariantRelationship) throws {
+        guard let statements = relationship.statements else { throw VariantError.pairsDoNotRead(relationship.pairs) }
         guard let matrixSymmetry = PhaseModel.orientationSymmetry(of: matrix),
               let precipitateSymmetry = PhaseModel.orientationSymmetry(of: precipitate) else { throw VariantError.noStandardSetting }
-        let relation = try OrientationRelationship.rotation(preset.statements.0, preset.statements.1, precipitate: precipitate, matrix: matrix)
+        let relation: simd_double3x3
+        do { relation = try OrientationRelationship.rotation(statements.0, statements.1, precipitate: precipitate, matrix: matrix) }
+        catch { throw VariantError.pairsDoNotFixAnOrientation }
         set = try OrientationVariantSet(matrix: relation, matrixSymmetry: matrixSymmetry, precipitateSymmetry: precipitateSymmetry)
-        guard let habit = PhaseReferenceLibrary.cartesianZoneAxis(preset.habitAxis, crystal: precipitate) else { throw VariantError.noStandardSetting }
-        habitFamily = set.variants.map { preset.family(nearest: $0 * habit) }
-        self.preset = preset
+        guard let habit = PhaseReferenceLibrary.cartesianZoneAxis(relationship.habitAxis, crystal: precipitate) else {
+            throw VariantError.habitAxisIsZero
+        }
+        if let example = relationship.example {
+            habitFamilies = example.habitFamilies
+            familyNames = example.familyNames
+        } else {
+            var families: [SIMD3<Double>] = []
+            for v in set.variants {
+                let axis = simd_normalize(v * habit)
+                if !families.contains(where: { abs(simd_dot($0, axis)) > cos(0.5 * .pi / 180) }) { families.append(axis) }
+            }
+            habitFamilies = families
+            familyNames = families.map { Self.directionName($0, in: matrix) }
+        }
+        let families = habitFamilies
+        habitFamily = set.variants.map { Self.family(nearest: $0 * habit, in: families) }
+        self.relationship = relationship
+    }
+
+    /// The family whose direction is most parallel to `axis` (largest |dot|, ±n one family), in `families` order.
+    package static func family(nearest axis: SIMD3<Double>, in families: [SIMD3<Double>]) -> Int {
+        let unit = simd_length(axis) > 0 ? simd_normalize(axis) : axis
+        let dots = families.map { abs(simd_dot(simd_normalize($0), unit)) }
+        return dots.indices.max { dots[$0] < dots[$1] } ?? 0
+    }
+    /// The family lying along `axis` (a beam direction) to within a tenth of a degree, or nil when it lies along none.
+    package static func family(alongBeam axis: SIMD3<Double>, in families: [SIMD3<Double>]) -> Int? {
+        guard simd_length(axis) > 0, !families.isEmpty else { return nil }
+        let i = family(nearest: axis, in: families)
+        return abs(simd_dot(simd_normalize(families[i]), simd_normalize(axis))) > cos(0.1 * .pi / 180) ? i : nil
+    }
+    package func family(alongBeam axis: SIMD3<Double>) -> Int? { Self.family(alongBeam: axis, in: habitFamilies) }
+
+    /// A Cartesian direction of `crystal` as its smallest lattice indices, first non-zero index positive: "[100]", "[1-10]", "[2 10 1]".
+    /// uᵢ = v · bᵢ (the reciprocal rows, aᵢ · bⱼ = δᵢⱼ), scaled by the least whole multiple up to 12 that makes them whole within 0.02;
+    /// a direction no such multiple makes whole is written with two decimals.
+    package static func directionName(_ v: SIMD3<Double>, in crystal: CrystalStructure) -> String {
+        let b = crystal.cell.reciprocalLattice
+        var u = SIMD3(simd_dot(v, b[0]), simd_dot(v, b[1]), simd_dot(v, b[2]))
+        let largest = max(abs(u.x), abs(u.y), abs(u.z))
+        guard largest.isFinite, largest > 0 else { return "[?]" }
+        u /= largest
+        if let first = [u.x, u.y, u.z].first(where: { abs($0) > 1e-6 }), first < 0 { u = -u }
+        let smallest = [u.x, u.y, u.z].map(abs).filter { $0 > 1e-6 }.min() ?? 1
+        for k in 1...12 {
+            let scaled = u * (Double(k) / smallest)
+            let whole = scaled.rounded(.toNearestOrAwayFromZero)
+            if simd_reduce_max(simd_abs(scaled - whole)) < 0.02, simd_reduce_max(simd_abs(whole)) <= 99 {
+                let ints = [Int(whole.x), Int(whole.y), Int(whole.z)]
+                return "[" + ints.map(String.init).joined(separator: ints.allSatisfy { abs($0) < 10 } ? "" : " ") + "]"
+            }
+        }
+        return "[" + [u.x, u.y, u.z].map { String(format: "%.2f", $0) }.joined(separator: " ") + "]"
     }
 }
 
 package nonisolated enum VariantError: Error, Equatable, LocalizedError {
     case noStandardSetting
     case noMatrixEntry
+    /// No relationship is typed and no example picked (#512).
+    case noRelationship
+    /// The typed pairs are not two pairs of the grammar.
+    case pairsDoNotRead(String)
+    /// The pairs do not fix an orientation (a zero vector, parallel vectors on one side).
+    case pairsDoNotFixAnOrientation
+    case habitAxisIsZero
     package var errorDescription: String? {
         switch self {
         case .noStandardSetting: "A phase has no standard orientation setting, so its variants cannot be named."
         case .noMatrixEntry: "The phase map has no fitted matrix orientation to measure the variants from."
+        case .noRelationship: "Type the orientation relationship as a paper states it (two parallel pairs, the habit and its axis), "
+            + "or pick a literature example."
+        case .pairsDoNotRead(let text): "\"\(text)\" is not two parallel pairs: write them as (h k l) ∥ (h k l), [u v w] ∥ [u v w], "
+            + "the precipitate first."
+        case .pairsDoNotFixAnOrientation: "These pairs do not fix an orientation: each side needs two vectors that are not parallel."
+        case .habitAxisIsZero: "The habit axis [0 0 0] is no direction."
         }
     }
 }
@@ -436,10 +584,15 @@ package nonisolated enum ObjectVariantAssigner {
 package nonisolated enum ObjectVariantJoin {
     package nonisolated struct Outcome: Sendable, Equatable {
         package var result: ObjectJoinResult<VariantAssignment>
-        /// The preset's matrix direction along the beam (the needles seen end-on, the plates face-on), when there is one.
+        /// The relationship's matrix direction along the beam (the needles seen end-on, the plates face-on), when there is one.
         package var endOnDirection: Int?
-        /// Each variant's habit direction (index into the preset's family names), in the kit's order.
+        /// Each variant's habit direction (index into `familyNames`), in the kit's order.
         package var habitFamilies: [Int] = []
+        /// The matrix directions those indices name ("[100]"), and the habit.
+        package var familyNames: [String] = []
+        package var habit: OrientationRelationshipPreset.Habit? = nil
+        /// A literature example used on a matrix its paper does not state it for, in words (#512).
+        package var warning: String? = nil
         /// A map made from the structures: the tolerance used when the user typed none, degrees (the learned relationship's distance to
         /// the named one plus the kit's 3 degrees). nil for typed zone axes, whose default is half the library's in-plane step.
         package var defaultToleranceDegrees: Double? = nil
@@ -481,6 +634,8 @@ package nonisolated enum ObjectVariantJoin {
         func unavailable(_ why: String) -> Outcome { Outcome(result: ObjectJoinResult(unavailable: why), endOnDirection: nil, habitFamilies: []) }
         guard settings.source == "known_variants" else { return unavailable("Variants from ACOM orientations are not built yet.") }
         guard let map else { return unavailable("There is no phase map.") }
+        guard let relationship = settings.relationship else { return unavailable(VariantError.noRelationship.localizedDescription) }
+        let matrixName = map.phaseNames.indices.contains(map.matrixPhaseIndex) ? map.phaseNames[map.matrixPhaseIndex] : "the matrix"
         if let structureRun {
             // Orientations found from the structures (mac4DSTEM#245).
             let candidates = map.phaseNames.indices.filter { $0 != map.matrixPhaseIndex }
@@ -495,7 +650,7 @@ package nonisolated enum ObjectVariantJoin {
                 return unavailable(VariantError.noMatrixEntry.localizedDescription)
             }
             let setup: VariantSetup
-            do { setup = try VariantSetup(precipitate: structureRun.crystals[phase], matrix: matrixCrystal, preset: settings.orientationRelationship) }
+            do { setup = try VariantSetup(precipitate: structureRun.crystals[phase], matrix: matrixCrystal, relationship: relationship) }
             catch { return unavailable((error as? LocalizedError)?.errorDescription ?? "\(error)") }
             // The run classified every position against the variants of the relationship it LEARNED, which on real data lies a few
             // degrees from the named one (the foil bends, the published relationship is ideal). The named relationship numbers those
@@ -527,8 +682,10 @@ package nonisolated enum ObjectVariantJoin {
             }
             let result = ObjectVariantAssigner.run(objects: objects, results: map.results, orientations: orientations, precipitatePhaseIndex: phase,
                                                    setup: setup, settings: settings)
-            return Outcome(result: result, endOnDirection: orientations.matrixBeamAxis.flatMap { setup.preset.family(alongBeam: $0) },
-                           habitFamilies: setup.habitFamily, defaultToleranceDegrees: orientations.inPlaneStepDegrees / 2)
+            return Outcome(result: result, endOnDirection: orientations.matrixBeamAxis.flatMap { setup.family(alongBeam: $0) },
+                           habitFamilies: setup.habitFamily, familyNames: setup.familyNames, habit: relationship.habit,
+                           warning: relationship.example?.warning(matrix: matrixCrystal, matrixName: matrixName),
+                           defaultToleranceDegrees: orientations.inPlaneStepDegrees / 2)
         }
         guard let library else { return unavailable("The phase map's reference library is not kept; map the phases again.") }
         guard let matrixEntryIndex, matrixEntryIndex >= 0 else { return unavailable(VariantError.noMatrixEntry.localizedDescription) }
@@ -541,13 +698,14 @@ package nonisolated enum ObjectVariantJoin {
             return unavailable(VariantError.noMatrixEntry.localizedDescription)
         }
         let setup: VariantSetup
-        do { setup = try VariantSetup(precipitate: library.phases[phase].crystal, matrix: library.phases[map.matrixPhaseIndex].crystal,
-                                      preset: settings.orientationRelationship) }
+        let matrixCrystal = library.phases[map.matrixPhaseIndex].crystal
+        do { setup = try VariantSetup(precipitate: library.phases[phase].crystal, matrix: matrixCrystal, relationship: relationship) }
         catch { return unavailable((error as? LocalizedError)?.errorDescription ?? "\(error)") }
         let result = ObjectVariantAssigner.run(objects: objects, results: map.results, orientations: orientations, precipitatePhaseIndex: phase,
                                                setup: setup, settings: settings)
         // The cube-axis presets keep the orientation's own cube-axis index (unchanged for beta''); a beam along no cube axis can still be a <111> family.
-        let endOn = orientations.matrixBeamAxis.map { settings.orientationRelationship.family(alongBeam: $0) } ?? orientations.matrixBeamDirection
-        return Outcome(result: result, endOnDirection: endOn, habitFamilies: setup.habitFamily)
+        let endOn = orientations.matrixBeamAxis.map { setup.family(alongBeam: $0) } ?? orientations.matrixBeamDirection
+        return Outcome(result: result, endOnDirection: endOn, habitFamilies: setup.habitFamily, familyNames: setup.familyNames,
+                       habit: relationship.habit, warning: relationship.example?.warning(matrix: matrixCrystal, matrixName: matrixName))
     }
 }

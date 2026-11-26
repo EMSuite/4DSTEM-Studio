@@ -310,7 +310,7 @@ final class ThronsenJourney: Journey {
             app.windows.firstMatch.click()
             reveal(wait(for: "precipitates.variants.section", timeout: 30)).click()
             pick("[1 0 0]", in: wait(for: "precipitates.variants.phase", timeout: 30))
-            pick("θ′ in Al", in: wait(for: "precipitates.variants.orPicker"))
+            pick("θ′ in Al", in: wait(for: "precipitates.variants.example"))
             waitIdle("the θ′ variants")
             let legend = app.disclosureTriangles["Variants"].exists ? app.disclosureTriangles["Variants"] : app.buttons["Variants"]
             if legend.exists { expand(reveal(legend)) }
@@ -324,7 +324,7 @@ final class ThronsenJourney: Journey {
         }
         front("variants: T1 {111} plate preset") {
             pick("T1", in: wait(for: "precipitates.variants.phase", timeout: 30))
-            pick("T1 in Al", in: wait(for: "precipitates.variants.orPicker"))
+            pick("T1 in Al", in: wait(for: "precipitates.variants.example"))
             waitIdle("the T1 variants")
             record("variants T1")
             _ = exportCSV(named: "thronsen-T1-variants.csv")

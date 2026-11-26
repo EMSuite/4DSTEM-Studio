@@ -20,8 +20,9 @@ extension Mac4DSTEMAgentDoor {
                   summary: "Sets the Precipitates section, only what is given: the overlays on the panes, the minimum counted size "
                       + "in scan pixels, which phase result the pane shows (phaseMap, objects, distance), the thickness behind N_V "
                       + "(nm, with σ and source words, or the source words from macTEM's EELS method JSON in the Agent folder; "
-                      + "clear_thickness takes it away), and variant counting (count_variants, its phase, orientation relationship, "
-                      + "angle tolerance in degrees and the least agreement). Needs a phase map. get_precipitate_objects reads the "
+                      + "clear_thickness takes it away), and variant counting (count_variants, its phase, the orientation relationship "
+                      + "as a paper states it with the habit and its axis, or a literature example, the angle tolerance in degrees and "
+                      + "the least agreement). Nothing is chosen for the relationship: without one the variant run says so. Needs a phase map. get_precipitate_objects reads the "
                       + "objects and N_V.",
                   input: .window,
                   parameters: [
@@ -39,8 +40,17 @@ extension Mac4DSTEMAgentDoor {
                       AgentParameter("clear_thickness", .boolean, summary: "true takes the thickness away."),
                       AgentParameter("count_variants", .boolean, summary: "Name each object's orientation-relationship variant."),
                       AgentParameter("variant_phase", .text, summary: "The candidate phase whose variants are counted, by name."),
-                      AgentParameter("orientation_relationship", .choice(caseNames(OrientationRelationshipPreset.self)),
-                                     summary: "The relationship whose variants are named."),
+                      AgentParameter("orientation_relationship", .text,
+                                     summary: "Two parallel pairs, precipitate first: \"(0 0 1) ∥ (1 1 1), [2 1 0] ∥ [1 -1 0]\" "
+                                         + "(planes in (), directions in []); with variant_habit and variant_habit_axis. \"none\" "
+                                         + "clears it."),
+                      AgentParameter("variant_habit", .choice(["needle", "plate"]), summary: "A needle lies along its habit axis, a "
+                                         + "plate stands on it."),
+                      AgentParameter("variant_habit_axis", .text, summary: "The needle axis or plate normal as a direction of the "
+                                         + "precipitate, \"[0 1 0]\"."),
+                      AgentParameter("variant_example", .choice(caseNames(OrientationRelationshipPreset.self)),
+                                     summary: "A literature example (beta'' Andersen 1998, theta' and T1 Thronsen 2024, all in Al): "
+                                         + "fills the relationship; the answer warns when the matrix is not Al."),
                       AgentParameter("angle_tolerance_deg", .number(0.001...90), summary: "A pixel votes only this near a variant."),
                       AgentParameter("agreement_min", .number(0.01...1), summary: "Least share of an object's pixels for its variant."),
                   ],
@@ -90,7 +100,8 @@ extension Mac4DSTEMAgentDoor {
                 let on = v == "true"
                 if on != (state.precipitateVariantSettings != nil) { state.setPrecipitateVariantSettings(on ? VariantSettings() : nil) }
             }
-            let variantKeys = ["variant_phase", "orientation_relationship", "angle_tolerance_deg", "agreement_min"]
+            let variantKeys = ["variant_phase", "orientation_relationship", "variant_habit", "variant_habit_axis", "variant_example",
+                               "angle_tolerance_deg", "agreement_min"]
             if variantKeys.contains(where: { a[$0] != nil }) {
                 guard var next = state.precipitateVariantSettings else {
                     return .refusal(status: 409, message: "Variant counting is off; give count_variants true with these.")
@@ -102,7 +113,10 @@ extension Mac4DSTEMAgentDoor {
                     }
                     next.phaseName = phase
                 }
-                if let v = named(a["orientation_relationship"], OrientationRelationshipPreset.self) { next.orientationRelationship = v }
+                switch Self.variantRelationship(a, current: next.relationship) {
+                case .failure(let refusal): return .refusal(status: refusal.status, message: refusal.message)
+                case .success(let relationship): next.relationship = relationship
+                }
                 if let v = a["angle_tolerance_deg"].flatMap(Double.init) { next.toleranceDegrees = v }
                 if let v = a["agreement_min"].flatMap(Double.init) { next.agreementMinimum = v }
                 state.setPrecipitateVariantSettings(next)
@@ -156,6 +170,36 @@ extension Mac4DSTEMAgentDoor {
         }
     }
 
+    /// The relationship `set_precipitates` asks for (#512): an example; "none"; typed pairs with the habit and its axis (each taken from
+    /// the standing relationship when not given); an old caller's example by its case name in `orientation_relationship`; or, with none
+    /// of these, the standing one.
+    static func variantRelationship(_ a: [String: String], current: VariantRelationship?) -> Result<VariantRelationship?, ToolRefusal> {
+        if let example = named(a["variant_example"], OrientationRelationshipPreset.self) { return .success(VariantRelationship(example: example)) }
+        let typed = a["orientation_relationship"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if typed == "none" { return .success(nil) }
+        if let typed, let example = named(typed, OrientationRelationshipPreset.self) { return .success(VariantRelationship(example: example)) }
+        guard typed != nil || a["variant_habit"] != nil || a["variant_habit_axis"] != nil else { return .success(current) }
+        guard let pairs = typed ?? current?.pairs else {
+            return .failure(ToolRefusal(status: 400, message: "Give orientation_relationship: two parallel pairs, precipitate first."))
+        }
+        guard let parsed = PhaseMappingSlot.parseOrientationRelationships(pairs), parsed.count == 2 else {
+            return .failure(ToolRefusal(status: 400, message: VariantError.pairsDoNotRead(pairs).localizedDescription))
+        }
+        guard let habit = a["variant_habit"].flatMap(OrientationRelationshipPreset.Habit.init(rawValue:)) ?? current?.habit else {
+            return .failure(ToolRefusal(status: 400, message: "Give variant_habit: needle or plate."))
+        }
+        let axisText = a["variant_habit_axis"]
+        guard let axis = axisText.map(PhaseMappingSlot.parseZoneAxis) ?? current?.habitAxis else {
+            return .failure(ToolRefusal(status: 400, message: axisText.map { "\($0) is not a direction [u v w]." }
+                                            ?? "Give variant_habit_axis: the needle axis or plate normal, \"[u v w]\" of the precipitate."))
+        }
+        guard axis != .zero else { return .failure(ToolRefusal(status: 400, message: VariantError.habitAxisIsZero.localizedDescription)) }
+        let next = VariantRelationship(pairs: pairs, habit: habit, habitAxis: axis)
+        // The standing example's own pairs, habit and axis given back unchanged stay that example.
+        if let example = current?.example, next.pairs == example.pairsText, habit == example.habit, axis == example.habitAxis { return .success(current) }
+        return .success(next)
+    }
+
     static func precipitateSettings(of state: AppState) -> [String: Any] {
         let overlay = state.precipitateOverlay
         var out: [String: Any] = [
@@ -170,7 +214,12 @@ extension Mac4DSTEMAgentDoor {
             out["thickness"] = NSNull()
         }
         if let v = state.precipitateVariantSettings {
-            out["variants"] = ["phase": AgentJSON.orNull(v.phaseName), "orientation_relationship": caseName(v.orientationRelationship),
+            out["variants"] = ["phase": AgentJSON.orNull(v.phaseName), "orientation_relationship": AgentJSON.orNull(v.relationship?.pairs),
+                               "habit": AgentJSON.orNull(v.relationship?.habit.rawValue),
+                               "habit_axis": AgentJSON.orNull(v.relationship?.habitAxisText),
+                               "example": AgentJSON.orNull(v.relationship?.example.map { caseName($0) }),
+                               "example_citation": AgentJSON.orNull(v.relationship?.example?.citation),
+                               "warning": AgentJSON.orNull(state.precipitateObjectReport?.variantWarning),
                                "angle_tolerance_deg": AgentJSON.number(v.toleranceDegrees),
                                "agreement_min": v.agreementMinimum,
                                "unavailable": AgentJSON.orNull(state.precipitateObjectReport?.variantUnavailable)] as [String: Any]

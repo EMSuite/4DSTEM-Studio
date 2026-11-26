@@ -524,7 +524,8 @@ extension AppState {
                 compositionJoin: precipitateJoins.composition, strainJoin: precipitateJoins.strain,
                 variantJoin: precipitateJoins.variants, variantSettings: precipitateVariantSettings,
                 endOnDirection: precipitateJoins.variantEndOnDirection, variantDirections: precipitateJoins.variantDirections,
-                variantDefaultToleranceDegrees: precipitateJoins.variantDefaultToleranceDegrees)
+                variantDefaultToleranceDegrees: precipitateJoins.variantDefaultToleranceDegrees,
+                variantFamilyNames: precipitateJoins.variantFamilyNames, variantWarning: precipitateJoins.variantWarning)
         } catch {
             // Nil: the objects cannot be measured. Said once in the Output, in the classification's words (mac4DSTEM#300).
             sayPrecipitateReportRefusal(error)

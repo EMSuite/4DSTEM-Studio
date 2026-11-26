@@ -128,7 +128,7 @@ final class ObjectVariantsTests: XCTestCase {
         plan.append(("none", []))                                                    // no indexed pixel
         let s = try scene(plan, entries: entries)
         let run = ObjectVariantAssigner.run(objects: s.objects, results: s.results, orientations: s.orientations, precipitatePhaseIndex: 1,
-                                            setup: try setup, settings: VariantSettings())
+                                            setup: try setup, settings: VariantSettings(example: .betaDoublePrimeInAl))
         for k in 0..<12 {
             let a = try XCTUnwrap(run.perObject[try XCTUnwrap(s.idAt["v\(k)"])])
             XCTAssertEqual(a.variant, k + 1, "needle \(k)")
@@ -162,7 +162,7 @@ final class ObjectVariantsTests: XCTestCase {
         plan.append(("weak", [(entry: 3, count: 3)]))
         plan.append(("none", []))
         let s = try scene(plan, entries: entries)
-        let settings = VariantSettings()
+        let settings = VariantSettings(example: .betaDoublePrimeInAl)
         let run = ObjectVariantAssigner.run(objects: s.objects, results: s.results, orientations: s.orientations, precipitatePhaseIndex: 1,
                                             setup: try setup, settings: settings)
         let report = try PrecipitateObjectReport.make(objects: s.objects, phaseNames: ["Al", "beta"], matrixPhaseIndex: 0, pixelSize: 1, pixelUnit: "nm",
@@ -204,7 +204,7 @@ final class ObjectVariantsTests: XCTestCase {
 
     /// The settings round-trip through the lineage parameters; a sidecar without them gives none.
     func testTheSettingsRoundTripThroughTheLineageParameters() {
-        var settings = VariantSettings()
+        var settings = VariantSettings(example: .betaDoublePrimeInAl)
         settings.toleranceDegrees = 2.5; settings.agreementMinimum = 0.6; settings.phaseName = "beta"
         XCTAssertEqual(VariantSettings(parameters: settings.parameters), settings)
         XCTAssertNil(VariantSettings(parameters: ["connectivity": "8"]))
@@ -354,7 +354,7 @@ extension ObjectVariantsTests {
         XCTAssertEqual(OrientationRelationshipPreset.t1InAl.family(nearest: SIMD3(-1, -1, 1) * 2), 3, "+-n is one family: [-1 -1 1] is the opposite of [1 1 -1]")
         XCTAssertEqual(OrientationRelationshipPreset.thetaPrimeInAl.title, "\u{03B8}\u{2032} in Al, Thronsen 2024")
         XCTAssertEqual(OrientationRelationshipPreset.t1InAl.title, "T1 in Al, Thronsen 2024")
-        var settings = VariantSettings(); settings.orientationRelationship = .t1InAl
+        let settings = VariantSettings(example: .t1InAl)
         XCTAssertEqual(settings.parameters["variant_or"], "t1-in-al")
         XCTAssertEqual(VariantSettings(parameters: settings.parameters), settings)
     }
@@ -371,7 +371,7 @@ extension ObjectVariantsTests {
             let entries = (0..<n).map { plateOrientation(setup, variant: $0, symmetry: $0) }
             let plan: [(name: String, votes: [(entry: Int, count: Int)])] = (0..<n).map { ("v\($0)", [(entry: $0, count: 9)]) }
             let s = try scene(plan, entries: entries)
-            var settings = VariantSettings(); settings.orientationRelationship = preset
+            let settings = VariantSettings(example: preset)
             let run = ObjectVariantAssigner.run(objects: s.objects, results: s.results, orientations: s.orientations, precipitatePhaseIndex: 1,
                                                 setup: setup, settings: settings)
             for k in 0..<n {

@@ -227,6 +227,8 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
     package var variantDirections: [Int]? = nil
     /// Where the variant count read its orientations, when not from the phase map's library entries (a map made from the structures).
     package var variantSourceNote: String? = nil
+    /// A literature example used on a matrix its paper does not state it for (#512), in words; nil otherwise and in a report from before.
+    package var variantWarning: String? = nil
 
     package var hasPhysicalScale: Bool { pixelSize != nil && pixelUnit != nil }
 
@@ -252,7 +254,9 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
         variantSettings: VariantSettings? = nil,
         endOnDirection: Int? = nil,
         variantDirections: [Int]? = nil,
-        variantDefaultToleranceDegrees: Double? = nil
+        variantDefaultToleranceDegrees: Double? = nil,
+        variantFamilyNames: [String]? = nil,
+        variantWarning: String? = nil
     ) throws -> PrecipitateObjectReport {
         let minimum = max(1, minimumAreaPx)
         let scale: Double? = {
@@ -335,10 +339,12 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
             if let why = variantJoin.unavailable {
                 report.variantUnavailable = why
             } else {
-                let preset = variantSettings?.orientationRelationship ?? .betaDoublePrimeInAl
+                let relationship = variantSettings?.relationship
                 report.variantGroups = try Self.variantGroups(objects: objects, rows: rows, minimum: minimum, scale: scale, pixelUnit: pixelUnit,
-                                                          familyNames: preset.familyNames, variantCount: variantDirections?.count ?? 12)
-                report.variantHabit = preset.habit
+                                                          familyNames: variantFamilyNames ?? relationship?.example?.familyNames ?? [],
+                                                          variantCount: variantDirections?.count ?? 12)
+                report.variantHabit = relationship?.habit
+                report.variantWarning = variantWarning
                 report.variantSummary = variantSettings.map { Self.variantSummary($0, structuresToleranceDegrees: variantDefaultToleranceDegrees) }
                 if variantDefaultToleranceDegrees != nil { report.variantSourceNote = "the matrix and precipitate orientation found at each position from the structures" }
                 report.endOnDirection = endOnDirection
@@ -355,7 +361,7 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
         let fallback = structuresToleranceDegrees.map { number(($0 * 10).rounded() / 10) + " degrees (the learned relationship's distance to the named one, plus 3)" }
             ?? "half the library's in-plane step"
         let tolerance = s.toleranceDegrees.map { number($0) + " degrees" } ?? fallback
-        return "\(s.orientationRelationship.title); a pixel votes within \(tolerance); assigned at an agreement of at least \(number(s.agreementMinimum)) of the object's pixels"
+        return "\(s.relationship?.title ?? "no relationship"); a pixel votes within \(tolerance); assigned at an agreement of at least \(number(s.agreementMinimum)) of the object's pixels"
     }
 
     /// The three needle directions, the twelve variants and the unassigned, over the objects the variant run covered.
@@ -514,7 +520,9 @@ package nonisolated struct PrecipitateObjectReport: Sendable, Codable, Hashable 
             lines.append("# strain: the mean of the strain map over the object's scan positions, in rows (rr) and columns (cc), rotation in degrees; *_sigma is the spread across the pixels, not a fit error")
         } else if let why = strainUnavailable { lines.append("# strain: not available: \(why)") }
         if let summary = variantSummary, variantGroups != nil {
-            lines.append("# variants: \(summary); source: \(variantSourceNote ?? "the phase map's winning library entry per position"); \(variantHabit == .plate ? "plate normals are matrix directions" : "needle directions are the matrix cube axes")")
+            let cubeAxes = variantGroups?.filter { $0.kind == .direction }.map(\.title).allSatisfy { ["[100]", "[010]", "[001]"].contains($0) } ?? true
+            lines.append("# variants: \(summary); source: \(variantSourceNote ?? "the phase map's winning library entry per position"); \(variantHabit == .plate ? "plate normals are matrix directions" : cubeAxes ? "needle directions are the matrix cube axes" : "needle directions are matrix directions")")
+            if let variantWarning { lines.append("# variants: warning: \(variantWarning)") }
             if let end = endOnDirection {
                 let name = variantGroups?.first { $0.kind == .direction && $0.index == end }?.title ?? VariantGroup.directionName(end)
                 lines.append(variantHabit == .plate ? "# face-on: plates on \(name) lie face-on to the beam" : "# end-on: needles along \(name) lie along the beam")

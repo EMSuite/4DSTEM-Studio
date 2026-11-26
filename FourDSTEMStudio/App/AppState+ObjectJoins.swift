@@ -23,6 +23,9 @@ nonisolated struct PrecipitateJoins: Sendable, Equatable {
     var variantDirections: [Int]?
     /// A map made from the structures: the variant tolerance used when none is typed, degrees (`ObjectVariantJoin.Outcome`).
     var variantDefaultToleranceDegrees: Double?
+    /// The relationship's matrix direction names and an example's matrix warning (#512).
+    var variantFamilyNames: [String]?
+    var variantWarning: String?
 }
 
 extension AppState {
@@ -69,7 +72,8 @@ extension AppState {
                                                            cancelled: { Task.isCancelled }),
                     strain: ObjectStrainJoin.run(objects: objects, strain: strainMap),
                     variants: variants?.result, variantEndOnDirection: variants?.endOnDirection,
-                    variantDirections: variants?.habitFamilies, variantDefaultToleranceDegrees: variants?.defaultToleranceDegrees)
+                    variantDirections: variants?.habitFamilies, variantDefaultToleranceDegrees: variants?.defaultToleranceDegrees,
+                    variantFamilyNames: variants?.familyNames, variantWarning: variants?.warning)
             }
             let joins = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
             guard let self, !Task.isCancelled, self.precipitateJoinGeneration == generation else { return }

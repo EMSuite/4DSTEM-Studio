@@ -66,16 +66,13 @@ final class CompiledModelCacheTests: XCTestCase {
         for _ in 0..<3 {
             let detector = try await LearnedDiskDetector.loadForComparison(assetURL: LearnedSwiftFixture.assetURL, computeUnits: units)
             paths.append(detector.compiledURL)
-            counts.append(Self.coreMLCacheEntryCount())
+            counts.append(CoreMLTestCache.entries(naming: "/" + detector.compiledURL.lastPathComponent).count)
         }
         print("Core ML e5 bundle cache entries after loads 1, 2, 3 (compute units \(units.rawValue)): \(counts)")
         XCTAssertEqual(Set(paths).count, 1, "every load opens the one kept compiled model")
         XCTAssertEqual(paths.first, CompiledModelCache.shared.location(sha256: try LearnedDiskDetector.sha256(ofAsset: LearnedSwiftFixture.assetURL)))
         XCTAssertEqual(counts[2], counts[1], "a repeated load added entries to Core ML's cache")
     }
-
-    /// The entries of `Caches/<bundle id>/com.apple.e5rt.e5bundlecache/<OS build>/`; 0 when the folder is absent.
-    private static func coreMLCacheEntryCount() -> Int { CoreMLTestCache.entries().count }
 
     /// A test that compiles a model and loads it leaves nothing in Core ML's cache: the entry Core ML adds for the fresh
     /// model is removed with the test's directory. Before, every run of the unit tests left its entries behind (#178).

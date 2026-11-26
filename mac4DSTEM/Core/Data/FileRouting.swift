@@ -41,10 +41,12 @@ package nonisolated enum FileRouting {
         case .digitalMicrograph: return .digitalMicrograph
         case .merlinMIB: return .merlinMIB
         case .empad: return .empad
-        case .hdf5, .veloxEMD: return .hdf5
+        // FormatoKit 0.19 names HyperSpy's .hspy (it sniffed as unknown and reached the HDF5 reader by its signature): the same route.
+        case .hdf5, .veloxEMD, .hyperSpy: return .hdf5
         case .msa: return .singleSpectrum
         case .tiff: return .refused("\(name) is a TIFF image, not a 4D dataset.")
         case .mrc: return .refused("\(name) is an MRC image or stack, not a 4D dataset.")
+        case .tia: return .refused("\(name) is a TIA (.ser or .emi) file, which 4DSTEM Studio does not open; Electron Microscopy Studio does.")
         case .unknown:
             // A file the app may not read sniffs as unknown too: say it can't be read, not that its format is wrong (#356).
             if let reason = unreadableReason(path) {

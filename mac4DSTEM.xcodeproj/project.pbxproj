@@ -647,7 +647,7 @@
 				30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */,
 				30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */,
 				30000000000000000000002F /* XCRemoteSwiftPackageReference "ImagoKit" */,
-				300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */,
+				300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */,
 				300000000000000000000502 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 90;
@@ -1640,7 +1640,7 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		300000000000000000000009 /* XCRemoteSwiftPackageReference "SpectroKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mac4DSTEM/SpectroKit";
+			repositoryURL = "https://github.com/EMSuite/SpectroKit";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.13.2;
@@ -1648,15 +1648,15 @@
 		};
 		30000000000000000000000C /* XCRemoteSwiftPackageReference "DiffractoKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mac4DSTEM/DiffractoKit";
+			repositoryURL = "https://github.com/EMSuite/DiffractoKit";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.18.0;
+				minimumVersion = 0.21.0;
 			};
 		};
 		30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mac4DSTEM/CuboKit";
+			repositoryURL = "https://github.com/EMSuite/CuboKit";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.11.0;
@@ -1664,26 +1664,26 @@
 		};
 		30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mac4DSTEM/FormatoKit";
+			repositoryURL = "https://github.com/EMSuite/FormatoKit";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.17.0;
+				minimumVersion = 0.20.0;
 			};
 		};
 		30000000000000000000002F /* XCRemoteSwiftPackageReference "ImagoKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mac4DSTEM/ImagoKit";
+			repositoryURL = "https://github.com/EMSuite/ImagoKit";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.9.1;
 			};
 		};
-		300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */ = {
+		300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mac4DSTEM/MacEMUI";
+			repositoryURL = "https://github.com/EMSuite/EMSuiteUI";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.9.0;
+				minimumVersion = 0.20.0;
 			};
 		};
 		300000000000000000000502 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
@@ -1796,42 +1796,42 @@
 		};
 		300000000000000000000401 /* ShellMetal */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
 			productName = ShellMetal;
 		};
 		300000000000000000000403 /* ShellControls */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
 			productName = ShellControls;
 		};
 		300000000000000000000405 /* ShellInspector */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
 			productName = ShellInspector;
 		};
 		300000000000000000000407 /* ShellLayout */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
 			productName = ShellLayout;
 		};
 		30000000000000000000040F /* ShellSpectroscopy */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
 			productName = ShellSpectroscopy;
 		};
 		300000000000000000000411 /* ShellEDXModel */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
 			productName = ShellEDXModel;
 		};
 		300000000000000000000415 /* ShellEDXAgent */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
 			productName = ShellEDXAgent;
 		};
 		300000000000000000000413 /* ShellAgentDoor */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "MacEMUI" */;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
 			productName = ShellAgentDoor;
 		};
 		500000000000000000000301 /* DSTEMQuickLook */ = {

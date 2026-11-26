@@ -44,17 +44,17 @@ let package = Package(
     // embeds in Contents/Frameworks and signs with the app's identity. Version ranges up to the next major; the two Package.resolved files
     // (this package's and the Xcode workspace's) hold the versions built, and a package update moves them.
     dependencies: [
-        .package(url: "https://github.com/mac4DSTEM/SpectroKit", from: "0.13.2"),
-        .package(url: "https://github.com/mac4DSTEM/FormatoKit", from: "0.17.0"),
+        .package(url: "https://github.com/EMSuite/SpectroKit", from: "0.13.2"),
+        .package(url: "https://github.com/EMSuite/FormatoKit", from: "0.20.0"),
         // The crystallography (cells, CIF, structure factors, the ring and ellipse fit) is DiffractoKit's and the 4D core
         // (virtual imaging, mean and max, centre of mass, origins) CuboKit's since 2026-10-15.
-        .package(url: "https://github.com/mac4DSTEM/DiffractoKit", from: "0.18.0"),
-        .package(url: "https://github.com/mac4DSTEM/CuboKit", from: "0.11.0"),
+        .package(url: "https://github.com/EMSuite/DiffractoKit", from: "0.21.0"),
+        .package(url: "https://github.com/EMSuite/CuboKit", from: "0.11.0"),
         // The exact-length 2D FFT (FFT2D) is ImagoKit's ImagoCore since 2026-10-15 (GPL-3.0 from 0.1.1; the app's copy was its origin,
         // the same arithmetic) and FFT1D (ACOM) is ImagoFFT's since 0.1.1. Only DSTEMCore uses it.
-        .package(url: "https://github.com/mac4DSTEM/ImagoKit", from: "0.9.1"),
+        .package(url: "https://github.com/EMSuite/ImagoKit", from: "0.9.1"),
         // The window shell, controls and Metal image view both apps share (suite task 8). DSTEMCore takes ShellMetal only, for MetalEngine and ColormapKind.
-        .package(url: "https://github.com/mac4DSTEM/MacEMUI", from: "0.9.0"),
+        .package(url: "https://github.com/EMSuite/EMSuiteUI", from: "0.20.0"),
     ],
     targets: [
         .target(
@@ -84,8 +84,8 @@ let package = Package(
                            .product(name: "ImagoCore", package: "ImagoKit"),
                            .product(name: "ImagoFFT", package: "ImagoKit"),
                            .product(name: "ImagoFilters", package: "ImagoKit"),   // the EDS room's map filter (macTEM's EDXMapFilter)
-                           .product(name: "ShellMetal", package: "MacEMUI"),
-                           .product(name: "ShellEDXModel", package: "MacEMUI")],
+                           .product(name: "ShellMetal", package: "EMSuiteUI"),
+                           .product(name: "ShellEDXModel", package: "EMSuiteUI")],
             path: "mac4DSTEM/Core",
             // No `-DACCELERATE_NEW_LAPACK` any more: the LAPACK call it served (DiffractionEmbedding's `dsyevd_`) is CuboKit's.
             swiftSettings: commonSwiftSettings
@@ -109,9 +109,9 @@ let package = Package(
                            .product(name: "CuboPhase", package: "CuboKit"),
                            .product(name: "CuboParallax", package: "CuboKit"),
                            .product(name: "ImagoCore", package: "ImagoKit"),
-                           .product(name: "ShellMetal", package: "MacEMUI"),
-                           .product(name: "ShellEDXModel", package: "MacEMUI"),
-                           .product(name: "ShellLayout", package: "MacEMUI")],
+                           .product(name: "ShellMetal", package: "EMSuiteUI"),
+                           .product(name: "ShellEDXModel", package: "EMSuiteUI"),
+                           .product(name: "ShellLayout", package: "EMSuiteUI")],
             path: "mac4DSTEM/Session",
             swiftSettings: commonSwiftSettings
         ),

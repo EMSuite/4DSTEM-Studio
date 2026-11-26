@@ -4,7 +4,7 @@
     {
       "identity" : "cubokit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mac4DSTEM/CuboKit",
+      "location" : "https://github.com/EMSuite/CuboKit",
       "state" : {
         "revision" : "bfb70ea97db87196351f4cc29c7738221c39f9b0",
         "version" : "0.12.1"
@@ -13,37 +13,37 @@
     {
       "identity" : "diffractokit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mac4DSTEM/DiffractoKit",
+      "location" : "https://github.com/EMSuite/DiffractoKit",
       "state" : {
-        "revision" : "06ee1878aac94c530ca8f6e582115ab70fb3b4cc",
-        "version" : "0.18.1"
+        "revision" : "3daeaad577d27d72ae5e1899410c7d152c10974a",
+        "version" : "0.24.2"
+      }
+    },
+    {
+      "identity" : "emsuiteui",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/EMSuite/EMSuiteUI",
+      "state" : {
+        "revision" : "84d99ca80cf3e0f2434c1bb1ed843804a14d725c",
+        "version" : "0.20.0"
       }
     },
     {
       "identity" : "formatokit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mac4DSTEM/FormatoKit",
+      "location" : "https://github.com/EMSuite/FormatoKit",
       "state" : {
-        "revision" : "63e6b8e5334eb0ead9f4aecfc281aa9b4c378779",
-        "version" : "0.18.0"
+        "revision" : "346385f7a5812b6d0b388db804fa771ecc70e0e9",
+        "version" : "0.21.0"
       }
     },
     {
       "identity" : "imagokit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mac4DSTEM/ImagoKit",
+      "location" : "https://github.com/EMSuite/ImagoKit",
       "state" : {
-        "revision" : "8454f1de245ad0f47fed5c1be8e99aeb728f87aa",
-        "version" : "0.9.2"
-      }
-    },
-    {
-      "identity" : "macemui",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mac4DSTEM/MacEMUI",
-      "state" : {
-        "revision" : "13d7a89b8ecc5a077eafdf1c474cb6366cda2ece",
-        "version" : "0.13.0"
+        "revision" : "4af4d49816d6d0fa55975faba48c403a2ac9240f",
+        "version" : "0.11.0"
       }
     },
     {
@@ -58,10 +58,10 @@
     {
       "identity" : "spectrokit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mac4DSTEM/SpectroKit",
+      "location" : "https://github.com/EMSuite/SpectroKit",
       "state" : {
-        "revision" : "b9707367ea3a7e688fe9c638826824686f7d4f8c",
-        "version" : "0.16.0"
+        "revision" : "025c564450cd3ce00ebcc06e81b7d73af8b6f1a9",
+        "version" : "0.17.1"
       }
     }
   ],

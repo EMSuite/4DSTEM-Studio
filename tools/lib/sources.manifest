@@ -190,7 +190,7 @@ kit_module() {
     echo "$pin $app_pins $*" > "$scratch/.pin"
   fi
   KIT_FLAGS=("-I$prod" "$prod"/*.o(N))   # -I joined: mac4dstem_sources dedups its tokens
-  # Resource bundles (MacEMUI's ShellMetal carries its Metal library in MacEMUI_ShellMetal.bundle and loads it from
+  # Resource bundles (EMSuiteUI's ShellMetal carries its Metal library in MacEMUI_ShellMetal.bundle and loads it from
   # Bundle.module, which traps when the bundle is not beside the binary): collected here, copied by mac4dstem_copy_bundles.
   local b; for b in "$prod"/*.bundle(N); do (( ${MAC4DSTEM_BUNDLES[(Ie)$b]} )) || MAC4DSTEM_BUNDLES+=("$b"); done
   # C targets (2026-10-20: CuboKit's CStrainLAPACK, CEmbeddingLAPACK): a Swift module that imports one needs its generated
@@ -291,7 +291,7 @@ mac4dstem_sources() {
         # in with the group, as SpectroKit rides in with `readers`.
         kit_module "$repo" CuboKit CuboVirtual CuboPhase
         want+=("${KIT_FLAGS[@]}")
-        kit_module "$repo" MacEMUI ShellMetal   # MetalEngine is MacEMUI's ShellMetal since 2026-10-22 (the app's copy went)
+        kit_module "$repo" EMSuiteUI ShellMetal   # MetalEngine is MacEMUI's ShellMetal since 2026-10-22 (the app's copy went)
         want+=("${KIT_FLAGS[@]}")
         mac4dstem_sources "$repo" data
         want+=(
@@ -325,7 +325,7 @@ mac4dstem_sources() {
         want+=("${KIT_FLAGS[@]}")
         kit_module "$repo" DiffractoKit DiffractoGeometry DiffractoOrientation
         want+=("${KIT_FLAGS[@]}")
-        kit_module "$repo" MacEMUI ShellMetal   # MetalEngine is MacEMUI's ShellMetal since 2026-10-22
+        kit_module "$repo" EMSuiteUI ShellMetal   # MetalEngine is MacEMUI's ShellMetal since 2026-10-22
         want+=("${KIT_FLAGS[@]}")
         mac4dstem_sources "$repo" calibration
         want+=(

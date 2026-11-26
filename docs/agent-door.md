@@ -4,7 +4,7 @@ A local API through which an agent on the same Mac (Claude, Codex, a script) loo
 is the MCP server itself, over HTTP at `http://127.0.0.1:47811/mcp`; nothing is installed beside it. This version is
 read-only: the agent looks, the person drives.
 
-The door itself (listener, token, Settings section, window list, MCP endpoint) is MacEMUI's `ShellAgentDoor` (MacEMUI
+The door itself (listener, token, Settings section, window list, MCP endpoint) is EMSuiteUI's `ShellAgentDoor` (EMSuiteUI
 `docs/agent-door.md`), shared with macTEM. This app hands the door its tools.
 
 ## What an agent can do
@@ -74,7 +74,7 @@ A batch is a loop: `list_agent_folder`, then for each file `open_file`, the run 
 1. In mac4DSTEM: Settings > Agents > "Let agents on this Mac look at open windows". Off by default.
 2. Press Copy Connection Command and paste it into Terminal once. It registers the app with Claude Code as an HTTP MCP
    server, with the port (mac4DSTEM asks for 47811) and the token. Cursor and VS Code take the same address and header.
-   Claude desktop connects through MacEMUI's extension (`mac4DSTEM.mcpb`, MacEMUI `DesktopExtension/`).
+   Claude desktop connects through EMSuiteUI's extension (`mac4DSTEM.mcpb`, EMSuiteUI `DesktopExtension/`).
 3. New Token shuts out whoever had the old one; copy the command again after it.
 4. For tools that act, also turn on "Let agents run analyses". The agent's client asks before each such call.
 
@@ -98,7 +98,7 @@ Notes from the first real-agent run (#237):
 
 `mac4DSTEM/App/AgentDoor/`: `Mac4DSTEMAgentDoor` (the door and the tools that look), `AgentDoorSnapshot` (what a window says), `AgentDoorRuns` (the
 tools that act), `AgentDoorFolder` and `AgentFolder` (the Agent folder).
-Settings > Agents is MacEMUI's `AgentDoorSettingsSection`.
+Settings > Agents is EMSuiteUI's `AgentDoorSettingsSection`.
 
 ## Coverage
 
@@ -154,7 +154,7 @@ Each answers with the calibration as `get_window` shows it, or says the step sta
 
 ## EDS in the Spectroscopy room (issue #254)
 
-The room is MacEMUI's, shared with macEM, and so are its tools (`EDXAgentTools`, written once and registered by both apps).
+The room is EMSuiteUI's, shared with macEM, and so are its tools (`EDXAgentTools`, written once and registered by both apps).
 They work on a spectrum image opened alone or beside a 4D scan. `select_task` with workspace `spectroscopy` moves the window
 to the room first.
 

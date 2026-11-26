@@ -69,6 +69,14 @@ enum CoreMLTestCache {
             .map(\.standardizedFileURL))
     }
 
+    /// The entries whose compiled program names `text` (part of the path of the model it was built from): another test
+    /// process's entries for other models in the same folder are not counted, so a count of them is not a race with the tests
+    /// running beside it.
+    static func entries(naming text: String) -> Set<URL> {
+        let bytes = Data(text.utf8)
+        return entries().filter { names($0, bytes) }
+    }
+
     /// Removes the entries that are not in `before`, except an entry of a model the app keeps: that one is the app's own,
     /// made once (here when the test run is the first to load the bundled model on this Mac) and reused from then on.
     static func removeEntries(addedSince before: Set<URL>) {

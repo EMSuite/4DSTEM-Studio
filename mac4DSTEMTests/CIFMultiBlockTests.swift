@@ -62,7 +62,7 @@ final class CIFMultiBlockTests: XCTestCase {
             XCTAssertEqual(error as? CIFModelImportError,
                            .cif(.multipleStructures(blockNames: ["gold", "silicon"])))
             let text = (error as? CIFModelImportError)?.errorDescription ?? ""
-            XCTAssertTrue(text.contains("This CIF holds 2 structures (gold, silicon); import one at a time"), text)
+            XCTAssertTrue(text.contains("This CIF holds 2 structures (gold, silicon); choose one to import"), text)
         }
     }
 

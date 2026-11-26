@@ -383,7 +383,7 @@ final class SpectroGoldenTests: XCTestCase {
     }
 
     /// COMPARISON: recomputes every scenario and compares each against the committed baseline, byte for byte, reporting the
-    /// first differing line. Mutation: one bit of any fitted net flipped (net * (1 + 1e-15)) - red on that scenario's file.
+    /// differing lines. Mutation: one bit of any fitted net flipped (net * (1 + 1e-15)) - red on that scenario's file.
     func testOutputsAreByteIdenticalToTheBaseline() async throws {
         try XCTSkipIf(recordDir != nil, "recording run")
         // Byte-identical holds on the macOS the baseline was recorded on (27): Accelerate's last bits differ on macOS 26 (the CI runner),
@@ -391,13 +391,24 @@ final class SpectroGoldenTests: XCTestCase {
         try XCTSkipIf(ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 27, "baseline recorded on macOS 27; bit-exact only there")
         let scenarios = try await SpectroGolden.scenarios()
         XCTAssertEqual(scenarios.count, 7)
+        // Every moved scenario goes into one failure message: the CI summary prints only the first message of a test.
+        var moved: [String] = []
         for s in scenarios {
             let url = SpectroGolden.baselineDirectory.appendingPathComponent(s.name + ".txt")
             let recorded = try String(contentsOf: url, encoding: .utf8)
             if s.text == recorded { continue }
             let a = s.text.split(separator: "\n", omittingEmptySubsequences: false), b = recorded.split(separator: "\n", omittingEmptySubsequences: false)
-            let i = (0..<min(a.count, b.count)).first { a[$0] != b[$0] } ?? min(a.count, b.count)
-            XCTFail("\(s.name) moved at line \(i + 1): now \(i < a.count ? String(a[i]) : "<end>") | baseline \(i < b.count ? String(b[i]) : "<end>")")
+            // The change as a line diff from the baseline (removals at baseline line numbers, insertions at new ones, the first
+            // 300), so one run says all a dependency moved and the baseline can be updated at once.
+            var changes: [String] = []
+            for change in a.difference(from: b) {
+                switch change {
+                case let .remove(offset, line, _): changes.append("- \(offset + 1) \(line)")
+                case let .insert(offset, line, _): changes.append("+ \(offset + 1) \(line)")
+                }
+            }
+            moved.append("\(s.name) moved, \(changes.count) line change(s):\n" + changes.prefix(300).joined(separator: "\n"))
         }
+        if !moved.isEmpty { XCTFail(moved.joined(separator: "\n")) }
     }
 }

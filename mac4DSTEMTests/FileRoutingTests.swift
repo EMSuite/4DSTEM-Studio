@@ -31,6 +31,7 @@ final class FileRoutingTests: XCTestCase {
         XCTAssertEqual(FileRouting.route(path: try file("a.raw", [1, 2, 3, 4])), .empad, "the EMPAD data file the kit does not name")
         XCTAssertEqual(FileRouting.route(path: try file("a.h5", hdf5)), .hdf5)
         XCTAssertEqual(FileRouting.route(path: try file("a.emd", hdf5)), .hdf5)
+        XCTAssertEqual(FileRouting.route(path: try file("a.hspy", hdf5)), .hdf5, "HyperSpy is HDF5 (FormatoKit 0.19 names it)")
         XCTAssertEqual(FileRouting.route(path: try file("a.msa", Array("#FORMAT : EMSA/MAS Spectral Data File\n".utf8))), .singleSpectrum)
     }
 
@@ -39,6 +40,11 @@ final class FileRoutingTests: XCTestCase {
         XCTAssertTrue(tiff.contains("im.tif") && tiff.contains("TIFF"), tiff)
         guard case .refused(let mrc) = FileRouting.route(path: try file("v.mrc", [0, 0, 0, 0, 0, 0, 0, 0])) else { return XCTFail() }
         XCTAssertTrue(mrc.contains("MRC"), mrc)
+        // FormatoKit 0.20 names TIA: a .ser with its byte-order mark, and an .emi by its extension.
+        guard case .refused(let ser) = FileRouting.route(path: try file("s.ser", [0x49, 0x49, 0x97, 0x01, 0, 0, 0, 0])) else { return XCTFail() }
+        XCTAssertTrue(ser.contains("s.ser") && ser.contains("TIA"), ser)
+        guard case .refused(let emi) = FileRouting.route(path: try file("s.emi", [0, 0, 0, 0])) else { return XCTFail() }
+        XCTAssertTrue(emi.contains("TIA"), emi)
         guard case .refused(let other) = FileRouting.route(path: try file("notes.txt", Array("hello".utf8))) else { return XCTFail() }
         XCTAssertTrue(other.contains("notes.txt"), other)
         // The kit's dedicated-reader refusal: extension and bytes disagree (a .dm4 that is not DM) falls to the signature check.

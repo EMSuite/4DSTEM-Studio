@@ -629,7 +629,7 @@ whole.quantification.kSet.relativeSigma[2] = 3fc999999999999a 0.2000000000000000
 whole.quantification.kSet.relativeSigma[3] = 3fc999999999999a 0.20000000000000001
 whole.quantification.kSet.reference = "Al"
 whole.quantification.abundanceRefusal = nil
-whole.quantification.absorption.refused = "GMS files: the stage tilt and the four detector segments are not read yet (open item), so the absorption geometry is unknown"
+whole.quantification.absorption.refused = "GMS file: no stage tilt (Microscope Info › Stage Position › Stage Alpha), so the absorption geometry is unknown"
 whole.quantification.warnings: array 1
 whole.quantification.warnings[0] = "a weak line next to Al Kα reads low by ≈ 300 counts per pooled spectrum on synthetic data (cause: the Al Kα incomplete-charge tail, unmodelled until a tail is measured on an Al matrix, `TailEstimate`); unmeasured on real data. Weak-line bias measured on synthetic data: Δ = −270 ± 31 counts at 900 planted Mg Kα (generator A, no tail: continuum–line projection) and −272 ± 23 at 882 (generator S); −325 ± 38 at 3000 (A) and −226 ± 22 at 2899 (S)"
 whole.quantification.qualityLabel = "χ²ᵣ (Pearson)"
@@ -644,7 +644,7 @@ whole.quantification.footerLines[5] = "σ: counting only; model choice can move 
 whole.quantification.footerLines[6] = "σ is counting statistics at χ²ᵣ = 1; this fit is at 0.38 (Pearson)"
 whole.quantification.footerLines[7] = "k: computed: Bote-Salvat 2008 (NIST EPQ tables, PRA 77 042701), edges DHS xionUis.csv; not Velox's Brown-Powell default; omega: Krause 1979 (NIST EPQ Krause1979.csv); epsilon: EPQ getDefaultSDDProperties (Au 0.0 nm, Al 10.0 nm, Si dead layer 0.0 µm, Si 450.0 µm); generic SDD model, not a measured calibration of this detector; FFAST MACs; relative to Al; beam 200.0 keV (EPQ 249dd3f8 + Krause 1979 + FFAST); σ_k 20 % flat, 0 on the reference (Al)"
 whole.quantification.footerLines[8] = "k-free ratio: net / net(Al)"
-whole.quantification.footerLines[9] = "absorption: not applied — GMS files: the stage tilt and the four detector segments are not read yet (open item), so the absorption geometry is unknown"
+whole.quantification.footerLines[9] = "absorption: not applied — GMS file: no stage tilt (Microscope Info › Stage Position › Stage Alpha), so the absorption geometry is unknown"
 whole.quantification.fitSettings.elements: array 6
 whole.quantification.fitSettings.elements[0] = "Al"
 whole.quantification.fitSettings.elements[1] = "Mg"
@@ -682,11 +682,11 @@ whole.quantification.unlistedCheckPending = false
 whole.quantification.abundanceCaveat = nil
 whole.quantification.appliedSumEscape = nil
 whole.quantification.continuumDeadLayerMicrons = nil
-whole.csv-fnv = ad98d2cdf3061a75
+whole.csv-fnv = 5b8aea84c25e6cc3
 whole.rangeSensitivity = nil
 whole.unlistedProposal.candidates: n 0 sum 0000000000000000 0 fnv cbf29ce484222325
 whole.unlistedProposal.sumPeaks: n 0 sum 0000000000000000 0 fnv cbf29ce484222325
-whole.unlistedProposal.refused: array 7
+whole.unlistedProposal.refused: array 6
 whole.unlistedProposal.refused[0].element = "H"
 whole.unlistedProposal.refused[0].reason = "H has no characteristic X-ray line: it cannot be detected by EDX."
 whole.unlistedProposal.refused[1].element = "He"
@@ -697,21 +697,19 @@ whole.unlistedProposal.refused[3].element = "Be"
 whole.unlistedProposal.refused[3].reason = "Be K (about 109 eV) lies below the detector's energy range and is absorbed in its window; it cannot be quantified by EDX."
 whole.unlistedProposal.refused[4].element = "B"
 whole.unlistedProposal.refused[4].reason = "Its line at 0.18 keV lies below the proposer's lowest tested line (0.45 keV): under the detector window the continuum is too model-dependent for a net area to be trusted. List it by hand if you know it is there."
-whole.unlistedProposal.refused[5].element = "C"
-whole.unlistedProposal.refused[5].reason = "Its line at 0.28 keV lies below the proposer's lowest tested line (0.45 keV): under the detector window the continuum is too model-dependent for a net area to be trusted. List it by hand if you know it is there."
-whole.unlistedProposal.refused[6].element = "N"
-whole.unlistedProposal.refused[6].reason = "Its line at 0.39 keV lies below the proposer's lowest tested line (0.45 keV): under the detector window the continuum is too model-dependent for a net area to be trusted. List it by hand if you know it is there."
+whole.unlistedProposal.refused[5].element = "N"
+whole.unlistedProposal.refused[5].reason = "Its line at 0.39 keV lies below the proposer's lowest tested line (0.45 keV): under the detector window the continuum is too model-dependent for a net area to be trusted. List it by hand if you know it is there."
 whole.unlistedProposal.currie.alpha = 3fa999999999999a 0.050000000000000003
 whole.unlistedProposal.currie.beta = 3fa999999999999a 0.050000000000000003
 whole.unlistedProposal.notes: array 7
-whole.unlistedProposal.notes[0] = "Lines below 0.45 keV are not tested (a measured limit of the continuum model, not a property of the method)."
+whole.unlistedProposal.notes[0] = "Lines below 0.45 keV are not tested (a measured limit of the continuum model, not a property of the method); C Kα is measured with the final model and shown as possible only, never proposed."
 whole.unlistedProposal.notes[1] = "Identification: the residual's peaks at or above 5 σ of its top-hat filter (1.5 × below 1 keV); a candidate joins when Σ(y − μ)²/(μ + (0.01 μ)²) falls by at least 100, 20 % of that at its own lines, with its area at or above Currie L_D (α = β = 0.05, σ₀ from the fit's own variance with it absent) and no line against it; the final fit drops what it does not need (100). Kβ weights from NIST EPQ in this fit."
-whole.unlistedProposal.notes[2] = "Fit: least squares, weighted by 1/(y + (0.01 y)²) to decide, least squares, unweighted for the numbers shown; continuum: Kramers×Bernstein(9,5), split at 1.5596 keV (step broadened by the detector resolution); orders chosen on synthetic data; escape peaks: fitted for 2 line groups above the Si K edge (1.839 keV); reference shapes: none; 0 residual peaks examined, 0 candidate fits, 2 fits in all."
+whole.unlistedProposal.notes[2] = "Fit: least squares, weighted by 1/(y + (0.01 y)²) to decide, least squares, unweighted for the numbers shown; continuum: Kramers×Bernstein(9,5), split at 1.5596 keV (step broadened by the detector resolution); orders chosen on synthetic data; escape peaks: fitted for 2 line groups above the Si K edge (1.839 keV); reference shapes: none; 0 residual peaks examined, 1 candidate fits, 3 fits in all."
 whole.unlistedProposal.notes[3] = "Confirmation lines: an element nominated by an L or M line needs its K or L alpha line at 3 σ in the residual where the fitted range holds it and the beam is at least 2.0 times its energy; otherwise it is withheld."
 whole.unlistedProposal.notes[4] = "Background check: data over model 0.59 off the lines in 1.0 to 2.5 keV (0.80 to 1.25 is healthy); a find there is only possible."
-whole.unlistedProposal.notes[5] = "Look-elsewhere: 0 candidates were tested, so about 0.00 chance passes of the area bar alone are expected; the gain and confirmation bars stand beside it."
+whole.unlistedProposal.notes[5] = "Look-elsewhere: 1 candidates were tested, so about 0.00 chance passes of the area bar alone are expected; the gain and confirmation bars stand beside it."
 whole.unlistedProposal.notes[6] = "a weak line next to Al Kα reads low by ≈ 300 counts per pooled spectrum on synthetic data (cause: the Al Kα incomplete-charge tail, unmodelled until a tail is measured on an Al matrix, `TailEstimate`); unmeasured on real data. Weak-line bias measured on synthetic data: Δ = −270 ± 31 counts at 900 planted Mg Kα (generator A, no tail: continuum–line projection) and −272 ± 23 at 882 (generator S); −325 ± 38 at 3000 (A) and −226 ± 22 at 2899 (S)"
-whole.unlistedProposal.passes = 2
+whole.unlistedProposal.passes = 3
 whole.unlistedProposal.settled = true
 whole.unlistedProposal.reducedChiSquared = 3fd88696d3af7cf8 0.38321467087185068
 whole.unlistedCheck.candidates: n 0 sum 0000000000000000 0 fnv cbf29ce484222325
@@ -730,7 +728,7 @@ whole.withholding[1][1] = 403b7e117b1a077f 27.492454236845784
 whole.withholding[1][2] = 40483983ddea3400 48.449336757046694
 whole.withholding[1][3] = 4012d79212e5305e 4.7105181648622345
 whole.withholding.caveat = nil
-whole.csv-withholding-fnv = 375acb86784e8bd8
+whole.csv-withholding-fnv = ffc22593da2bec8e
 region-locked-axis.quantification.method.version = 1
 region-locked-axis.quantification.method.estimator = .leastSquares
 region-locked-axis.quantification.method.background = .empiricalWithAlEdge
@@ -877,7 +875,7 @@ region-locked-axis.quantification.plotModel: n 512 sum 406a43ff6653d1c4 210.1249
 region-locked-axis.quantification.plotBackground: n 512 sum 4052e9b94af9b83b 75.651934379450651 fnv 918f79970c64ae0c
 region-locked-axis.quantification.kSet = nil
 region-locked-axis.quantification.abundanceRefusal = "The computed-k data files are not available in this build."
-region-locked-axis.quantification.absorption.refused = "GMS files: the stage tilt and the four detector segments are not read yet (open item), so the absorption geometry is unknown"
+region-locked-axis.quantification.absorption.refused = "GMS file: no stage tilt (Microscope Info › Stage Position › Stage Alpha), so the absorption geometry is unknown"
 region-locked-axis.quantification.warnings: array 1
 region-locked-axis.quantification.warnings[0] = "a weak line next to Al Kα reads low by ≈ 300 counts per pooled spectrum on synthetic data (cause: the Al Kα incomplete-charge tail, unmodelled until a tail is measured on an Al matrix, `TailEstimate`); unmeasured on real data. Weak-line bias measured on synthetic data: Δ = −270 ± 31 counts at 900 planted Mg Kα (generator A, no tail: continuum–line projection) and −272 ± 23 at 882 (generator S); −325 ± 38 at 3000 (A) and −226 ± 22 at 2899 (S)"
 region-locked-axis.quantification.qualityLabel = "χ²ᵣ (Pearson)"
@@ -891,7 +889,7 @@ region-locked-axis.quantification.footerLines[4] = "sum peaks tested, not kept: 
 region-locked-axis.quantification.footerLines[5] = "σ: counting only; model choice can move a weak line by more"
 region-locked-axis.quantification.footerLines[6] = "σ is counting statistics at χ²ᵣ = 1; this fit is at 0.27 (Pearson)"
 region-locked-axis.quantification.footerLines[7] = "at%: not computed — The computed-k data files are not available in this build."
-region-locked-axis.quantification.footerLines[8] = "absorption: not applied — GMS files: the stage tilt and the four detector segments are not read yet (open item), so the absorption geometry is unknown"
+region-locked-axis.quantification.footerLines[8] = "absorption: not applied — GMS file: no stage tilt (Microscope Info › Stage Position › Stage Alpha), so the absorption geometry is unknown"
 region-locked-axis.quantification.fitSettings.elements: array 3
 region-locked-axis.quantification.fitSettings.elements[0] = "Al"
 region-locked-axis.quantification.fitSettings.elements[1] = "Si"
@@ -926,5 +924,5 @@ region-locked-axis.quantification.unlistedCheckPending = false
 region-locked-axis.quantification.abundanceCaveat = nil
 region-locked-axis.quantification.appliedSumEscape = nil
 region-locked-axis.quantification.continuumDeadLayerMicrons = nil
-region-locked-axis.csv-fnv = 9343c4495bfd5c6
+region-locked-axis.csv-fnv = 7ac58a9c2ac61450
 region-locked-axis.rangeSensitivity = nil

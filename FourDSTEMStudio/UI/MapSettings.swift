@@ -1171,7 +1171,7 @@ private struct ACOMWorkControls: View {
 private struct ACOMSections: View {
     @Environment(AppState.self) private var appState
     @State private var showCIFImporter = false
-    @State private var showMaterialsProjectSheet = false
+    @State private var showAddPhaseSheet = false
     @SceneStorage("map.settings.acomEngine.isExpanded") private var showsEngine = false
 
     /// Nothing on a stock macOS declares `.cif`, so this resolves to the
@@ -1187,25 +1187,22 @@ private struct ACOMSections: View {
     var body: some View {
         @Bindable var session = appState.acomSession
         InspectorSection("ACOM (orientation)") {
-            // Materials Project is the default phase source (owner
-            // decision); the built-in library and "Custom cubic…" are no
-            // longer offered here — see the doc comment on
-            // `CrystalModelLibrary.models`. A picker whose only choices
-            // were "Choose phase…" and already-imported models added
-            // nothing over the buttons below, so it's gone: the row is
-            // just the current selection's name, and the two buttons are
-            // the only way to choose a phase model. Switching between
-            // already-imported models still works, as the `Menu` case of
+            // The phases come from the shared phase library (#513): Add Phase…
+            // opens its sheet (the Materials Project, or My Phases), Import
+            // CIF… a file, which is kept in My Phases too. The built-in
+            // crystals are no choice here (`CrystalModelLibrary.models`).
+            // Switching between the window's models is the `Menu` case of
             // `phaseModelValue`.
             InspectorRow("Phase model") {
                 phaseModelValue
             }
 
             InspectorActionRow {
-                InspectorAdaptiveButton("Materials Project…", systemImage: "network") {
-                    showMaterialsProjectSheet = true
+                InspectorAdaptiveButton("Add Phase…", systemImage: "plus") {
+                    showAddPhaseSheet = true
                 }
-                .accessibilityIdentifier("acom.materialsProject")
+                .accessibilityIdentifier("acom.addPhase")
+                .libraryAddPhaseSheet(isPresented: $showAddPhaseSheet, as: .acom) { showCIFImporter = true }
 
                 InspectorAdaptiveButton("Import CIF…", systemImage: "square.and.arrow.down") {
                     showCIFImporter = true
@@ -1219,14 +1216,10 @@ private struct ACOMSections: View {
             ) { result in
                 switch result {
                 case .success(let urls):
-                    if let url = urls.first { appState.importCrystalModel(from: url) }
+                    if let url = urls.first { appState.importCIFIntoLibrary(from: url, as: .acom) }
                 case .failure(let error):
                     appState.present(error)
                 }
-            }
-            .sheet(isPresented: $showMaterialsProjectSheet) {
-                MaterialsProjectImportSheet(addsToPhaseMapping: false)
-                    .environment(appState)
             }
 
             if appState.acomSession.modelSelection == .none {

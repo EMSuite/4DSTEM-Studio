@@ -132,7 +132,7 @@ structure can be in the list twice with typed zone axes.
 
 | Tool | What it does |
 |---|---|
-| `add_phase` | a CIF in the Agent folder becomes a phase, as Add Phase > From CIF file does; the first phase is the matrix, `is_matrix` makes this one it; a file that does not read is refused in words, no modal |
+| `add_phase` | a CIF in the Agent folder becomes a phase, as Add Phase > From CIF file does, or a phase of My Phases by `phase_id`; the first phase is the matrix, `is_matrix` makes this one it; a file that does not read is refused in words, no modal |
 | `set_phase` | one phase: `is_matrix` (exactly one is; the matrix moves by marking another), its own `excitation_slab_inv_angstrom` or `clear_excitation_slab` back to the default, and with typed zone axes `zone_axis` and `orientation_relationship` |
 | `remove_phase` | the minus button (Edit > Undo puts it back); removing the matrix makes the first phase the matrix |
 
@@ -186,16 +186,18 @@ A tool whose control asks the person first (Clear Calibration's dialog, Remove F
 dataset) refuses with HTTP 409 and says in words what would be lost. The agent asks the person in the chat and, only after a
 yes, calls again with `confirm` true.
 
-## Materials Project (issue #297)
+## Phases (issues #297, #513)
+
+The phases come from the shared phase library, My Phases, as in Electron Microscopy Studio.
 
 | Tool | What it does |
 |---|---|
-| `fetch_materials_project` | fetches a material by its id (`mp-…`), as the sheet's Fetch does, and checks it against an expected formula and space group; answers at once; behind "Let agents run analyses", since it goes online |
-| `get_materials_project` | whether the person has stored a key, and the last fetch: the material (formula, space group, cell, deprecated), the verdict and whether it may be imported, or why it failed |
-| `import_materials_project` | the sheet's Import: as a phase of Map Phases or as ACOM's phase model; refused on a mismatch |
+| `list_phases` | the phases of My Phases: id, name, source and credit, lattice, whether edited; records that could not be read; a fetch still running and the last one's outcome |
+| `fetch_phase` | adds a Materials Project entry by its id (`mp-…`), as the Add Phase sheet does; `use` phase or acom also puts it to work; answers at once, `list_phases` says when it ends |
 
-The request uses the key the person stored in Settings. The key never passes through the door: no tool reads, returns, sets
-or logs it, and saving or removing it stays the person's.
+`add_phase` and `set_acom` take a phase of My Phases by `phase_id`. A download uses the person's own key when Settings holds
+one, and the open service otherwise. The key never passes through the door: no tool reads, returns, sets or logs it, and
+saving or removing it stays the person's.
 
 ## The view (issue #297)
 

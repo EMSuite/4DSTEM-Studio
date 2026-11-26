@@ -42,8 +42,6 @@ FourDSTEMStudioTests/LearnedDiskDetectionScanTests.swift	Metal	test of display, 
 FourDSTEMStudioTests/LearnedDiskDetectorRefineAndWindowTests.swift	Metal	test of display, residency or detector GPU path, or of simd-typed kit calls
 FourDSTEMStudioTests/LearnedWindowedDetectionTests.swift	Metal	test of display, residency or detector GPU path, or of simd-typed kit calls
 FourDSTEMStudioTests/LearnedWindowedFixture.swift	Metal	test of display, residency or detector GPU path, or of simd-typed kit calls
-FourDSTEMStudioTests/MaterialsProjectImportTests.swift	simd	test of display, residency or detector GPU path, or of simd-typed kit calls
-FourDSTEMStudioTests/MaterialsProjectDocumentTests.swift	simd	test of display, residency or detector GPU path, or of simd-typed kit calls
 FourDSTEMStudioTests/MetalLayerScaleTests.swift	MetalKit	test of display, residency or detector GPU path, or of simd-typed kit calls
 FourDSTEMStudioTests/MonoclinicOrientationTests.swift	simd	test of display, residency or detector GPU path, or of simd-typed kit calls
 FourDSTEMStudioTests/PhaseDiskClaimsTests.swift	simd	test of display, residency or detector GPU path, or of simd-typed kit calls

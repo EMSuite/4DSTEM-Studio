@@ -33,7 +33,7 @@ package nonisolated struct CrystalModel: Identifiable, Sendable {
     package let symmetry: ACOMCrystalSymmetry
     package let source: CrystalModelSource
     /// IT (International Tables) space-group number, when known — set by
-    /// `MaterialsProjectImport` from `symmetry.number`, or by `CIFModelImport` when
+    /// `CIFModelImport` when
     /// the CIF itself carries `_symmetry_int_tables_number` /
     /// `_space_group_it_number`. `nil` means "not recorded", not "P1"; most
     /// built-in and custom models never set it.

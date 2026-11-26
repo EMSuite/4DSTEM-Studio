@@ -32,11 +32,6 @@ extension LayoutPolicy {
     static let configuratorSheet: (min: CGSize, ideal: CGSize) =
         (CGSize(width: 720, height: 500), CGSize(width: 880, height: 720))
 
-    /// The Materials Project fetch sheet: three fields, a result card, a
-    /// footer.
-    static let materialsProjectSheet: (min: CGSize, ideal: CGSize) =
-        (CGSize(width: 460, height: 380), CGSize(width: 520, height: 480))
-
     /// The Settings window (session S21, `ROADMAP.md` "Settings window,
     /// Xcode-style sidebar"): a `NavigationSplitView` — the old
     /// `materialsProjectSettingsWidth` (one `Form` section, width only)

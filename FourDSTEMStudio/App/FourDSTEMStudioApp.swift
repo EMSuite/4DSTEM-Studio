@@ -68,7 +68,7 @@ private struct DatasetWindow: View {
     @Environment(PrecipitateReportUpdates.self) private var reportUpdates: PrecipitateReportUpdates?
 
     /// `preferences` is handed in (not `AppPreferences()` as a default, the
-    /// `materialsProject`/`sessionSidecar` shape) because it must be the
+    /// `sessionSidecar` shape) because it must be the
     /// SAME instance the app's `Settings` scene edits — a `didSet` on a
     /// second instance backed by the same `UserDefaults` domain would still
     /// read the right values, but would never observe THIS window's live
@@ -167,6 +167,8 @@ private struct DatasetWindow: View {
         .task {
             if let action = menuRelay.take() { MenuActionRelay.run(action, in: appState) }
         }
+        // My Phases, the shared phase library (#513): read from disk once per launch, by the first window.
+        .task { await PhaseServices.loadLibrary() }
         #if DEBUG
         // `--demo-fixture` (UI journeys): the demo opens at launch. DEBUG only (#310).
         .task {

@@ -1,9 +1,7 @@
 //
 //  SettingsWindow.swift
 //  Role: the Settings scene (`ROADMAP.md` "Settings window, Xcode-style
-//        sidebar") — grows the one-section scene
-//        `UI/MaterialsProjectSettingsView.swift` opened (S5) into a
-//        `NavigationSplitView`: a sidebar of sections, a `Form` detail. Every
+//        sidebar"): a `NavigationSplitView`: a sidebar of sections, a `Form` detail. Every
 //        preference it edits lives on `AppPreferences`
 //        (`Session/AppPreferences.swift`), the Settings scene's one state
 //        owner, reached through `.environment(preferences)`
@@ -17,6 +15,8 @@
 
 import ShellAgentDoor
 import ShellLayout
+import ShellPhaseLibrary
+import ShellPhaseViews
 import SwiftUI
 import UniformTypeIdentifiers
 import ShellMetal
@@ -55,13 +55,9 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
 struct SettingsWindow: View {
     @State private var selection: SettingsSection? = .general
-    /// Hoisted out of `MaterialsProjectSettingsView`, which the `switch`
-    /// below rebuilds (a fresh `@State` each time, discarding the local one)
-    /// whenever the sidebar selection leaves `.materialsProject` and comes
-    /// back. This `@State` lives on `SettingsWindow` instead, which the
-    /// switch does not rebuild, so a typed-but-not-yet-saved key survives
-    /// the round trip.
-    @State private var materialsProjectKeyDraft = ""
+    /// The shared library's Materials Project settings (#513): the open service by default, the person's own key optional and
+    /// kept in the Keychain. Held here, which the `switch` below does not rebuild, so a typed key survives a change of section.
+    @State private var materialsProject = MaterialsProjectSettingsModel(keyStore: PhaseServices.keyStore, client: PhaseServices.client)
     @Environment(AppPreferences.self) private var preferences
 
     var body: some View {
@@ -81,7 +77,7 @@ struct SettingsWindow: View {
                 case .general: GeneralSettingsSection()
                 case .appearance: AppearanceSettingsSection()
                 case .analysis: AnalysisSettingsSection()
-                case .materialsProject: MaterialsProjectSettingsView(keyDraft: $materialsProjectKeyDraft)
+                case .materialsProject: MaterialsProjectSettingsSections(model: materialsProject)
                 case .agents: AgentSettingsSection()
                 case .advanced: AdvancedSettingsSection()
                 }

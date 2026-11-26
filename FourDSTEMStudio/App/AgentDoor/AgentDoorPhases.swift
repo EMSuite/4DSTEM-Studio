@@ -19,19 +19,34 @@ import DSTEMSession
 
 extension Mac4DSTEMAgentDoor {
     static let phaseTools: [AgentTool] = [
-        AgentTool(name: "add_phase", title: "Add phase from CIF",
-                  summary: "Adds a phase to Map Phases' phase list from a CIF file in the Agent folder, as Add Phase > From CIF file "
-                      + "does. The first phase in an empty list is the matrix; is_matrix true makes this one the matrix instead. "
+        AgentTool(name: "add_phase", title: "Add phase",
+                  summary: "Adds a phase to Map Phases' phase list: a CIF file in the Agent folder, as Add Phase > From CIF file "
+                      + "does, or a phase of My Phases by phase_id (list_phases names them; fetch_phase adds a Materials Project "
+                      + "entry), as the Add Phase sheet does. The first phase in an empty list is the matrix; is_matrix true makes this one the matrix instead. "
                       + "Answers the phase list (get_window's phase_mapping).",
                   input: .window,
                   parameters: [
-                      AgentParameter("path", .text, summary: "The CIF, relative to the Agent folder, as list_agent_folder names it.",
-                                     required: true),
+                      AgentParameter("path", .text, summary: "The CIF, relative to the Agent folder, as list_agent_folder names it."),
+                      AgentParameter("phase_id", .text, summary: "A phase of My Phases by its id, instead of a CIF."),
                       AgentParameter("is_matrix", .boolean, summary: "Make this phase the matrix (default false)."),
                   ],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
             guard !state.agentBusy else { return busyRefusal }
+            if let id = call.arguments["phase_id"] {
+                guard call.arguments["path"] == nil else { return .refusal(status: 400, message: "Give path or phase_id, not both.") }
+                switch libraryPhase(id: id) {
+                case .failure(let refusal): return .refusal(status: refusal.status, message: refusal.message)
+                case .success(let phase):
+                    let model = state.useLibraryPhase(phase, as: .phase)
+                    let product = state.phaseMapping
+                    if call.arguments["is_matrix"] == "true" { markMatrix(product.phases.count - 1, in: product) }
+                    let role = product.phases.last?.isMatrix == true ? " as the matrix" : ""
+                    state.statusText = "An agent added the phase \(quotedAgentText(model.displayName))\(role) from My Phases."
+                    return .json(phaseMappingSettings(of: state))
+                }
+            }
+            guard call.arguments["path"] != nil else { return .refusal(status: 400, message: "Give path (a CIF) or phase_id.") }
             let file: URL
             switch folder.resolve(call.arguments["path"] ?? "") {
             case .success(let url): file = url

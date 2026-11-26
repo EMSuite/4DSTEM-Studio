@@ -32,7 +32,7 @@ import DiffractoOrientation
 struct PhaseMappingSections: View {
     @Environment(AppState.self) private var appState
     @State private var showCIFImporter = false
-    @State private var showMaterialsProjectSheet = false
+    @State private var showAddPhaseSheet = false
     @SceneStorage private var showsAdvanced: Bool
     /// The Phases section's own Advanced disclosure (typed zone axes, mac4DSTEM#184).
     @SceneStorage("aiAnalysis.phaseMapping.phasesAdvanced.isExpanded") private var showsPhasesAdvanced = false
@@ -542,13 +542,13 @@ struct PhaseMappingSections: View {
         return values.map { Num.fixed($0, 2, locale: locale) }.joined(separator: " · ") + " px"
     }
 
-    /// Materials Project is the default phase source (owner decision); the
-    /// built-in library is not offered here — see the doc comment on
-    /// `CrystalModelLibrary.models`. The menu offers exactly the two sources
-    /// plus this session's already-imported models (CIF or Materials Project).
+    /// The phases come from the shared phase library (#513): Add Phase… opens
+    /// its sheet (the Materials Project, or My Phases), From CIF file… a file,
+    /// kept in My Phases too; then the window's models. The built-in crystals
+    /// are no choice here (`CrystalModelLibrary.models`).
     private var addPhaseMenu: some View {
         InspectorAdaptiveMenu("Add Phase", systemImage: "plus") {
-            Button("Materials Project…") { showMaterialsProjectSheet = true }
+            Button("Add Phase…") { showAddPhaseSheet = true }
             Button("From CIF file…") { showCIFImporter = true }
             if !appState.acomSession.importedCrystalModels.isEmpty {
                 Divider()
@@ -566,30 +566,18 @@ struct PhaseMappingSections: View {
             switch result {
             case .success(let urls):
                 guard let url = urls.first else { return }
-                // `importCrystalModel` stores into the shared imported-model
-                // list, which ACOM owns, so a single import serves both
-                // rooms; it returns the model it parsed (nil on a refusal),
-                // which is the one to add — never the list's `.last`.
-                if let model = appState.importCrystalModel(from: url, selectsForOrientation: false) {
-                    add(model)
-                }
+                // The import is held in the window's models, which ACOM
+                // shares, kept in My Phases, and added as a phase.
+                appState.importCIFIntoLibrary(from: url, as: .phase)
             case .failure(let error):
                 appState.present(error)
             }
         }
-        .sheet(isPresented: $showMaterialsProjectSheet) {
-            // `addsToPhaseMapping: true` routes the sheet's Import button
-            // through `AppState.addPhaseMappingSlot(_:)` — the same function
-            // `add(_:)` below delegates to — so both paths share one rule.
-            MaterialsProjectImportSheet(addsToPhaseMapping: true)
-                .environment(appState)
-        }
+        .libraryAddPhaseSheet(isPresented: $showAddPhaseSheet, as: .phase) { showCIFImporter = true }
     }
 
-    /// `AppState.addPhaseMappingSlot(_:)` (`App/AppState+MaterialsProject.swift`)
-    /// is the same duplicate/matrix rule; this delegates rather than keeping
-    /// a second copy, now that the Materials Project sheet needs the same
-    /// logic from a view that doesn't have this one's local state.
+    /// `AppState.addPhaseMappingSlot(_:)` (`App/PhaseServices.swift`) is the
+    /// one duplicate/matrix rule, shared with the Add Phase sheet and the door.
     private func add(_ model: CrystalModel) {
         appState.addPhaseMappingSlot(model)
     }

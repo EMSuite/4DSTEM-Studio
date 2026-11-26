@@ -182,13 +182,15 @@ extension AppState {
         return nil
     }
 
+    /// The window's models and My Phases' (#513): a recipe naming a library phase by id replays on another window too.
     private var replayMaterials: ReplayStepPlan.ACOMReplayPlan.SessionMaterials {
-        .init(
-            importedIDs: Set(acomSession.importedCrystalModels.map(\.id)),
+        let models = heldAndLibraryCrystalModels
+        return .init(
+            importedIDs: Set(models.map(\.id)),
             // The content check: an imported id is a file stem, so the
             // recipe's fingerprint must match THIS session's import.
             importedFingerprints: Dictionary(
-                acomSession.importedCrystalModels.map { ($0.id, $0.contentFingerprint) },
+                models.map { ($0.id, $0.contentFingerprint) },
                 uniquingKeysWith: { _, last in last }),
             customStructure: acomSession.customStructure, customLatticeA: acomSession.customLatticeA,
             customZ: acomSession.customZ)
@@ -209,7 +211,9 @@ extension AppState {
     func selectReplayMaterial(_ acomPlan: ReplayStepPlan.ACOMReplayPlan) -> String? {
         switch acomPlan.resolveMaterial(in: replayMaterials) {
         case .library(let id): acomSession.modelSelection = .library(id)
-        case .imported(let id): acomSession.modelSelection = .imported(id)
+        case .imported(let id):
+            holdLibraryPhase(id: id)   // a library phase the window does not hold yet
+            acomSession.modelSelection = .imported(id)
         case .customCubic: acomSession.modelSelection = .customCubic
         case .unavailable(let reason): return reason
         }

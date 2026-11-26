@@ -9,9 +9,9 @@
 # them found 3 — because the same list is spelled three different ways across
 # tools/harnesses/*/run.sh:
 #
-#     "$REPO/mac4DSTEM/Core/Data/FourDArray.swift"     # REPO=<repo root>
-#     "$SRC/Data/FourDArray.swift"                     # SRC=<repo>/mac4DSTEM/Core
-#     "$SRC/FourDArray.swift"                          # SRC=<repo>/mac4DSTEM/Core/Data
+#     "$REPO/FourDSTEMStudio/Core/Data/FourDArray.swift"     # REPO=<repo root>
+#     "$SRC/Data/FourDArray.swift"                     # SRC=<repo>/FourDSTEMStudio/Core
+#     "$SRC/FourDArray.swift"                          # SRC=<repo>/FourDSTEMStudio/Core/Data
 #
 # `unit` and `scientific` both passed; the breakage only surfaced when the
 # aggregate ran, because the affected runners live in `all` or outside the gate
@@ -230,7 +230,7 @@ mac4dstem_copy_bundles() {
 # contributed no sources would reproduce the very failure this file prevents.
 mac4dstem_sources() {
   local repo=$1; shift
-  local core="$repo/mac4DSTEM/Core"
+  local core="$repo/FourDSTEMStudio/Core"
   local -a want=()
 
   local group

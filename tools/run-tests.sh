@@ -17,7 +17,7 @@ resolve_mac4dstem_developer_dir
 #
 # MEASURED 2026-09-12, because "margin, not measurement" is only defensible
 # until someone measures. Sampling free space every 3 s through a full
-# `-only-testing:mac4DSTEMTests` run: PEAK CONSUMPTION 1245 MB, and the suite
+# `-only-testing:FourDSTEMStudioTests` run: PEAK CONSUMPTION 1245 MB, and the suite
 # completed 602/0 with 7 GB free — i.e. it ran fine BELOW the 8 GB floor that
 # was refusing it. The floor was blocking work it did not need to block.
 #
@@ -92,17 +92,17 @@ unit_tests() (
   # `-testLanguage en -testRegion US`: the unit tests spell numbers with a decimal point; display strings follow the Mac's
   # locale now (a de_DE Mac printed commas and failed them), and locale-specific cases pass their own Locale.
   # MAC4DSTEM_UNIT_ONLY="ClassA,ClassB": run only those test classes and print the failures in full (a diagnosis run, not the gate).
-  local -a only=(-only-testing:mac4DSTEMTests) loud=(-quiet)
+  local -a only=(-only-testing:FourDSTEMStudioTests) loud=(-quiet)
   if [[ -n "${MAC4DSTEM_UNIT_ONLY:-}" ]]; then
     only=(); loud=(); par=(-parallel-testing-enabled NO)   # a class filter finds no test under the parallel runner
     local -a classes; classes=("${(@s:,:)MAC4DSTEM_UNIT_ONLY}")
-    local c; for c in "${classes[@]}"; do only+=(-only-testing:mac4DSTEMTests/$c); done
+    local c; for c in "${classes[@]}"; do only+=(-only-testing:FourDSTEMStudioTests/$c); done
   fi
   # A result bundle, so a failure says WHY (#370): with -quiet and parallel workers the log names a failing test and nothing
   # else, and an intermittent CI failure could not be diagnosed from it (#368, #369).
   local rc=0
   LLVM_PROFILE_FILE="$work/default-%p.profraw" \
-    xcodebuild test -project "$ROOT/mac4DSTEM.xcodeproj" -scheme mac4DSTEM \
+    xcodebuild test -project "$ROOT/FourDSTEMStudio.xcodeproj" -scheme FourDSTEMStudio \
       -configuration Debug -destination 'platform=macOS' \
       -derivedDataPath "$dd" "${par[@]}" -resultBundlePath "$work/unit.xcresult" \
       "${only[@]}" -testLanguage en -testRegion US \
@@ -190,7 +190,7 @@ inventory() {
   # DSTEMCore is out of reach from a clone in another folder (v5.1.0's archive from ~/GitHub/.worktrees/mac4DSTEM-v5.1.0).
   echo "== SWIFT_PACKAGE_NAME follows the checkout folder"
   local pkg_lines
-  pkg_lines="$(grep -E 'SWIFT_PACKAGE_NAME = ' "$ROOT/mac4DSTEM.xcodeproj/project.pbxproj")"
+  pkg_lines="$(grep -E 'SWIFT_PACKAGE_NAME = ' "$ROOT/FourDSTEMStudio.xcodeproj/project.pbxproj")"
   if [[ -z "$pkg_lines" ]] || grep -vqF 'SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";' <<< "$pkg_lines"; then
     echo "  every SWIFT_PACKAGE_NAME must be \"\$(SRCROOT:file:lower:c99extidentifier)\", never a literal name"; rc=1
   fi
@@ -224,11 +224,11 @@ inventory() {
   done
   # Without EMSuiteUI's sources every identifier of the window shell reads as missing; say why (mac4DSTEM#86).
   (( ${#macemui_sources} )) || echo "  NOTE  no EMSuiteUI sources ($ROOT/../EMSuiteUI/Sources, $ROOT/.build/checkouts/EMSuiteUI/Sources); run swift package resolve"
-  for id in $(grep -rhoE '"[a-z][A-Za-z]*\.[A-Za-z][A-Za-z0-9.]*"' "$ROOT/mac4DSTEMUITests" 2>/dev/null | tr -d '"' | sort -u); do
+  for id in $(grep -rhoE '"[a-z][A-Za-z]*\.[A-Za-z][A-Za-z0-9.]*"' "$ROOT/FourDSTEMStudioUITests" 2>/dev/null | tr -d '"' | sort -u); do
     [[ "$id" == workspace.* || "$id" == task.* || "$id" == detector.preset.* || "$id" == edx.export.* || "$id" == *.xcresult ]] && continue   # built from an enum raw value in the source
     # the window shell's identifiers (toolbar, sidebar, inspector frames) are EMSuiteUI's (MacEMUI until 2026-11) since 2026-10-22
     # EMSuiteUI: the sibling checkout on the developer's Mac, else the copy `swift package resolve` puts in .build/checkouts (CI).
-    grep -rqF "\"$id\"" "$ROOT/mac4DSTEM" "${macemui_sources[@]}" 2>/dev/null || { echo "  MISSING identifier $id"; rc=1; }
+    grep -rqF "\"$id\"" "$ROOT/FourDSTEMStudio" "${macemui_sources[@]}" 2>/dev/null || { echo "  MISSING identifier $id"; rc=1; }
   done
 
   # Large tracked files (added 2026-09-18): history already carries a removed 6 MB model and two copies of a 4 MB dylib, and a
@@ -250,7 +250,7 @@ inventory() {
   # model a fine-tune is judged against, on other numerics with every unit test green (Gate B, 2026-09-30).
   echo "== the app loads the learned detector on the Neural Engine only"
   local comparison_callers
-  comparison_callers=$(grep -rl 'loadForComparison' "$ROOT/mac4DSTEM" | grep -v '/Core/ML/LearnedDiskDetector.swift$' || true)
+  comparison_callers=$(grep -rl 'loadForComparison' "$ROOT/FourDSTEMStudio" | grep -v '/Core/ML/LearnedDiskDetector.swift$' || true)
   if [[ -n "$comparison_callers" ]]; then
     echo "  loadForComparison is called from app code: $comparison_callers"; rc=1
   else
@@ -261,7 +261,7 @@ inventory() {
   # literal storage in `init` kept them green and read a 128 MB file off exFAT into memory again (the defect that panicked this
   # Mac on 28 GB). `init` asks once, and the kit's storage (`.mapped` / `.readIntoMemory`) and the rank-3 file's options follow it.
   echo "== DM4Reader chooses its storage from readingOptions(forPath:)"
-  local dm4="$ROOT/mac4DSTEM/Core/Data/DM4Reader.swift"
+  local dm4="$ROOT/FourDSTEMStudio/Core/Data/DM4Reader.swift"
   if [[ "$(grep -c 'Self.readingOptions(forPath: path)' "$dm4")" == 1 ]] \
      && grep -q 'storage: isMapped ? .mapped : .readIntoMemory' "$dm4" \
      && grep -q 'options: options' "$dm4"; then
@@ -275,7 +275,7 @@ inventory() {
   # and the columns draw no bar or wash of their own. Not measurable in the
   # NSView tree (SwiftUI's `.bar` hosts no NSVisualEffectView; measured
   # 2026-09-03), so the rule is held here. The scientific panes are exempt.
-  if grep -nE '\.background\((\.bar\)|Color\.[a-zA-Z]+\.opacity)' "$ROOT"/mac4DSTEM/UI/*.swift \
+  if grep -nE '\.background\((\.bar\)|Color\.[a-zA-Z]+\.opacity)' "$ROOT"/FourDSTEMStudio/UI/*.swift \
        | grep -vE 'ImagePanes|PaneOverlays|PhaseClaimOverlay|LoadConfigurator|MetalImageView|HistogramView'; then
     echo "  ^ custom bar or opacity wash in the chrome (presentation contract rule 3)"; rc=1
   fi
@@ -283,7 +283,7 @@ inventory() {
   # Rule 4 (2026-09-03): no fixed frames except the science. A numeric
   # `.frame(...)` in the chrome must come from `LayoutPolicy.swift`; the
   # panes, overlays and plots are exempt.
-  if grep -nE '\.frame\([^)]*: *[0-9]' "$ROOT"/mac4DSTEM/UI/*.swift \
+  if grep -nE '\.frame\([^)]*: *[0-9]' "$ROOT"/FourDSTEMStudio/UI/*.swift \
        | grep -vE 'ImagePanes|PaneOverlays|PhaseClaimOverlay|HistogramView|ResultsWorkspace|LoadConfigurator|LayoutPolicy' \
        | grep -vE 'LayoutPolicy\.|cropPane|// science'; then
     echo "  ^ a fixed frame outside the science (presentation contract rule 4)"; rc=1
@@ -295,10 +295,10 @@ inventory() {
   # — a fix in this repo gets a gate. Comment lines are exempt: the ban is
   # explained in several of them.
   if grep -nE '^[^/]*\b(HSplitView|VSplitView|NSSplitView|NSSplitViewController)\b' \
-       "$ROOT"/mac4DSTEM/UI/*.swift; then
+       "$ROOT"/FourDSTEMStudio/UI/*.swift; then
     echo "  ^ a split banned by the UI contract (architecture.md 'The UI contract')"; rc=1
   fi
-  if grep -nE '^ *import +AppKit' "$ROOT"/mac4DSTEM/UI/*.swift; then
+  if grep -nE '^ *import +AppKit' "$ROOT"/FourDSTEMStudio/UI/*.swift; then
     echo "  ^ import AppKit in UI (architecture.md 'The UI contract')"; rc=1
   fi
   # Every harness compiles Core/ through tools/lib/sources.manifest or says
@@ -345,7 +345,7 @@ inventory() {
 
   echo "== bundled folder references (every file must be tracked)"
   local ref bf why
-  for ref in $(grep 'lastKnownFileType = folder' "$ROOT/mac4DSTEM.xcodeproj/project.pbxproj" | sed -nE 's/.*path = ([^;]+);.*/\1/p' | tr -d '"'); do
+  for ref in $(grep 'lastKnownFileType = folder' "$ROOT/FourDSTEMStudio.xcodeproj/project.pbxproj" | sed -nE 's/.*path = ([^;]+);.*/\1/p' | tr -d '"'); do
     if [[ ! -d "$ROOT/$ref" ]]; then echo "  MISSING   $ref"; rc=1; continue; fi
     printf "  %-36s %7s files\n" "$ref" "$(find "$ROOT/$ref" -type f | wc -l | tr -d ' ')"
     for bf in $(cd "$ROOT" && find "$ref" -type f); do
@@ -392,7 +392,7 @@ core_build() (
   return "$rc"
 )
 
-# UI journeys (mac4DSTEMUITests): signed build, never part of `unit`. `tools/run-tests.sh ui [Journey ...]`; screenshots are exported
+# UI journeys (FourDSTEMStudioUITests): signed build, never part of `unit`. `tools/run-tests.sh ui [Journey ...]`; screenshots are exported
 # from the result bundle into the gate dir (tools/lib/ui-screenshots.sh). The first run asks for Accessibility permission for Xcode Helper.
 ui_tests() (
   local gate="${MAC4DSTEM_GATE_DIR:-${TMPDIR:-/tmp}/mac4dstem-gate}" sha only=()
@@ -400,10 +400,10 @@ ui_tests() (
   mkdir -p "$gate"
   rm -rf "$gate/ui.xcresult"
   # No argument: every functional journey (the per-landing set). `Performance` runs the measured journey, `all` runs everything.
-  if [[ $# -eq 0 ]]; then only=(-only-testing:mac4DSTEMUITests -skip-testing:mac4DSTEMUITests/PerformanceJourney)
-  elif [[ "$1" == all ]]; then only=(-only-testing:mac4DSTEMUITests)
+  if [[ $# -eq 0 ]]; then only=(-only-testing:FourDSTEMStudioUITests -skip-testing:FourDSTEMStudioUITests/PerformanceJourney)
+  elif [[ "$1" == all ]]; then only=(-only-testing:FourDSTEMStudioUITests)
   else
-    for j in "$@"; do [[ "$j" == Performance ]] && j=PerformanceJourney; only+=(-only-testing:mac4DSTEMUITests/$j); done
+    for j in "$@"; do [[ "$j" == Performance ]] && j=PerformanceJourney; only+=(-only-testing:FourDSTEMStudioUITests/$j); done
   fi
   cd "$ROOT"
   # The UI runner lives in a predictable DerivedData (`$gate/dd-ui`, or MAC4DSTEM_UI_DERIVED_DATA), not Xcode's per-project folder: macOS
@@ -412,7 +412,7 @@ ui_tests() (
   # One screen, one mouse, one UI-test session: macTEM's and mac4DSTEM's runs take the same machine-wide lock (lockf blocks until it
   # is free; a run that holds it for 20 minutes is given up on).
   lockf -k -t 1200 "${TMPDIR:-/tmp}/macem-ui-tests.lock" \
-    xcodebuild test -project "$ROOT/mac4DSTEM.xcodeproj" -scheme mac4DSTEMUI -configuration Debug \
+    xcodebuild test -project "$ROOT/FourDSTEMStudio.xcodeproj" -scheme FourDSTEMStudioUI -configuration Debug \
     -destination 'platform=macOS' -derivedDataPath "${MAC4DSTEM_UI_DERIVED_DATA:-$gate/dd-ui}" -resultBundlePath "$gate/ui.xcresult" "${only[@]}" \
     SWIFT_OPTIMIZATION_LEVEL=-O -quiet && rc=0 || rc=$?
   "$ROOT/tools/lib/ui-screenshots.sh" "$gate/ui.xcresult" "$gate/ui-screenshots/$sha" || true

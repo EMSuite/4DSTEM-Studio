@@ -96,13 +96,13 @@ Notes from the first real-agent run (#237):
 
 ## Code
 
-`mac4DSTEM/App/AgentDoor/`: `Mac4DSTEMAgentDoor` (the door and the tools that look), `AgentDoorSnapshot` (what a window says), `AgentDoorRuns` (the
+`FourDSTEMStudio/App/AgentDoor/`: `Mac4DSTEMAgentDoor` (the door and the tools that look), `AgentDoorSnapshot` (what a window says), `AgentDoorRuns` (the
 tools that act), `AgentDoorFolder` and `AgentFolder` (the Agent folder).
 Settings > Agents is EMSuiteUI's `AgentDoorSettingsSection`.
 
 ## Coverage
 
-`mac4DSTEM/App/AgentDoor/AgentDoorCoverage.swift` lists every control in the UI, by its accessibility identifier, with how an
+`FourDSTEMStudio/App/AgentDoor/AgentDoorCoverage.swift` lists every control in the UI, by its accessibility identifier, with how an
 agent reaches it: the tool that does it, already seen in `get_window` or a picture, left to the person on purpose (with the
 reason), or a gap with its open issue (#224 to #230, #192). `AgentDoorCoverageTests` fails when a control has no row, so a
 new control cannot ship until someone decides. Today 34 controls have a tool, 95 are seen, 47 stay with the person and 90

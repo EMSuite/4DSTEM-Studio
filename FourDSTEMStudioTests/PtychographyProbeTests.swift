@@ -1,0 +1,274 @@
+import ShellControls
+import ShellInspector
+import ShellLayout
+import AppKit
+import SwiftUI
+import XCTest
+import DSTEMCore
+import ImagoCore
+import DSTEMSession
+import struct CuboParallax.ParallaxPhysicalShift
+import struct CuboParallax.ParallaxAberrationFitResult
+import struct CuboParallax.ParallaxHigherOrderAberrationFitResult
+import struct CuboParallax.ParallaxAberrationTerm
+@testable import FourDSTEMStudio
+
+/// Lane R1 (2026-09-30): the ptychography probe takes a defocus and the fitted aberrations.
+///
+/// The fixture that pins the probe to py4DSTEM's `ComplexProbe` (planted wrong conventions included) is
+/// `singleslice-ptychography-test` (a retired harness; the kit's parity tests hold it) - it needs py4DSTEM, so it lives in the scientific gate. What this class pins without
+/// Python: the conventions as plain arithmetic on the Fourier side of the probe, the seeding rule (defocus is MINUS the parallax fit's C1), and that the published product names the defocus it started from.
+/// Every test names the mutation it catches.
+@MainActor
+final class PtychographyProbeTests: XCTestCase {
+
+    // MARK: - The probe's conventions, as arithmetic
+
+    private let energyEV = 80_000.0
+    private let rows = 32, columns = 24
+    private let rowSampling = 0.4, columnSampling = 0.55
+    private let semiangleRad = 0.028, rolloffRad = 0.002
+
+    private var wavelength: Double { ParallaxPreprocessor.electronWavelengthAngstrom(energyEV: energyEV) }
+
+    /// The probe's Fourier transform (aperture * exp(-i chi), up to one overall complex scale), by `PtychographyPreparer.initialProbe` (CuboPtycho's `PtychographyProbe.build`)
+    /// followed by a forward FFT.
+    private func spectrum(_ aberrations: PtychographyProbeAberrations) throws -> (real: [Float], imaginary: [Float]) {
+        let fft = try XCTUnwrap(FFT2D(nx: columns, ny: rows))
+        var probe = try PtychographyPreparer.initialProbe(
+            detectorHeight: rows, detectorWidth: columns,
+            rowSamplingAngstrom: rowSampling, columnSamplingAngstrom: columnSampling,
+            wavelengthAngstrom: wavelength, cutoffRad: semiangleRad, rolloffRad: rolloffRad,
+            aberrations: aberrations
+        )
+        fft.transform(re: &probe.real, im: &probe.imaginary, forward: true)
+        return probe
+    }
+
+    /// Phase of the spectrum at (row, column) relative to its DC pixel (the overall scale), and the scattering angle there.
+    private func relativePhase(of s: (real: [Float], imaginary: [Float]), row: Int, column: Int) -> (phase: Double, alpha: Double) {
+        let here = row * columns + column
+        let phase = atan2(Double(s.imaginary[here]), Double(s.real[here]))
+            - atan2(Double(s.imaginary[0]), Double(s.real[0]))
+        let rowFrequency = Double(row <= (rows - 1) / 2 ? row : row - rows) / (Double(rows) * rowSampling)
+        let columnFrequency = Double(column <= (columns - 1) / 2 ? column : column - columns)
+            / (Double(columns) * columnSampling)
+        return (atan2(sin(phase), cos(phase)), hypot(rowFrequency, columnFrequency) * wavelength)
+    }
+
+    /// py4DSTEM: `defocus` -> C10 = -defocus, chi = (2 pi / lambda) * alpha^2 / 2 * C10, the probe's spectrum
+    /// aperture * exp(-i chi). So the spectrum's phase is +pi alpha^2 defocus / lambda: POSITIVE for positive defocus.
+    /// Mutation it catches: `-defocusAngstrom` -> `defocusAngstrom` in `PtychographyProbeAberrations.chi`; `-aperture * sin` ->
+    /// `aperture * sin` (exp(+i chi)); `2 * .pi` dropped.
+    func testPositiveDefocusGivesAPositiveSpectrumPhase() throws {
+        let defocus = 60.0
+        let s = try spectrum(PtychographyProbeAberrations(defocusAngstrom: defocus))
+        var checked = 0
+        for (row, column) in [(3, 0), (0, 4), (2, 3), (30, 1), (1, 21)] {
+            let (phase, alpha) = relativePhase(of: s, row: row, column: column)
+            guard alpha > 0.002, alpha < semiangleRad - 2 * rolloffRad else { continue }
+            XCTAssertEqual(phase, .pi * alpha * alpha * defocus / wavelength, accuracy: 2e-3, "pixel (\(row), \(column))")
+            checked += 1
+        }
+        XCTAssertGreaterThanOrEqual(checked, 4, "the test has to look at pixels inside the aperture")
+    }
+
+    /// chi's astigmatism term is (pi / lambda) alpha^2 (C12a cos 2 theta + C12b sin 2 theta) with theta = atan2(column, row)
+    /// frequency (py4DSTEM's phi = arctan2(second axis, first axis)); the spectrum phase is minus that. On the ROW axis
+    /// theta = 0 (cos 2 theta = +1), on the COLUMN axis theta = 90 deg (cos 2 theta = -1), on the diagonal sin 2 theta = +1.
+    /// Mutation it catches: cos/sin swapped; `atan2(frequencyRow, frequencyColumn)`; the sign of the astigmatism term.
+    func testAstigmatismFollowsThePy4DSTEMAxes() throws {
+        let c12a = 40.0, c12b = 25.0
+        let s = try spectrum(PtychographyProbeAberrations(c12aAngstrom: c12a))
+        let row = relativePhase(of: s, row: 3, column: 0)        // theta = 0
+        let column = relativePhase(of: s, row: 0, column: 4)     // theta = 90 deg
+        XCTAssertEqual(row.phase, -.pi * row.alpha * row.alpha * c12a / wavelength, accuracy: 2e-3)
+        XCTAssertEqual(column.phase, .pi * column.alpha * column.alpha * c12a / wavelength, accuracy: 2e-3)
+
+        // A pixel at 45 degrees in ANGLE: equal row and column frequencies.
+        let rowFrequency = 2.0 / (Double(rows) * rowSampling), columnFrequency = 2.0 / (Double(columns) * columnSampling)
+        let diagonalRow = 2, diagonalColumn = 2
+        // theta there is atan2(columnFrequency, rowFrequency), NOT 45 degrees on this non-square grid: use the real angle.
+        let theta = atan2(columnFrequency, rowFrequency)
+        let t = try spectrum(PtychographyProbeAberrations(c12bAngstrom: c12b))
+        let diagonal = relativePhase(of: t, row: diagonalRow, column: diagonalColumn)
+        XCTAssertEqual(diagonal.phase, -.pi * diagonal.alpha * diagonal.alpha * c12b * sin(2 * theta) / wavelength, accuracy: 2e-3)
+        XCTAssertGreaterThan(abs(sin(2 * theta)), 0.5, "the pixel must sit where sin 2 theta is far from zero")
+    }
+
+    /// A higher-order term is coefficient * alpha^(m+1) / (m+1) * cos(n theta) (cosine) or sin(n theta) (sine), the basis
+    /// `ParallaxAberrationCorrector` uses for the same fit. Coma C21 (m = 2, n = 1) on the ROW axis: cos = 1, sin = 0.
+    /// Mutation it catches: the 1/(m+1); cos <-> sin; the exponent.
+    func testComaUsesTheParallaxBasis() throws {
+        let coefficient = 4_000.0
+        let cosine = try spectrum(PtychographyProbeAberrations(
+            higherOrder: [.init(radialOrder: 2, angularOrder: 1, component: 0, coefficientAngstrom: coefficient)]))
+        let sine = try spectrum(PtychographyProbeAberrations(
+            higherOrder: [.init(radialOrder: 2, angularOrder: 1, component: 1, coefficientAngstrom: coefficient)]))
+        let onRow = relativePhase(of: cosine, row: 3, column: 0)
+        XCTAssertEqual(onRow.phase, -2 * .pi / wavelength * coefficient * pow(onRow.alpha, 3) / 3, accuracy: 3e-3)
+        let sineOnRow = relativePhase(of: sine, row: 3, column: 0)
+        XCTAssertEqual(sineOnRow.phase, 0, accuracy: 3e-3, "sin(theta) vanishes on the row axis")
+        let onColumn = relativePhase(of: sine, row: 0, column: 4)
+        XCTAssertEqual(onColumn.phase, -2 * .pi / wavelength * coefficient * pow(onColumn.alpha, 3) / 3, accuracy: 3e-3)
+    }
+
+    // MARK: - Seeding from the parallax fit
+
+    private func lowOrderFit(c1: Double, c12a: Double, c12b: Double, rotationRad: Double = -0.0017) -> ParallaxAberrationFitResult {
+        ParallaxAberrationFitResult(
+            measuredShifts: [], fittedShifts: [], rotationRad: rotationRad,
+            c1Angstrom: c1, c12aAngstrom: c12a, c12bAngstrom: c12b,
+            rmsResidualAngstrom: 0, forceTranspose: false, forcedRotationAngleDegrees: nil
+        )
+    }
+
+    /// The defocus a parallax fit implies is MINUS its C1: py4DSTEM's forward model stores C10 = -defocus (utils.py:159-160) and
+    /// E1 (2026-09-30) has its Parallax return C1 = -508.67 for a probe built at `defocus = +500` (the gold-on-carbon tutorial
+    /// agrees; the MoS2 notebooks pass +C1 at about 50 A). The astigmatism keeps the fit's signs (E1: C12a/C12b came back with
+    /// ComplexProbe's own signs, transpose = false).
+    /// Mutation it catches: `-lowOrder.c1Angstrom` -> `lowOrder.c1Angstrom`; negating the astigmatism.
+    func testUseParallaxFitTakesMinusC1AndTheFitsAstigmatism() {
+        let settings = PtychographySettings()
+        settings.useParallaxFit(lowOrder: lowOrderFit(c1: 663.6, c12a: 10.1, c12b: 12.8))
+        XCTAssertEqual(settings.defocusAngstrom, -663.6)
+        XCTAssertEqual(settings.c12aAngstrom, 10.1)
+        XCTAssertEqual(settings.c12bAngstrom, 12.8)
+        XCTAssertEqual(settings.probeAberrations, PtychographyProbeAberrations(
+            defocusAngstrom: -663.6, c12aAngstrom: 10.1, c12bAngstrom: 12.8))
+    }
+
+    /// The higher-order control is gone (2026-10-01): the settings carry no higher-order state, and the probe a fit seeds has no
+    /// C21/C23 whatever was stored before. Mutation it catches: restoring a higher-order property/terms on the settings;
+    /// `useParallaxFit` leaving a previously set-back term in the probe is covered by the record test.
+    func testTheSettingsCarryNoHigherOrderState() {
+        let settings = PtychographySettings()
+        let labels = Mirror(reflecting: settings).children.compactMap(\.label)
+        XCTAssertFalse(labels.contains { $0.lowercased().contains("higherorder") }, "\(labels)")
+        settings.useParallaxFit(lowOrder: lowOrderFit(c1: 663.6, c12a: 10.1, c12b: 12.8))
+        XCTAssertTrue(settings.probeAberrations.higherOrder.isEmpty)
+    }
+
+    /// The action fills the fields from the stored fit, names what it took (and both rotations, for the reader to judge), and
+    /// does nothing without a fit.
+    /// Mutation it catches: writing the status without the defocus; acting without a fit.
+    func testTheActionFillsTheFieldsFromTheStoredFit() {
+        let state = AppState()
+        state.usePtychographyProbeFromParallaxFit()
+        XCTAssertEqual(state.ptychography.defocusAngstrom, 0, "no fit: untouched")
+
+        state.phaseContrast.parallaxAberrationFit = lowOrderFit(c1: 663.6, c12a: 10.1, c12b: 12.8, rotationRad: -0.0017)
+        state.calibrationSession.calibration.rotationRad = 0
+        state.usePtychographyProbeFromParallaxFit()
+        XCTAssertEqual(state.ptychography.defocusAngstrom, -663.6)
+        XCTAssertEqual(state.ptychography.c12aAngstrom, 10.1)
+        XCTAssertTrue(state.statusText.contains("defocus -663.6 Å"), state.statusText)
+        XCTAssertTrue(state.statusText.contains("fit rotation -0.10°"), state.statusText)
+        XCTAssertTrue(state.statusText.contains("calibrated rotation 0.00°"), state.statusText)
+        XCTAssertTrue(state.statusText.contains("0.10° apart"), state.statusText)
+        // A calibration on the other branch reads as such (wrapped, not 359.90°): the 2026-10-01 drive saw the old fixed
+        // "180° apart, flip the defocus sign" printed for two rotations 0.10° apart.
+        state.calibrationSession.calibration.rotationRad = Float.pi
+        state.usePtychographyProbeFromParallaxFit()
+        XCTAssertTrue(state.statusText.contains("179.90° apart"), state.statusText)
+    }
+
+    // MARK: - The section fits the inspector
+
+    private func hostedSize<V: View>(_ view: V, width: CGFloat, state: AppState) -> CGSize {
+        let host = NSHostingController(rootView: view.environment(state).environment(state.preferences))
+        return host.sizeThatFits(in: CGSize(width: width, height: 10_000))
+    }
+
+    /// The new rows (Defocus, Use Parallax Fit, and under Advanced the two astigmatism rows and the higher-order toggle) must
+    /// fit the narrowest inspector column - a fixed-size label and a 72-pt field set the pane's minimum
+    /// (`InspectorWidthBudgetTests`). Hosted with Advanced open, because the room-wide sweep hosts it closed. The measured
+    /// heights are attached so the row cost (rows x pt) is on record.
+    /// Mutation it catches: "Astigmatism C12a" -> "Astigmatism C12a (two-fold, cosine)".
+    func testPtychographySectionFitsTheNarrowestColumnWithAdvancedOpen() {
+        let state = AppState()
+        let budget = LayoutPolicy.inspectorWidth.min - 2 * 16
+        let closed = hostedSize(SingleslicePtychographySection(), width: 1, state: state)
+        let open = hostedSize(SingleslicePtychographySection(advancedExpanded: true), width: 1, state: state)
+        XCTAssertGreaterThan(open.width, 10, "the probe measured nothing")
+        XCTAssertLessThanOrEqual(closed.width, budget, "Advanced closed needs \(closed.width) pt")
+        XCTAssertLessThanOrEqual(open.width, budget, "Advanced open needs \(open.width) pt against \(budget)")
+
+        let ideal = LayoutPolicy.inspectorWidth.ideal - 2 * 16
+        let closedHeight = hostedSize(SingleslicePtychographySection(), width: ideal, state: state).height
+        let openHeight = hostedSize(SingleslicePtychographySection(advancedExpanded: true), width: ideal, state: state).height
+        let single = hostedSize(
+            InspectorRow("Astigmatism C12a") { NumericField("x", value: .constant(0.0), format: .number, unit: "Å") },
+            width: ideal, state: state)
+        let action = hostedSize(
+            InspectorActionRow { InspectorAdaptiveButton("Use Parallax Fit", systemImage: "arrow.down.circle") {} },
+            width: ideal, state: state)
+        let toggle = hostedSize(
+            InspectorRow("Take higher-order terms") { Toggle("x", isOn: .constant(false)).labelsHidden() },
+            width: ideal, state: state)
+        let attachment = XCTAttachment(string: "section height at \(ideal) pt: Advanced closed \(closedHeight), open \(openHeight); numeric row \(single.height) pt, action row \(action.height) pt, toggle row \(toggle.height) pt; row spacing \(LayoutPolicy.inspectorRowSpacing) pt; minimum width closed \(closed.width), open \(open.width)")
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        print("ROW-COST section height at \(ideal) pt: closed \(closedHeight), open \(openHeight); numeric row \(single.height), action row \(action.height), toggle row \(toggle.height); row spacing \(LayoutPolicy.inspectorRowSpacing); min width closed \(closed.width), open \(open.width)")
+    }
+
+    // MARK: - The product says what it was made with
+
+    private func result(probe aberrations: PtychographyProbeAberrations = PtychographyProbeAberrations()) -> SingleslicePtychographyResult {
+        let array = PtychographyComplexArray(width: 2, height: 2, real: [1, 1, 1, 1], imaginary: [0, 0, 0, 0])
+        return SingleslicePtychographyResult(
+            object: array, probe: array, positions: [], errorHistory: [0.5, 0.25],
+            objectSamplingRowAngstrom: 0.25, objectSamplingColumnAngstrom: 0.30,
+            options: SingleslicePtychographyOptions(), probeAberrations: aberrations)
+    }
+
+    /// The published product's name carries the defocus the probe started from, read from the RESULT, and the record goes with
+    /// it (there is no second copy).
+    /// Mutation it catches: the suffix dropped; the name read from the settings instead of the result; a separately stored probe
+    /// record surviving its result.
+    func testThePublishedProductNamesTheDefocusAndItGoesWithTheResult() throws {
+        let state = AppState()
+        state.changeMode(.singleslicePtychography)
+        state.ptychography.defocusAngstrom = 123   // the settings must NOT leak into the name of a result made without them
+        state.phaseContrast.singleslicePtychography = result()
+        state.showParallaxProduct(.iterativePhase)
+        XCTAssertEqual(state.resultPresentation.product?.displayName, "Ptychography object phase · defocus 0 Å",
+                       "the name is the result's record, not the settings'")
+
+        state.phaseContrast.singleslicePtychography = result(probe: PtychographyProbeAberrations(defocusAngstrom: -663.6))
+        state.showParallaxProduct(.iterativePhase)
+        XCTAssertEqual(state.resultPresentation.product?.displayName, "Ptychography object phase · defocus -663.6 Å")
+        state.showParallaxProduct(.iterativeProbeAmplitude)
+        XCTAssertEqual(state.resultPresentation.product?.displayName, "Ptychography probe amplitude · defocus -663.6 Å")
+
+        state.phaseContrast.singleslicePtychography = nil
+        XCTAssertNil(state.phaseContrast.singleslicePtychographyProbe, "the probe record goes with its result")
+    }
+
+    /// THE CALL SITE (Gate B, 2026-09-30): the app's run must hand its fields to `PtychographyPreparer.prepare`, and what it
+    /// publishes must be what `prepare` received. Driven through the real `runSingleslicePtychography` on the demo cube (one
+    /// iteration): the result's record is the input's, which `prepare` set from its `aberrations` argument, so a call that drops
+    /// the argument publishes an in-focus record and this goes red. Before this, dropping `aberrations: aberrations` left the
+    /// harness and every unit test green while the status line still said "defocus -600 Å" (it read the settings).
+    /// Mutation it catches: `aberrations: aberrations` removed from the `prepare` call in `runSingleslicePtychography`.
+    func testTheRunHandsItsFieldsToPrepareAndPublishesWhatPrepareReceived() async throws {
+        let state = AppState()
+        await state.openDemoFixture(calibrated: true)
+        if state.calibrationSession.acceleratingVoltage == nil { state.calibrationSession.acceleratingVoltage = 80 }
+        if state.calibrationSession.calibration.rotationRad == nil { state.calibrationSession.calibration.rotationRad = 0 }
+        state.changeMode(.singleslicePtychography)
+        state.ptychography.iterations = 1
+        state.ptychography.defocusAngstrom = -600
+        state.ptychography.c12aAngstrom = 35
+        state.ptychography.c12bAngstrom = -20
+        let typed = PtychographyProbeAberrations(defocusAngstrom: -600, c12aAngstrom: 35, c12bAngstrom: -20)
+        XCTAssertEqual(state.ptychography.probeAberrations, typed, "precondition: the fields are what the run should start from")
+
+        await state.runSingleslicePtychography()
+        let reconstruction = try XCTUnwrap(state.phaseContrast.singleslicePtychography, state.statusText)
+        XCTAssertEqual(reconstruction.probeAberrations, typed, "the reconstruction's record is what prepare received")
+        XCTAssertEqual(state.phaseContrast.singleslicePtychographyProbe, typed)
+        XCTAssertTrue(state.statusText.contains("defocus -600 Å"), state.statusText)
+        XCTAssertEqual(state.resultPresentation.product?.displayName, "Ptychography object phase · defocus -600 Å")
+    }
+}

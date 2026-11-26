@@ -1,7 +1,7 @@
 #!/bin/zsh
 # tools/harnesses/disk-detector/run.sh — the learned disk detector's GATED fixture check (run-tests.sh scientific).
 #
-# The committed synthetic fixture only (mac4DSTEMTests/Fixtures/DiskDetector/fixture/): fast, no network, no real data.
+# The committed synthetic fixture only (FourDSTEMStudioTests/Fixtures/DiskDetector/fixture/): fast, no network, no real data.
 # Proves (1) simulate.py's kernel/correlation port equals py4DSTEM's pixel for pixel and (2) py4DSTEM's classical
 # detector at the 2026-09-05 settings recovers the drawn centres, then BREAKS the fixture four ways and requires
 # each break to fail. Exit 0 only if all of that holds.

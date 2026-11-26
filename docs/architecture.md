@@ -28,7 +28,7 @@ moment `Core/` reaches upward into `App/`, `UI/` or `Support/` — run as
 second time: an explicit exception list in `project.pbxproj` excludes every
 `Core/`/`Session/` file from the app target, which links the packages
 instead. A `Session/` file missing from that list is compiled into both;
-check `mac4DSTEM.SwiftFileList` under DerivedData. Declarations use the `package` access level throughout (app
+check `FourDSTEMStudio.SwiftFileList` under DerivedData. Declarations use the `package` access level throughout (app
 and test targets set `SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)"`, the identity SwiftPM gives the local package from the checkout folder, so a clone in any folder builds; `tools/run-tests.sh inventory` refuses a literal name); a file compiled into
 both the app target and a standalone `tools/` harness guards the imports
 with `#if canImport(DSTEMCore) import DSTEMCore import DSTEMSession #endif`. `tools/run-tests.sh inventory` backs the UI half: it greps
@@ -162,25 +162,25 @@ CSV, py4DSTEM `BraggVectors`, calibrated reduced `DataCube` with the recipe.
 
 ## Project structure and where files go
 
-Synchronized folder groups: any file under `mac4DSTEM/` joins the app target.
+Synchronized folder groups: any file under `FourDSTEMStudio/` joins the app target.
 Placement is wiring.
 
 | Putting in… | goes under… |
 |---|---|
-| App entry, window state (`AppState`), pending load, workspace vocabulary | `mac4DSTEM/App/` |
-| The agent door: the local, read-only API an agent on this Mac looks through (`docs/agent-door.md`) | `mac4DSTEM/App/AgentDoor/` (the app's tools); the door and its MCP bridge are EMSuiteUI's `ShellAgentDoor` and `AgentBridge/` |
-| Session state with no UI: replay, sidecars, gates, products, residency, recovery | `mac4DSTEM/Session/` (package `DSTEMSession`) |
-| App-side reader adapters over FormatoKit, calibration model, EMD writer, product model | `mac4DSTEM/Core/Data/` |
-| Cancellation (the Metal engine is EMSuiteUI's `ShellMetal`, the FFTs ImagoKit's) | `mac4DSTEM/Core/Compute/` |
-| Analysis algorithms (virtual detector, solvers, disks, strain, DPC, parallax, ptycho) | `mac4DSTEM/Core/Analysis/` |
-| Crystal model, CIF and Materials Project import, the ACOM orientation plan and backend choice (cells, presets, scattering factors and the CPU and Metal matcher are DiffractoKit's) | `mac4DSTEM/Core/Crystal/` |
-| Learned stages: the Core ML inference class and its scan orchestration (C7) | `mac4DSTEM/Core/ML/`; the pinned asset and its record JSON in `mac4DSTEM/Resources/DiskDetector/` (a folder resource, compiled at load); its session owner `Session/LearnedDetection.swift` |
-| EDS spectrum images: opening, line windows, maps, quantification inputs, exports (the science is SpectroKit's) | `mac4DSTEM/Core/EDS/`; the room in `mac4DSTEM/UI/EDS/` |
-| 4D × EDS registration | `mac4DSTEM/Core/Spectroscopy/Registration/` |
-| Operation lifecycle | `mac4DSTEM/Core/Workflow/` |
-| SwiftUI views, viewers, controls, inspectors | `mac4DSTEM/UI/` |
-| Export, figures, bridging header | `mac4DSTEM/Support/` |
-| Fast unit and workflow-contract tests | `mac4DSTEMTests/` |
+| App entry, window state (`AppState`), pending load, workspace vocabulary | `FourDSTEMStudio/App/` |
+| The agent door: the local, read-only API an agent on this Mac looks through (`docs/agent-door.md`) | `FourDSTEMStudio/App/AgentDoor/` (the app's tools); the door and its MCP bridge are EMSuiteUI's `ShellAgentDoor` and `AgentBridge/` |
+| Session state with no UI: replay, sidecars, gates, products, residency, recovery | `FourDSTEMStudio/Session/` (package `DSTEMSession`) |
+| App-side reader adapters over FormatoKit, calibration model, EMD writer, product model | `FourDSTEMStudio/Core/Data/` |
+| Cancellation (the Metal engine is EMSuiteUI's `ShellMetal`, the FFTs ImagoKit's) | `FourDSTEMStudio/Core/Compute/` |
+| Analysis algorithms (virtual detector, solvers, disks, strain, DPC, parallax, ptycho) | `FourDSTEMStudio/Core/Analysis/` |
+| Crystal model, CIF and Materials Project import, the ACOM orientation plan and backend choice (cells, presets, scattering factors and the CPU and Metal matcher are DiffractoKit's) | `FourDSTEMStudio/Core/Crystal/` |
+| Learned stages: the Core ML inference class and its scan orchestration (C7) | `FourDSTEMStudio/Core/ML/`; the pinned asset and its record JSON in `FourDSTEMStudio/Resources/DiskDetector/` (a folder resource, compiled at load); its session owner `Session/LearnedDetection.swift` |
+| EDS spectrum images: opening, line windows, maps, quantification inputs, exports (the science is SpectroKit's) | `FourDSTEMStudio/Core/EDS/`; the room in `FourDSTEMStudio/UI/EDS/` |
+| 4D × EDS registration | `FourDSTEMStudio/Core/Spectroscopy/Registration/` |
+| Operation lifecycle | `FourDSTEMStudio/Core/Workflow/` |
+| SwiftUI views, viewers, controls, inspectors | `FourDSTEMStudio/UI/` |
+| Export, figures, bridging header | `FourDSTEMStudio/Support/` |
+| Fast unit and workflow-contract tests | `FourDSTEMStudioTests/` |
 | Standalone parity, diagnostic and packaging harnesses | `tools/harnesses/<name>/` — classify it in `tools/run-tests.sh` (gated / diagnostic / owner-only) |
 | Docs | `docs/` |
 | CI | `.github/workflows/` |
@@ -211,7 +211,7 @@ owner in `Session/` plus one orchestration extension in `App/`; `AppState`
 (`App/AppState.swift`, 1642 lines at HEAD) now composes those owners plus
 the window, publishing glue and the dataset epoch, rather than holding
 feature state directly, and `ContentView` reconstructs workflow rules from
-it. Current owners (`mac4DSTEM/Session/`): `ACOMSession`, `ACOMWorkflow`,
+it. Current owners (`FourDSTEMStudio/Session/`): `ACOMSession`, `ACOMWorkflow`,
 `CalibrationSession`, `DatasetResidency`, `DatasetSession`,
 `DiffractionGroupsProduct`, `DiskCentreLabels`, `DiskDetectionProduct`,
 `DPCProduct`, `FitOverlayPresentation`, `LearnedDetection`, `LoadedView`,
@@ -313,8 +313,8 @@ again and no flag selects it. Six rules, the first three enforced by
   downloadable for older systems. Development is on Xcode 27; CI pins
   Xcode 26.6. An API newer than macOS 26.0 sits behind `if #available`.
   No separately installed HDF5.
-- Build: open `mac4DSTEM.xcodeproj`, scheme `mac4DSTEM`, `⌘R`; or
-  `xcodebuild -project mac4DSTEM.xcodeproj -scheme mac4DSTEM -destination 'platform=macOS' build`.
+- Build: open `FourDSTEMStudio.xcodeproj`, scheme `FourDSTEMStudio`, `⌘R`; or
+  `xcodebuild -project FourDSTEMStudio.xcodeproj -scheme FourDSTEMStudio -destination 'platform=macOS' build`.
   Tools resolve their own toolchain via `tools/lib/developer-dir.sh`
   (`DEVELOPER_DIR` wins; the Command Line Tools directory is rejected).
 - Test: `tools/run-tests.sh unit | scientific | all | inventory | core | campaign | ui` (the script is the roster).
@@ -343,7 +343,7 @@ once stayed green an hour before an archive build failed.
 `run-tests.sh` refuses to start `unit`/`scientific` below 4 GB free and
 `all`/`campaign` below 8 GB (exit 69); the remedy is clearing regenerable build debris (DerivedData, `.build`), never `References/`. Not
 every harness is Swift: `tools/harnesses/disk-detector/` is a Python
-fixture check (the training pipeline is not in this repository; the frozen hand-labelled test set is `mac4DSTEMTests/Fixtures/DiskDetector/labels/`); `tools/harnesses/comparator-test/` mutation-tests
+fixture check (the training pipeline is not in this repository; the frozen hand-labelled test set is `FourDSTEMStudioTests/Fixtures/DiskDetector/labels/`); `tools/harnesses/comparator-test/` mutation-tests
 `tools/harnesses/real-data-acceptance/compare.py` itself, since a comparator that
 quietly stopped checking something looks like a passing gate.
 
@@ -381,7 +381,7 @@ deadlock and never held across an `await`. The HDF5, SZ and AEC binaries are For
 
 ## Developer notes
 
-- One `@main` in `App/mac4DSTEMApp.swift`; the root view is
+- One `@main` in `App/FourDSTEMStudioApp.swift`; the root view is
   `UI/ContentView.swift`. See "The UI contract" above.
 - Swift 5 language mode, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`;
   blocking compute types are `nonisolated` and run via `Task.detached`;

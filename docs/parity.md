@@ -6,9 +6,9 @@ Numbers match the reference within its own spread, never stricter (suite rule D1
 ## Precipitation workflow: Thronsen et al., Ultramicroscopy 255 (2024) 113861 (Al-Cu-Li, T1 + θ′, SPED)
 
 Data: Zenodo 10.5281/zenodo.6645396 (CC BY 4.0, kept outside the repo in `References/mac4DSTEM/thronsen-datasetA`). Dataset A, 512 × 512
-(PDF page 3), stride 3 here (171 × 171; the full cube is not on this disk). Facts, page and table per number: `mac4DSTEMTests/Fixtures/thronsen-parity/truth.json`.
+(PDF page 3), stride 3 here (171 × 171; the full cube is not on this disk). Facts, page and table per number: `FourDSTEMStudioTests/Fixtures/thronsen-parity/truth.json`.
 Run (heavy, real data, skipped unless asked; 8 GB cap): `env TEST_RUNNER_MAC4DSTEM_THRONSEN=1 MAC4DSTEM_UNIT_ONLY=ThronsenParityTests tools/run-tests.sh unit`
-(`mac4DSTEMTests/ThronsenParityTests.swift`, 8 s after the build).
+(`FourDSTEMStudioTests/ThronsenParityTests.swift`, 8 s after the build).
 
 | Check | Reference | Ours | State |
 |---|---|---|---|

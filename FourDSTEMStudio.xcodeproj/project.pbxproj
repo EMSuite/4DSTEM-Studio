@@ -1,0 +1,1869 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 90;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		000000000000000000000151 /* QuickLookThumbnail.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 500000000000000000000120 /* QuickLookThumbnail.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		000000000000000000000152 /* QuickLookPreview.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 600000000000000000000120 /* QuickLookPreview.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		300000000000000000000004 /* DSTEMCore in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000003 /* DSTEMCore */; };
+		300000000000000000000006 /* DSTEMSession in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000005 /* DSTEMSession */; };
+		300000000000000000000008 /* DSTEMTraining in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000007 /* DSTEMTraining */; };
+		30000000000000000000000B /* SpectroCore in Frameworks */ = {isa = PBXBuildFile; productRef = 30000000000000000000000A /* SpectroCore */; };
+		300000000000000000000011 /* DiffractoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000010 /* DiffractoCore */; };
+		300000000000000000000013 /* DiffractoScattering in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000012 /* DiffractoScattering */; };
+		300000000000000000000015 /* DiffractoGeometry in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000014 /* DiffractoGeometry */; };
+		300000000000000000000017 /* CuboCore in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000016 /* CuboCore */; };
+		300000000000000000000019 /* CuboVirtual in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000018 /* CuboVirtual */; };
+		30000000000000000000001B /* CuboPhase in Frameworks */ = {isa = PBXBuildFile; productRef = 30000000000000000000001A /* CuboPhase */; };
+		30000000000000000000001D /* SpectroEDX in Frameworks */ = {isa = PBXBuildFile; productRef = 30000000000000000000001C /* SpectroEDX */; };
+		30000000000000000000001F /* FormatoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 30000000000000000000001E /* FormatoCore */; };
+		300000000000000000000021 /* FormatoDM in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000020 /* FormatoDM */; };
+		300000000000000000000023 /* FormatoEMD in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000022 /* FormatoEMD */; };
+		300000000000000000000025 /* FormatoHDF5 in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000024 /* FormatoHDF5 */; };
+		300000000000000000000031 /* ImagoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000030 /* ImagoCore */; };
+		300000000000000000000033 /* ImagoFFT in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000032 /* ImagoFFT */; };
+		300000000000000000000101 /* DiffractoOrientation in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000100 /* DiffractoOrientation */; };
+		300000000000000000000103 /* CuboParallax in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000102 /* CuboParallax */; };
+		300000000000000000000211 /* DSTEMQuickLook in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000210 /* DSTEMQuickLook */; };
+		300000000000000000000402 /* ShellMetal in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000401 /* ShellMetal */; };
+		300000000000000000000404 /* ShellControls in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000403 /* ShellControls */; };
+		300000000000000000000406 /* ShellInspector in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000405 /* ShellInspector */; };
+		300000000000000000000408 /* ShellLayout in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000407 /* ShellLayout */; };
+		300000000000000000000414 /* ShellAgentDoor in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000413 /* ShellAgentDoor */; };
+		300000000000000000000410 /* ShellSpectroscopy in Frameworks */ = {isa = PBXBuildFile; productRef = 30000000000000000000040F /* ShellSpectroscopy */; };
+		300000000000000000000412 /* ShellEDXModel in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000411 /* ShellEDXModel */; };
+		300000000000000000000416 /* ShellEDXAgent in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000415 /* ShellEDXAgent */; };
+		300000000000000000000501 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000500 /* Sparkle */; };
+		500000000000000000000302 /* DSTEMQuickLook in Frameworks */ = {isa = PBXBuildFile; productRef = 500000000000000000000301 /* DSTEMQuickLook */; };
+		500000000000000000000304 /* FormatoPeek in Frameworks */ = {isa = PBXBuildFile; productRef = 500000000000000000000303 /* FormatoPeek */; };
+		600000000000000000000302 /* DSTEMQuickLook in Frameworks */ = {isa = PBXBuildFile; productRef = 600000000000000000000301 /* DSTEMQuickLook */; };
+		600000000000000000000304 /* FormatoPeek in Frameworks */ = {isa = PBXBuildFile; productRef = 600000000000000000000303 /* FormatoPeek */; };
+		700000000000000000000151 /* HDF5Helper.xpc in Embed XPC Services */ = {isa = PBXBuildFile; fileRef = 700000000000000000000120 /* HDF5Helper.xpc */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		700000000000000000000302 /* DSTEMCore in Frameworks */ = {isa = PBXBuildFile; productRef = 700000000000000000000301 /* DSTEMCore */; };
+		F68E4EE62FF9C43F00135C51 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = F68E4EE52FF9C43F00135C51 /* README.md */; };
+		F6A1D0DE0001000000000002 /* DiskDetector in Resources */ = {isa = PBXBuildFile; fileRef = F6A1D0DE0001000000000001 /* DiskDetector */; };
+		F6A1D0DE0001000000000004 /* Licenses in Resources */ = {isa = PBXBuildFile; fileRef = F6A1D0DE0001000000000003 /* Licenses */; };
+		F6A1D0DE0001000000000006 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = F6A1D0DE0001000000000005 /* LICENSE */; };
+		F6A1D0DE0001000000000008 /* NOTICE in Resources */ = {isa = PBXBuildFile; fileRef = F6A1D0DE0001000000000007 /* NOTICE */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		100000000000000160000000 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = FourDSTEMStudio;
+		};
+		400000000000000160000000 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = FourDSTEMStudio;
+		};
+		500000000000000160000000 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 500000000000000100000000;
+			remoteInfo = QuickLookThumbnail;
+		};
+		600000000000000160000000 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 600000000000000100000000;
+			remoteInfo = QuickLookPreview;
+		};
+		700000000000000160000000 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 700000000000000100000000;
+			remoteInfo = HDF5Helper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		000000000000000001500000 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				000000000000000000000151 /* QuickLookThumbnail.appex in Embed Foundation Extensions */,
+				000000000000000000000152 /* QuickLookPreview.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+		000000000000000001600000 /* Embed XPC Services */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/XPCServices";
+			dstSubfolderSpec = 16;
+			files = (
+				700000000000000000000151 /* HDF5Helper.xpc in Embed XPC Services */,
+			);
+			name = "Embed XPC Services";
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		000000000000000000000120 /* FourDSTEMStudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FourDSTEMStudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000120 /* FourDSTEMStudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FourDSTEMStudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		400000000000000000000120 /* FourDSTEMStudioUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FourDSTEMStudioUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		500000000000000000000120 /* QuickLookThumbnail.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QuickLookThumbnail.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		600000000000000000000120 /* QuickLookPreview.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QuickLookPreview.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		700000000000000000000120 /* HDF5Helper.xpc */ = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = HDF5Helper.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
+		F68E4EE52FF9C43F00135C51 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		F6A1D0DE0001000000000001 /* DiskDetector */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DiskDetector; path = FourDSTEMStudio/Resources/DiskDetector; sourceTree = "<group>"; };
+		F6A1D0DE0001000000000003 /* Licenses */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Licenses; sourceTree = "<group>"; };
+		F6A1D0DE0001000000000005 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		F6A1D0DE0001000000000007 /* NOTICE */ = {isa = PBXFileReference; lastKnownFileType = text; path = NOTICE; sourceTree = "<group>"; };
+		F6A1D0DE0001000000000009 /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Version.xcconfig; path = Config/Version.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		300000000000000000000001 /* Exceptions for "FourDSTEMStudio" folder in "FourDSTEMStudio" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Core/Analysis/DatasetPreview.swift,
+				Core/Analysis/DiffractionEmbedding.swift,
+				Core/Analysis/DiskDetection.swift,
+				Core/Analysis/DPC.swift,
+				Core/Analysis/FitOverlays.swift,
+				Core/Analysis/OrientationResult.swift,
+				Core/Analysis/OriginCalibration.swift,
+				Core/Analysis/ParallaxAberrationCorrection.swift,
+				Core/Analysis/ParallaxAberrationFitting.swift,
+				Core/Analysis/ParallaxAlignment.swift,
+				Core/Analysis/ParallaxDepthSectioning.swift,
+				Core/Analysis/ParallaxPreprocessing.swift,
+				Core/Analysis/ParallaxSubpixelReconstruction.swift,
+				Core/Analysis/Precipitates/PrecipitateSegmentation.swift,
+				Core/Analysis/ProbeKernel.swift,
+				Core/Analysis/ProbeRingHint.swift,
+				Core/Analysis/PtychographyPreparation.swift,
+				Core/Analysis/QCalibration.swift,
+				Core/Analysis/RotationCalibration.swift,
+				Core/Analysis/SingleslicePtychography.swift,
+				Core/Analysis/StrainFrame.swift,
+				Core/Analysis/StrainMapping.swift,
+				Core/Analysis/TiledDiskDetection.swift,
+				Core/Analysis/VirtualDetector.swift,
+				Core/Compute/AnalysisCancellationToken.swift,
+				Core/Crystal/CIFModelImport.swift,
+				Core/Crystal/Crystal.swift,
+				Core/Crystal/CrystalModel.swift,
+				Core/Crystal/MaterialsProjectImport.swift,
+				Core/Crystal/OrientationMatcher.swift,
+				Core/Crystal/OrientationPlan.swift,
+				Core/Crystal/OrientationRelationshipVariants.swift,
+				Core/Crystal/PhaseMappingScan.swift,
+				Core/Crystal/PhaseMapPresentation.swift,
+				Core/Data/BraggVectorEMDTypes.swift,
+				Core/Data/BraggVectorEMDWriter.swift,
+				Core/Data/CalibratedDataCubeWriter.swift,
+				Core/Data/Calibration.swift,
+				Core/Data/CalibrationReReference.swift,
+				Core/Data/CompanionFolder.swift,
+				Core/Data/CuboCalibrationBridge.swift,
+				Core/Data/CuboCubeSource.swift,
+				Core/Data/DatasetDescriptor.swift,
+				Core/Data/DemoFourDDataSource.swift,
+				Core/Data/DiffractionPattern.swift,
+				Core/Data/DisplayedProduct.swift,
+				Core/Data/DM4Reader.swift,
+				Core/Data/FileRouting.swift,
+				Core/Data/FormatoArrayFloat32.swift,
+				Core/Data/FourDArray.swift,
+				Core/Data/FourDDataSource.swift,
+				Core/Data/GMSFourDRegistration.swift,
+				Core/Data/H5Reader.swift,
+				Core/Data/HDF5HelperClient.swift,
+				Core/Data/HDF5HelperProtocol.swift,
+				Core/Data/HDF5HelperService.swift,
+				Core/Data/LoadConfiguration.swift,
+				Core/Data/LoadSpecification.swift,
+				Core/Data/ResidentCube.swift,
+				Core/Data/ResultPresentation.swift,
+				Core/Data/RQRotationConvention.swift,
+				Core/Data/SessionLineage.swift,
+				Core/Data/SessionReplayRecord.swift,
+				Core/Data/SessionSidecarFormat.swift,
+				Core/Data/SessionSidecarReading.swift,
+				Core/Data/SessionSidecarWriting.swift,
+				Core/Data/VendorRawReaders.swift,
+				Core/EDS/EDXCompute.swift,
+				Core/EDS/EDXElements.swift,
+				Core/EDS/EDXExports.swift,
+				Core/EDS/EDXLines.swift,
+				Core/EDS/EDXMapFilter.swift,
+				Core/EDS/EDXOpening.swift,
+				Core/EDS/EDXPins.swift,
+				Core/EDS/EDXQuantMaps.swift,
+				Core/ML/LearnedDiskDetection.swift,
+				Core/ML/LearnedDiskDetector.swift,
+				Core/ML/ModelCacheUsage.swift,
+				Core/Spectroscopy/Registration/QuantificationStep.swift,
+				Core/Spectroscopy/Registration/RegistrationRecordM2.swift,
+				Core/Workflow/AnalysisOperationController.swift,
+				"Info-Direct.plist",
+				Info.plist,
+				"Resources/DiskDetector/disk-detector-heatmap-256.json",
+				"Resources/DiskDetector/disk-detector-heatmap-256.mlpackage",
+				Session/ACOMSession.swift,
+				Session/ACOMWorkflow.swift,
+				Session/AppPreferences.swift,
+				Session/CalibrationSession.swift,
+				Session/DatasetResidency.swift,
+				Session/DatasetSession.swift,
+				Session/DiffractionGroupsProduct.swift,
+				Session/DiskCentreLabels.swift,
+				Session/DiskDetectionProduct.swift,
+				Session/DPCProduct.swift,
+				Session/EDXSession.swift,
+				Session/FitOverlayPresentation.swift,
+				Session/GrainsPhaseRun.swift,
+				Session/LearnedDetection.swift,
+				Session/LoadedView.swift,
+				Session/MaterialsProjectKeyStore.swift,
+				Session/MaterialsProjectSettings.swift,
+				Session/ObjectJoins.swift,
+				Session/ObjectVariants.swift,
+				Session/OpenDatasetRegistry.swift,
+				Session/OperationCenter.swift,
+				Session/ParallaxReplay.swift,
+				Session/PhaseContrastProduct.swift,
+				Session/PhaseMapObjectsBridge.swift,
+				Session/PhaseMappingProduct.swift,
+				Session/PhaseOrientationField.swift,
+				Session/PhaseSetupRecord.swift,
+				Session/PoolCatalogue.swift,
+				Session/PrecipitateClassificationProduct.swift,
+				Session/PrecipitateObjectReport.swift,
+				Session/PromotionRun.swift,
+				Session/PtychographyReplay.swift,
+				Session/QCalibrationRun.swift,
+				Session/RecentDatasets.swift,
+				Session/ReplaceUndo.swift,
+				Session/ReplayContract.swift,
+				Session/ReplayPlan.swift,
+				Session/ReplayRun.swift,
+				Session/ResultPresentation.swift,
+				Session/SessionCalibrationFramePolicy.swift,
+				Session/SessionGates.swift,
+				Session/SessionReplay.swift,
+				Session/SessionSidecarLocator.swift,
+				Session/SpectroscopyQuantification.swift,
+				Session/SpectroscopySession.swift,
+				Session/StrainProduct.swift,
+				Session/SystemMonitor.swift,
+				Session/WorkspaceRecovery.swift,
+				Training/DetectionScorer.swift,
+				Training/DetectorFineTuning.swift,
+				Training/DetectorGraph.swift,
+				Training/DetectorTrainer.swift,
+				Training/DetectorWeights.swift,
+				Training/HeldOutSplit.swift,
+				Training/ModelPackageWriter.swift,
+				Training/TrainedModelStore.swift,
+				Training/TrainingPolicy.swift,
+				Training/TrainingSampleBuilder.swift,
+			);
+			target = 000000000000000100000000 /* FourDSTEMStudio */;
+		};
+		3000000000000000000000E1 /* Exceptions for "FourDSTEMStudioTests" folder in "FourDSTEMStudioTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Fixtures/DiskDetector/fixture/expected.json,
+				Fixtures/DiskDetector/fixture/fixture.npz,
+				Fixtures/DiskDetector/fixture/swift/expected.json,
+				"Fixtures/DiskDetector/fixture/swift/inputs-ref.f16",
+				Fixtures/DiskDetector/fixture/swift/patterns.u16,
+				Fixtures/DiskDetector/fixture/swift/probe.f32,
+				"Fixtures/DiskDetector/labels/bullseye-2026-09-28.json",
+			);
+			target = 100000000000000100000000 /* FourDSTEMStudioTests */;
+		};
+		700000000000000000000001 /* Exceptions for "HDF5Helper" folder in "HDF5Helper" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				HDF5Helper.entitlements,
+				Info.plist,
+			);
+			target = 700000000000000100000000 /* HDF5Helper */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		000000000000000000000010 /* FourDSTEMStudio */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				300000000000000000000001 /* Exceptions for "FourDSTEMStudio" folder in "FourDSTEMStudio" target */,
+			);
+			path = FourDSTEMStudio;
+			sourceTree = "<group>";
+		};
+		100000000000000000000010 /* FourDSTEMStudioTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3000000000000000000000E1 /* Exceptions for "FourDSTEMStudioTests" folder in "FourDSTEMStudioTests" target */,
+			);
+			path = FourDSTEMStudioTests;
+			sourceTree = "<group>";
+		};
+		400000000000000000000010 /* FourDSTEMStudioUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = FourDSTEMStudioUITests;
+			sourceTree = "<group>";
+		};
+		500000000000000000000010 /* QuickLook/Thumbnail */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = QuickLook/Thumbnail;
+			sourceTree = "<group>";
+		};
+		600000000000000000000010 /* QuickLook/Preview */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = QuickLook/Preview;
+			sourceTree = "<group>";
+		};
+		700000000000000000000010 /* HDF5Helper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				700000000000000000000001 /* Exceptions for "HDF5Helper" folder in "HDF5Helper" target */,
+			);
+			path = HDF5Helper;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		000000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				300000000000000000000004 /* DSTEMCore in Frameworks */,
+				300000000000000000000006 /* DSTEMSession in Frameworks */,
+				300000000000000000000008 /* DSTEMTraining in Frameworks */,
+				300000000000000000000211 /* DSTEMQuickLook in Frameworks */,
+				30000000000000000000000B /* SpectroCore in Frameworks */,
+				300000000000000000000011 /* DiffractoCore in Frameworks */,
+				300000000000000000000013 /* DiffractoScattering in Frameworks */,
+				300000000000000000000015 /* DiffractoGeometry in Frameworks */,
+				300000000000000000000101 /* DiffractoOrientation in Frameworks */,
+				300000000000000000000017 /* CuboCore in Frameworks */,
+				300000000000000000000019 /* CuboVirtual in Frameworks */,
+				30000000000000000000001B /* CuboPhase in Frameworks */,
+				300000000000000000000103 /* CuboParallax in Frameworks */,
+				300000000000000000000031 /* ImagoCore in Frameworks */,
+				300000000000000000000033 /* ImagoFFT in Frameworks */,
+				300000000000000000000402 /* ShellMetal in Frameworks */,
+				300000000000000000000404 /* ShellControls in Frameworks */,
+				300000000000000000000406 /* ShellInspector in Frameworks */,
+				300000000000000000000408 /* ShellLayout in Frameworks */,
+				300000000000000000000410 /* ShellSpectroscopy in Frameworks */,
+				300000000000000000000412 /* ShellEDXModel in Frameworks */,
+				300000000000000000000414 /* ShellAgentDoor in Frameworks */,
+				300000000000000000000416 /* ShellEDXAgent in Frameworks */,
+				30000000000000000000001D /* SpectroEDX in Frameworks */,
+				30000000000000000000001F /* FormatoCore in Frameworks */,
+				300000000000000000000021 /* FormatoDM in Frameworks */,
+				300000000000000000000023 /* FormatoEMD in Frameworks */,
+				300000000000000000000025 /* FormatoHDF5 in Frameworks */,
+				300000000000000000000501 /* Sparkle in Frameworks */,
+			);
+		};
+		100000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		400000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		500000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				500000000000000000000302 /* DSTEMQuickLook in Frameworks */,
+				500000000000000000000304 /* FormatoPeek in Frameworks */,
+			);
+		};
+		600000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				600000000000000000000302 /* DSTEMQuickLook in Frameworks */,
+				600000000000000000000304 /* FormatoPeek in Frameworks */,
+			);
+		};
+		700000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				700000000000000000000302 /* DSTEMCore in Frameworks */,
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000010 /* FourDSTEMStudio */,
+				100000000000000000000010 /* FourDSTEMStudioTests */,
+				400000000000000000000010 /* FourDSTEMStudioUITests */,
+				500000000000000000000010 /* QuickLook/Thumbnail */,
+				600000000000000000000010 /* QuickLook/Preview */,
+				700000000000000000000010 /* HDF5Helper */,
+				000000000000000000000020 /* Products */,
+				F68E4EE52FF9C43F00135C51 /* README.md */,
+				F6A1D0DE0001000000000001 /* DiskDetector */,
+				F6A1D0DE0001000000000003 /* Licenses */,
+				F6A1D0DE0001000000000005 /* LICENSE */,
+				F6A1D0DE0001000000000007 /* NOTICE */,
+				F6A1D0DE0001000000000009 /* Version.xcconfig */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000020 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000120 /* FourDSTEMStudio.app */,
+				100000000000000000000120 /* FourDSTEMStudioTests.xctest */,
+				400000000000000000000120 /* FourDSTEMStudioUITests.xctest */,
+				500000000000000000000120 /* QuickLookThumbnail.appex */,
+				600000000000000000000120 /* QuickLookPreview.appex */,
+				700000000000000000000120 /* HDF5Helper.xpc */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000100000000 /* FourDSTEMStudio */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000110000000 /* Build configuration list for PBXNativeTarget "FourDSTEMStudio" */;
+			buildPhases = (
+				000000000000000120000000 /* Sources */,
+				000000000000000130000000 /* Frameworks */,
+				000000000000000140000000 /* Resources */,
+				000000000000000001500000 /* Embed Foundation Extensions */,
+				000000000000000001600000 /* Embed XPC Services */,
+				000000000000000001700000 /* Leave Sparkle out of the store build */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				500000000000000170000000 /* PBXTargetDependency */,
+				600000000000000170000000 /* PBXTargetDependency */,
+				700000000000000170000000 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				000000000000000000000010 /* FourDSTEMStudio */,
+			);
+			name = FourDSTEMStudio;
+			packageProductDependencies = (
+				300000000000000000000003 /* DSTEMCore */,
+				300000000000000000000005 /* DSTEMSession */,
+				300000000000000000000007 /* DSTEMTraining */,
+				300000000000000000000210 /* DSTEMQuickLook */,
+				30000000000000000000000A /* SpectroCore */,
+				300000000000000000000010 /* DiffractoCore */,
+				300000000000000000000012 /* DiffractoScattering */,
+				300000000000000000000014 /* DiffractoGeometry */,
+				300000000000000000000100 /* DiffractoOrientation */,
+				300000000000000000000016 /* CuboCore */,
+				300000000000000000000018 /* CuboVirtual */,
+				30000000000000000000001A /* CuboPhase */,
+				300000000000000000000102 /* CuboParallax */,
+				300000000000000000000030 /* ImagoCore */,
+				300000000000000000000032 /* ImagoFFT */,
+				30000000000000000000001C /* SpectroEDX */,
+				30000000000000000000001E /* FormatoCore */,
+				300000000000000000000020 /* FormatoDM */,
+				300000000000000000000022 /* FormatoEMD */,
+				300000000000000000000024 /* FormatoHDF5 */,
+				300000000000000000000401 /* ShellMetal */,
+				300000000000000000000403 /* ShellControls */,
+				300000000000000000000405 /* ShellInspector */,
+				300000000000000000000407 /* ShellLayout */,
+				30000000000000000000040F /* ShellSpectroscopy */,
+				300000000000000000000411 /* ShellEDXModel */,
+				300000000000000000000413 /* ShellAgentDoor */,
+				300000000000000000000415 /* ShellEDXAgent */,
+				300000000000000000000500 /* Sparkle */,
+			);
+			productName = FourDSTEMStudio;
+			productReference = 000000000000000000000120 /* FourDSTEMStudio.app */;
+			productType = "com.apple.product-type.application";
+		};
+		100000000000000100000000 /* FourDSTEMStudioTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 100000000000000110000000 /* Build configuration list for PBXNativeTarget "FourDSTEMStudioTests" */;
+			buildPhases = (
+				100000000000000120000000 /* Sources */,
+				100000000000000130000000 /* Frameworks */,
+				100000000000000140000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				100000000000000170000000 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				100000000000000000000010 /* FourDSTEMStudioTests */,
+			);
+			name = FourDSTEMStudioTests;
+			productName = FourDSTEMStudioTests;
+			productReference = 100000000000000000000120 /* FourDSTEMStudioTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		400000000000000100000000 /* FourDSTEMStudioUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 400000000000000110000000 /* Build configuration list for PBXNativeTarget "FourDSTEMStudioUITests" */;
+			buildPhases = (
+				400000000000000120000000 /* Sources */,
+				400000000000000130000000 /* Frameworks */,
+				400000000000000140000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				400000000000000170000000 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				400000000000000000000010 /* FourDSTEMStudioUITests */,
+			);
+			name = FourDSTEMStudioUITests;
+			productName = FourDSTEMStudioUITests;
+			productReference = 400000000000000000000120 /* FourDSTEMStudioUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		500000000000000100000000 /* QuickLookThumbnail */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 500000000000000110000000 /* Build configuration list for PBXNativeTarget "QuickLookThumbnail" */;
+			buildPhases = (
+				500000000000000120000000 /* Sources */,
+				500000000000000130000000 /* Frameworks */,
+				500000000000000140000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				500000000000000000000010 /* QuickLook/Thumbnail */,
+			);
+			name = QuickLookThumbnail;
+			packageProductDependencies = (
+				500000000000000000000301 /* DSTEMQuickLook */,
+				500000000000000000000303 /* FormatoPeek */,
+			);
+			productName = QuickLookThumbnail;
+			productReference = 500000000000000000000120 /* QuickLookThumbnail.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		600000000000000100000000 /* QuickLookPreview */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 600000000000000110000000 /* Build configuration list for PBXNativeTarget "QuickLookPreview" */;
+			buildPhases = (
+				600000000000000120000000 /* Sources */,
+				600000000000000130000000 /* Frameworks */,
+				600000000000000140000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				600000000000000000000010 /* QuickLook/Preview */,
+			);
+			name = QuickLookPreview;
+			packageProductDependencies = (
+				600000000000000000000301 /* DSTEMQuickLook */,
+				600000000000000000000303 /* FormatoPeek */,
+			);
+			productName = QuickLookPreview;
+			productReference = 600000000000000000000120 /* QuickLookPreview.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		700000000000000100000000 /* HDF5Helper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 700000000000000110000000 /* Build configuration list for PBXNativeTarget "HDF5Helper" */;
+			buildPhases = (
+				700000000000000120000000 /* Sources */,
+				700000000000000130000000 /* Frameworks */,
+				700000000000000140000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				700000000000000000000010 /* HDF5Helper */,
+			);
+			name = HDF5Helper;
+			packageProductDependencies = (
+				700000000000000000000301 /* DSTEMCore */,
+			);
+			productName = HDF5Helper;
+			productReference = 700000000000000000000120 /* HDF5Helper.xpc */;
+			productType = "com.apple.product-type.xpc-service";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2630;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					000000000000000100000000 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					100000000000000100000000 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = 000000000000000100000000;
+					};
+					400000000000000100000000 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = 000000000000000100000000;
+					};
+				};
+			};
+			buildConfigurationList = 000000000000000010000000 /* Build configuration list for PBXProject "FourDSTEMStudio" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 000000000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				300000000000000000000002 /* XCLocalSwiftPackageReference "." */,
+				300000000000000000000009 /* XCRemoteSwiftPackageReference "SpectroKit" */,
+				30000000000000000000000C /* XCRemoteSwiftPackageReference "DiffractoKit" */,
+				30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */,
+				30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */,
+				30000000000000000000002F /* XCRemoteSwiftPackageReference "ImagoKit" */,
+				300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */,
+				300000000000000000000502 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
+			preferredProjectObjectVersion = 90;
+			productRefGroup = 000000000000000000000020 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000100000000 /* FourDSTEMStudio */,
+				100000000000000100000000 /* FourDSTEMStudioTests */,
+				400000000000000100000000 /* FourDSTEMStudioUITests */,
+				500000000000000100000000 /* QuickLookThumbnail */,
+				600000000000000100000000 /* QuickLookPreview */,
+				700000000000000100000000 /* HDF5Helper */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				F68E4EE62FF9C43F00135C51 /* README.md in Resources */,
+				F6A1D0DE0001000000000002 /* DiskDetector in Resources */,
+				F6A1D0DE0001000000000004 /* Licenses in Resources */,
+				F6A1D0DE0001000000000006 /* LICENSE in Resources */,
+				F6A1D0DE0001000000000008 /* NOTICE in Resources */,
+			);
+		};
+		100000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		400000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		500000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		600000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		700000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		000000000000000001700000 /* Leave Sparkle out of the store build */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Leave Sparkle out of the store build";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# The App Store build (MACEM_STORE_BUILD=YES) carries no updater (#122): its code is compiled out (no SPARKLE condition),\n# -dead_strip_dylibs drops the unused load command (the HDF5 frameworks, loaded by path, are kept as needed), and this removes the framework Xcode embedded for the package.\nif [ \"${MACEM_STORE_BUILD}\" = YES ]; then\n  rm -rf \"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Sparkle.framework\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		000000000000000120000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		100000000000000120000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		400000000000000120000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		500000000000000120000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		600000000000000120000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		700000000000000120000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		100000000000000170000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* FourDSTEMStudio */;
+			targetProxy = 100000000000000160000000 /* PBXContainerItemProxy */;
+		};
+		400000000000000170000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* FourDSTEMStudio */;
+			targetProxy = 400000000000000160000000 /* PBXContainerItemProxy */;
+		};
+		500000000000000170000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 500000000000000100000000 /* QuickLookThumbnail */;
+			targetProxy = 500000000000000160000000 /* PBXContainerItemProxy */;
+		};
+		600000000000000170000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 600000000000000100000000 /* QuickLookPreview */;
+			targetProxy = 600000000000000160000000 /* PBXContainerItemProxy */;
+		};
+		700000000000000170000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 700000000000000100000000 /* HDF5Helper */;
+			targetProxy = 700000000000000160000000 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		000000000000000011000000 /* Debug configuration for PBXProject "FourDSTEMStudio" */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F6A1D0DE0001000000000009 /* Version.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APPLETVOS_DEPLOYMENT_TARGET = 27.0;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PROJECT_UNIQUE_VALUE = FDQE8ARN;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		000000000000000012000000 /* Release configuration for PBXProject "FourDSTEMStudio" */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F6A1D0DE0001000000000009 /* Version.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APPLETVOS_DEPLOYMENT_TARGET = 27.0;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PROJECT_UNIQUE_VALUE = FDQE8ARN;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		000000000000000013000000 /* Develop configuration for PBXProject "FourDSTEMStudio" */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F6A1D0DE0001000000000009 /* Version.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APPLETVOS_DEPLOYMENT_TARGET = 27.0;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PROJECT_UNIQUE_VALUE = FDQE8ARN;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Develop;
+		};
+		000000000000000111000000 /* Debug configuration for PBXNativeTarget "FourDSTEMStudio" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = mac4DSTEM;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = "FourDSTEMStudio/FourDSTEMStudio$(MACEM_FLAVOUR_SUFFIX_$(MACEM_STORE_BUILD)).entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "FourDSTEMStudio/Info$(MACEM_FLAVOUR_SUFFIX_$(MACEM_STORE_BUILD)).plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "";
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				MACEM_FLAVOUR_SUFFIX_NO = "-Direct";
+				MACEM_FLAVOUR_SUFFIX_YES = "";
+				MACEM_STORE_BUILD = NO;
+				MACEM_STORE_LDFLAGS_YES = "-Wl,-dead_strip_dylibs -Wl,-needed_framework,FormatoLibHDF5 -Wl,-needed_framework,FormatoLibSZ -Wl,-needed_framework,FormatoLibAEC";
+				MACEM_UPDATER_CONDITION_NO = SPARKLE;
+				OTHER_LDFLAGS = "$(inherited) $(MACEM_STORE_LDFLAGS_$(MACEM_STORE_BUILD))";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID)";
+				PRODUCT_MODULE_NAME = FourDSTEMStudio;
+				PRODUCT_NAME = "$(MACEM_APP_NAME_$(MACEM_STORE_BUILD))";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(MACEM_UPDATER_CONDITION_$(MACEM_STORE_BUILD))";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		000000000000000112000000 /* Release configuration for PBXNativeTarget "FourDSTEMStudio" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = mac4DSTEM;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = "FourDSTEMStudio/FourDSTEMStudio$(MACEM_FLAVOUR_SUFFIX_$(MACEM_STORE_BUILD)).entitlements";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "FourDSTEMStudio/Info$(MACEM_FLAVOUR_SUFFIX_$(MACEM_STORE_BUILD)).plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "";
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				MACEM_FLAVOUR_SUFFIX_NO = "-Direct";
+				MACEM_FLAVOUR_SUFFIX_YES = "";
+				MACEM_STORE_BUILD = NO;
+				MACEM_STORE_LDFLAGS_YES = "-Wl,-dead_strip_dylibs -Wl,-needed_framework,FormatoLibHDF5 -Wl,-needed_framework,FormatoLibSZ -Wl,-needed_framework,FormatoLibAEC";
+				MACEM_UPDATER_CONDITION_NO = SPARKLE;
+				OTHER_LDFLAGS = "$(inherited) $(MACEM_STORE_LDFLAGS_$(MACEM_STORE_BUILD))";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID)";
+				PRODUCT_MODULE_NAME = FourDSTEMStudio;
+				PRODUCT_NAME = "$(MACEM_APP_NAME_$(MACEM_STORE_BUILD))";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(MACEM_UPDATER_CONDITION_$(MACEM_STORE_BUILD))";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		000000000000000113000000 /* Develop configuration for PBXNativeTarget "FourDSTEMStudio" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = mac4DSTEM;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = "FourDSTEMStudio/FourDSTEMStudio$(MACEM_FLAVOUR_SUFFIX_$(MACEM_STORE_BUILD)).entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "FourDSTEMStudio/Info$(MACEM_FLAVOUR_SUFFIX_$(MACEM_STORE_BUILD)).plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "";
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				MACEM_FLAVOUR_SUFFIX_NO = "-Direct";
+				MACEM_FLAVOUR_SUFFIX_YES = "";
+				MACEM_STORE_BUILD = NO;
+				MACEM_STORE_LDFLAGS_YES = "-Wl,-dead_strip_dylibs -Wl,-needed_framework,FormatoLibHDF5 -Wl,-needed_framework,FormatoLibSZ -Wl,-needed_framework,FormatoLibAEC";
+				MACEM_UPDATER_CONDITION_NO = SPARKLE;
+				OTHER_LDFLAGS = "$(inherited) $(MACEM_STORE_LDFLAGS_$(MACEM_STORE_BUILD))";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID)";
+				PRODUCT_MODULE_NAME = FourDSTEMStudio;
+				PRODUCT_NAME = "$(MACEM_APP_NAME_$(MACEM_STORE_BUILD))";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(MACEM_UPDATER_CONDITION_$(MACEM_STORE_BUILD))";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Develop;
+		};
+		100000000000000111000000 /* Debug configuration for PBXNativeTarget "FourDSTEMStudioTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEMTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/4DSTEM Studio.app/Contents/MacOS/4DSTEM Studio";
+			};
+			name = Debug;
+		};
+		100000000000000112000000 /* Release configuration for PBXNativeTarget "FourDSTEMStudioTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEMTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/4DSTEM Studio.app/Contents/MacOS/4DSTEM Studio";
+			};
+			name = Release;
+		};
+		100000000000000113000000 /* Develop configuration for PBXNativeTarget "FourDSTEMStudioTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEMTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/4DSTEM Studio.app/Contents/MacOS/4DSTEM Studio";
+			};
+			name = Develop;
+		};
+		400000000000000111000000 /* Debug configuration for PBXNativeTarget "FourDSTEMStudioUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = 3B8SMSSAX4;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEMUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = FourDSTEMStudio;
+			};
+			name = Debug;
+		};
+		400000000000000112000000 /* Release configuration for PBXNativeTarget "FourDSTEMStudioUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = 3B8SMSSAX4;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEMUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = FourDSTEMStudio;
+			};
+			name = Release;
+		};
+		400000000000000113000000 /* Develop configuration for PBXNativeTarget "FourDSTEMStudioUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = 3B8SMSSAX4;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEMUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = FourDSTEMStudio;
+			};
+			name = Develop;
+		};
+		500000000000000111000000 /* Debug configuration for PBXNativeTarget "QuickLookThumbnail" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = QuickLook/QuickLook.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickLook/QuickLookThumbnail.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QuickLookThumbnail;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID).QuickLookThumbnail";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		500000000000000112000000 /* Release configuration for PBXNativeTarget "QuickLookThumbnail" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = QuickLook/QuickLook.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickLook/QuickLookThumbnail.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QuickLookThumbnail;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID).QuickLookThumbnail";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		500000000000000113000000 /* Develop configuration for PBXNativeTarget "QuickLookThumbnail" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = QuickLook/QuickLook.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickLook/QuickLookThumbnail.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QuickLookThumbnail;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID).QuickLookThumbnail";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Develop;
+		};
+		600000000000000111000000 /* Debug configuration for PBXNativeTarget "QuickLookPreview" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = QuickLook/QuickLook.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickLook/QuickLookPreview.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QuickLookPreview;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID).QuickLookPreview";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		600000000000000112000000 /* Release configuration for PBXNativeTarget "QuickLookPreview" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = QuickLook/QuickLook.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickLook/QuickLookPreview.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QuickLookPreview;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID).QuickLookPreview";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		600000000000000113000000 /* Develop configuration for PBXNativeTarget "QuickLookPreview" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = QuickLook/QuickLook.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickLook/QuickLookPreview.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QuickLookPreview;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID).QuickLookPreview";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Develop;
+		};
+		700000000000000111000000 /* Debug configuration for PBXNativeTarget "HDF5Helper" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HDF5Helper/HDF5Helper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HDF5Helper/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HDF5Helper;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEM.HDF5Helper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		700000000000000112000000 /* Release configuration for PBXNativeTarget "HDF5Helper" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HDF5Helper/HDF5Helper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HDF5Helper/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HDF5Helper;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEM.HDF5Helper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		700000000000000113000000 /* Develop configuration for PBXNativeTarget "HDF5Helper" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HDF5Helper/HDF5Helper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HDF5Helper/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HDF5Helper;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Paul Lobpreis.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mac4dstem.mac4DSTEM.HDF5Helper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_PACKAGE_NAME = "$(SRCROOT:file:lower:c99extidentifier)";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Develop;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000000000000000010000000 /* Build configuration list for PBXProject "FourDSTEMStudio" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000011000000 /* Debug configuration for PBXProject "FourDSTEMStudio" */,
+				000000000000000013000000 /* Develop configuration for PBXProject "FourDSTEMStudio" */,
+				000000000000000012000000 /* Release configuration for PBXProject "FourDSTEMStudio" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		000000000000000110000000 /* Build configuration list for PBXNativeTarget "FourDSTEMStudio" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000111000000 /* Debug configuration for PBXNativeTarget "FourDSTEMStudio" */,
+				000000000000000113000000 /* Develop configuration for PBXNativeTarget "FourDSTEMStudio" */,
+				000000000000000112000000 /* Release configuration for PBXNativeTarget "FourDSTEMStudio" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		100000000000000110000000 /* Build configuration list for PBXNativeTarget "FourDSTEMStudioTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				100000000000000111000000 /* Debug configuration for PBXNativeTarget "FourDSTEMStudioTests" */,
+				100000000000000113000000 /* Develop configuration for PBXNativeTarget "FourDSTEMStudioTests" */,
+				100000000000000112000000 /* Release configuration for PBXNativeTarget "FourDSTEMStudioTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		400000000000000110000000 /* Build configuration list for PBXNativeTarget "FourDSTEMStudioUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				400000000000000111000000 /* Debug configuration for PBXNativeTarget "FourDSTEMStudioUITests" */,
+				400000000000000113000000 /* Develop configuration for PBXNativeTarget "FourDSTEMStudioUITests" */,
+				400000000000000112000000 /* Release configuration for PBXNativeTarget "FourDSTEMStudioUITests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		500000000000000110000000 /* Build configuration list for PBXNativeTarget "QuickLookThumbnail" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				500000000000000111000000 /* Debug configuration for PBXNativeTarget "QuickLookThumbnail" */,
+				500000000000000113000000 /* Develop configuration for PBXNativeTarget "QuickLookThumbnail" */,
+				500000000000000112000000 /* Release configuration for PBXNativeTarget "QuickLookThumbnail" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		600000000000000110000000 /* Build configuration list for PBXNativeTarget "QuickLookPreview" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				600000000000000111000000 /* Debug configuration for PBXNativeTarget "QuickLookPreview" */,
+				600000000000000113000000 /* Develop configuration for PBXNativeTarget "QuickLookPreview" */,
+				600000000000000112000000 /* Release configuration for PBXNativeTarget "QuickLookPreview" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		700000000000000110000000 /* Build configuration list for PBXNativeTarget "HDF5Helper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				700000000000000111000000 /* Debug configuration for PBXNativeTarget "HDF5Helper" */,
+				700000000000000113000000 /* Develop configuration for PBXNativeTarget "HDF5Helper" */,
+				700000000000000112000000 /* Release configuration for PBXNativeTarget "HDF5Helper" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		300000000000000000000002 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		300000000000000000000009 /* XCRemoteSwiftPackageReference "SpectroKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EMSuite/SpectroKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.13.2;
+			};
+		};
+		30000000000000000000000C /* XCRemoteSwiftPackageReference "DiffractoKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EMSuite/DiffractoKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.21.0;
+			};
+		};
+		30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EMSuite/CuboKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.11.0;
+			};
+		};
+		30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EMSuite/FormatoKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.20.0;
+			};
+		};
+		30000000000000000000002F /* XCRemoteSwiftPackageReference "ImagoKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EMSuite/ImagoKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.1;
+			};
+		};
+		300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EMSuite/EMSuiteUI";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.20.0;
+			};
+		};
+		300000000000000000000502 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		300000000000000000000003 /* DSTEMCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DSTEMCore;
+		};
+		300000000000000000000005 /* DSTEMSession */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DSTEMSession;
+		};
+		300000000000000000000007 /* DSTEMTraining */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DSTEMTraining;
+		};
+		30000000000000000000000A /* SpectroCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000009 /* XCRemoteSwiftPackageReference "SpectroKit" */;
+			productName = SpectroCore;
+		};
+		300000000000000000000010 /* DiffractoCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000000C /* XCRemoteSwiftPackageReference "DiffractoKit" */;
+			productName = DiffractoCore;
+		};
+		300000000000000000000012 /* DiffractoScattering */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000000C /* XCRemoteSwiftPackageReference "DiffractoKit" */;
+			productName = DiffractoScattering;
+		};
+		300000000000000000000014 /* DiffractoGeometry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000000C /* XCRemoteSwiftPackageReference "DiffractoKit" */;
+			productName = DiffractoGeometry;
+		};
+		300000000000000000000016 /* CuboCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */;
+			productName = CuboCore;
+		};
+		300000000000000000000018 /* CuboVirtual */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */;
+			productName = CuboVirtual;
+		};
+		30000000000000000000001A /* CuboPhase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */;
+			productName = CuboPhase;
+		};
+		30000000000000000000001C /* SpectroEDX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000009 /* XCRemoteSwiftPackageReference "SpectroKit" */;
+			productName = SpectroEDX;
+		};
+		30000000000000000000001E /* FormatoCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */;
+			productName = FormatoCore;
+		};
+		300000000000000000000020 /* FormatoDM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */;
+			productName = FormatoDM;
+		};
+		300000000000000000000022 /* FormatoEMD */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */;
+			productName = FormatoEMD;
+		};
+		300000000000000000000024 /* FormatoHDF5 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */;
+			productName = FormatoHDF5;
+		};
+		300000000000000000000030 /* ImagoCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000002F /* XCRemoteSwiftPackageReference "ImagoKit" */;
+			productName = ImagoCore;
+		};
+		300000000000000000000032 /* ImagoFFT */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000002F /* XCRemoteSwiftPackageReference "ImagoKit" */;
+			productName = ImagoFFT;
+		};
+		300000000000000000000100 /* DiffractoOrientation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000000C /* XCRemoteSwiftPackageReference "DiffractoKit" */;
+			productName = DiffractoOrientation;
+		};
+		300000000000000000000102 /* CuboParallax */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000000D /* XCRemoteSwiftPackageReference "CuboKit" */;
+			productName = CuboParallax;
+		};
+		300000000000000000000210 /* DSTEMQuickLook */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000002 /* XCLocalSwiftPackageReference "." */;
+			productName = DSTEMQuickLook;
+		};
+		300000000000000000000401 /* ShellMetal */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellMetal;
+		};
+		300000000000000000000403 /* ShellControls */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellControls;
+		};
+		300000000000000000000405 /* ShellInspector */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellInspector;
+		};
+		300000000000000000000407 /* ShellLayout */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellLayout;
+		};
+		30000000000000000000040F /* ShellSpectroscopy */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellSpectroscopy;
+		};
+		300000000000000000000411 /* ShellEDXModel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellEDXModel;
+		};
+		300000000000000000000415 /* ShellEDXAgent */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellEDXAgent;
+		};
+		300000000000000000000413 /* ShellAgentDoor */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellAgentDoor;
+		};
+		500000000000000000000301 /* DSTEMQuickLook */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000002 /* XCLocalSwiftPackageReference "." */;
+			productName = DSTEMQuickLook;
+		};
+		500000000000000000000303 /* FormatoPeek */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */;
+			productName = FormatoPeek;
+		};
+		600000000000000000000301 /* DSTEMQuickLook */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000002 /* XCLocalSwiftPackageReference "." */;
+			productName = DSTEMQuickLook;
+		};
+		600000000000000000000303 /* FormatoPeek */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */;
+			productName = FormatoPeek;
+		};
+		700000000000000000000301 /* DSTEMCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DSTEMCore;
+		};
+		300000000000000000000500 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000502 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 000000000000000000000000 /* Project object */;
+}

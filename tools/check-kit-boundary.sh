@@ -33,7 +33,7 @@ allowed_mods() {  # <path> -> comma list, empty when unlisted
 gated='Accelerate|vecLib|Metal|MetalKit|MetalPerformanceShaders[A-Za-z]*|BNNS|simd'
 symbols='vDSP_[A-Za-z0-9_]+|vDSP\.[A-Za-z]|cblas_[A-Za-z0-9_]+|vImage[A-Za-z0-9_]*|LAPACK[A-Za-z0-9_]*|[ds]gemm_|vv(exp|log|sin|cos|sqrt|pow|rsqrt|tan|atan2?)f?\(|BNNS[A-Za-z0-9_]*|MPS[A-Z][A-Za-z0-9_]*'
 
-files="$( { find mac4DSTEM mac4DSTEMTests tools/harnesses -type f \( -name '*.swift' -o -name '*.metal' \) 2>/dev/null; } | sort)"
+files="$( { find FourDSTEMStudio FourDSTEMStudioTests tools/harnesses -type f \( -name '*.swift' -o -name '*.metal' \) 2>/dev/null; } | sort)"
 
 while IFS= read -r f; do
   [ -z "$f" ] && continue

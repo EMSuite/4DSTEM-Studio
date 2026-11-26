@@ -1,0 +1,1812 @@
+import ShellLayout
+import Foundation
+import DiffractoOrientation
+import ShellMetal
+#if canImport(DSTEMCore)   // absent when a tools/ harness compiles this file into one module
+import CuboPhase
+import DSTEMCore
+import DSTEMSession
+#endif
+import ShellEDXModel
+import ShellSpectroscopy
+
+struct SimpleError: LocalizedError {
+    let message: String
+
+    init(_ message: String) {
+        self.message = message
+    }
+
+    var errorDescription: String? { message }
+}
+
+/// A real-space scan position. x is the scan column and y is the scan row.
+struct ScanPos: Equatable {
+    var x: Int
+    var y: Int
+}
+
+enum PatternDisplayMode: String, CaseIterable, Identifiable {
+    case current = "Current"
+    case mean = "Mean"
+    case max = "Max"
+
+    var id: String { rawValue }
+}
+
+enum PatternScaleUnit: String, CaseIterable, Identifiable {
+    case reciprocal = "Reciprocal"
+    case milliradians = "mrad"
+    var id: String { rawValue }
+}
+
+// `ParallaxResultProduct` moved to `Session/PhaseContrastProduct.swift` (seam
+// 1, the archived notes): a Session-layer owner cannot reference a
+// type defined in App/, so it moved with the state that uses it.
+
+/// Which image pane the user is currently operating on. Determines which ROI
+/// tools the left panel shows and where interactions are routed.
+enum ActivePane {
+    case diffraction   // detector ROI → real-space image (virtual imaging)
+    case realSpace     // region ROI → diffraction pattern (virtual diffraction)
+}
+
+// `RegionShape` moved to `Core/Analysis/VirtualDetector.swift` (C7 session 4,
+// budget relocation) — a placement change, not a policy change.
+
+enum ComparisonSlot: Hashable { case a, b }
+
+/// What one analysis entry point did — returned by the five run functions so
+/// S6's replay executor learns the verdict from a typed value written at the
+/// exit site, never by scraping a UI string that a copy edit could reword
+/// (Gate A findings A1/A2/B6, 2026-08-25). Interactive call sites ignore it.
+enum AnalysisRunOutcome: Equatable {
+    /// The result published — the recipe-recording path, exactly.
+    case published
+    /// The user (or a dataset change) stopped it; deliberately distinct from
+    /// `failed` so an overnight summary never calls a cancel a failure.
+    case cancelled
+    /// Ran and did not publish, with the reason in the app's voice.
+    case failed(String)
+}
+
+@Observable
+final class AppState {
+    /// Seam 6: the live reader/array pair,
+    /// dataset list, preview, loading state and stale-publish epoch. Readers go
+    /// directly to the owner; AppState has no forwarding properties.
+    let datasetSession = DatasetSession()
+
+    /// Whether the open cube is held in memory, and the preload's progress.
+    /// Owned by its own type, with no forwarding properties on `AppState` —
+    /// see `DatasetResidency.swift` for why. Views read `residency.…`.
+    let residency = DatasetResidency()
+
+    /// Which part of the source file is loaded, and what moving the calibration
+    /// into that frame cost. Stage L3's seam — see `Session/LoadedView.swift`.
+    let loadedView = LoadedView()
+
+    var openURL: URL?
+    @ObservationIgnored var pendingRecovery: DatasetRecoveryRecord?
+    /// S1's seam (the archived notes §7): the one
+    /// owner of where this dataset's session sidecar is and whether the app
+    /// may read it. Replaces a bare `scopedSessionSidecarURL` that eight call
+    /// sites derived around in two different ways — see
+    /// `Session/SessionSidecarLocator.swift`.
+    /// Injectable because the locator persists bookmarks into `UserDefaults`,
+    /// and the demo dataset's file path is a CONSTANT — a test that saves a
+    /// sidecar for the demo through the real defaults plants a grant for
+    /// every other demo-opening test (including one in a parallel worker
+    /// PROCESS, which shares the persisted domain), which then adopts that
+    /// test's calibration and recipe as session state. Measured 2026-08-25:
+    /// `.mixed` replay frames and `sessionSidecar`-stamped Q scales appearing
+    /// in unrelated suites. Tests that publish sidecars must construct
+    /// `AppState(sessionSidecar:)` with a suite-private store.
+    let sessionSidecar: SessionSidecarLocator
+
+    init(
+        sessionSidecar: SessionSidecarLocator = SessionSidecarLocator(),
+        materialsProject: MaterialsProjectSettings? = nil,
+        preferences: AppPreferences? = nil,
+        recents: RecentDatasets? = nil
+    ) {
+        self.sessionSidecar = sessionSidecar
+        self.recents = recents ?? RecentDatasets()
+        // Not a default *parameter* value: `MaterialsProjectSettings` is
+        // `@MainActor`, and a default argument expression is always checked
+        // as nonisolated, regardless of the initializer's own isolation — so
+        // constructing the fallback here, inside the (MainActor) init body,
+        // is what actually compiles.
+        self.materialsProject = materialsProject ?? MaterialsProjectSettings()
+        // Local `let`, not `self.preferences`, so the closures handed to
+        // `OperationCenter` below capture a plain value instead of `self`
+        // before every other stored property has one (two-phase init).
+        //
+        // Finding C (adversarial review, 2026-09-21): the fallback must not
+        // be `AppPreferences()`, whose default store is the real
+        // `UserDefaults.standard` — `sessionSidecar`/`materialsProject` keep
+        // that same real store out of a bare `AppState()` by staying LAZY
+        // (nothing touches the store until a caller asks a specific
+        // question), but `AppPreferences.init` cannot be made lazy the same
+        // way: by design (its own header) it decodes every key into a stored
+        // `@Observable` property immediately, so it always has to read
+        // something at construction. The mirror that fits here is instead
+        // `AppPreferencesTests.scratchDefaults()`'s shape — a private,
+        // uniquely named suite nothing else ever opens — applied
+        // automatically so none of the ~123 bare `AppState()`/
+        // `AppState(recents:)` call sites in FourDSTEMStudioTests (this file is
+        // hosted inside mac4DSTEM.app under the unit gate, so `.standard` IS
+        // the app's own domain) can seed from, or write into, the owner's
+        // real Settings. Production never reaches this branch — the one
+        // production call site (`App/FourDSTEMStudioApp.swift`) always supplies
+        // its own `AppPreferences(defaults: .standard)` explicitly — so nothing
+        // about shipped behaviour changes.
+        let preferences = preferences ?? AppPreferences(defaults: Self.scratchPreferencesDefaults())
+        self.preferences = preferences
+        self.operationCenter = OperationCenter(
+            beginKeepAwake: {
+                guard preferences.keepAwake else { return nil }
+                return ProcessInfo.processInfo.beginActivity(
+                    options: [.idleSystemSleepDisabled],
+                    reason: "mac4DSTEM analysis run"
+                )
+            },
+            endKeepAwake: { ProcessInfo.processInfo.endActivity($0) }
+        )
+        // Session S21 (`ROADMAP.md` "Settings window"): a FRESH window's
+        // starting colormap/intensity/engine choice, read once here — never
+        // re-applied later, so an analysis's own colormap choice (a
+        // diverging strain or DPC-difference map, `AppState+DPC.swift`,
+        // `AppState+ResultPresentation.swift`) is never overridden by a
+        // stale default.
+        //
+        // `patternColormap`/`logScale` bump `patternVersion` on every
+        // assignment (their own `didSet`, below) — restore it after seeding
+        // so this one-time default is invisible to version-gated caches, the
+        // same reason `resultPresentation.seedInitialColormap` exists rather
+        // than a plain `resultColormap =`.
+        let priorPatternVersion = patternVersion
+        patternColormap = preferences.diffractionColormap
+        logScale = preferences.intensityDisplay.isLog
+        patternVersion = priorPatternVersion
+        resultPresentation.seedInitialColormap(preferences.mapColormap)
+        // The seam signals presentation changes (component switches); the
+        // displayed image is shared display state, so the derivation stays
+        // here. Weak: AppState owns the seam, never the reverse.
+        strain.onPresentationChange = { [weak self] in
+            self?.applyStrainDisplay()
+        }
+        // Same ownership direction as the strain seam: AppState owns
+        // navigation, never the reverse. This closure is the recovery
+        // persist the old stored `navigation.analysisMode`'s didSet performed.
+        // 7c 4b: the ACOM effects that need the window. The scope drives the
+        // region selection on the real-space pane; display writes republish
+        // the map; an invalidated map clears the published product.
+        acomSession.onScopeChange = { [weak self] scope in
+            guard let self else { return }
+            if scope == .selectedRegion {
+                acomSession.regionSelectionActive = true
+                realSpaceShape = .rectangle
+                realSpaceRadius = Float(acomSession.regionRadius)
+                Task { await self.ensureScanNavigator() }
+            } else {
+                acomSession.regionSelectionActive = false
+            }
+        }
+        acomSession.onRegionRadiusChange = { [weak self] radius in
+            guard let self, acomSession.scope == .selectedRegion else { return }
+            acomSession.regionSelectionActive = true
+            realSpaceRadius = Float(radius)
+        }
+        acomSession.onDisplayChange = { [weak self] in self?.applyACOMDisplay() }
+        acomSession.onResultInvalidated = { [weak self] in
+            guard let self, navigation.analysisMode == .acom else { return }
+            resultPresentation.replaceProduct(nil)
+            resultPresentation.bumpResultVersion()
+        }
+        navigation.onModeChange = { [weak self] in
+            self?.persistRecoveryPosition()
+        }
+        // Seam 3: the live overlay needs
+        // `probeKernel`/`navigation`/`displayedPattern`, none of which
+        // `diskDetection` holds — same hook shape as `strain
+        // .onPresentationChange` above. Body unchanged from the pre-seam
+        // `diskParams` `didSet`.
+        diskDetection.onParamsChange = { [weak self] in
+            Task { await self?.detectCurrentPattern() }
+        }
+        // Seam 4: the display derivation needs
+        // `comField`/`descriptor`/`navigation`/`calibrationSession`, none of
+        // which `dpc` holds — same hook shape as `diskDetection
+        // .onParamsChange` above. Body unchanged from the pre-seam
+        // `dpcDisplay` `didSet` (its return value was ignored there too).
+        dpc.onDisplayChange = { [weak self] in
+            _ = self?.applyDPCDisplay()
+        }
+        detectorTraining.install(in: learnedDetection)
+        // Review a5 / owner card D3 (a): the sidecar-rewrite gate asks which view the sidecar records, which view is
+        // loaded and what the sidecar holds — this object's facts, read live, the same hook shape as the seams above.
+        gates.sessionView = { [weak self] in
+            guard let self else { return nil }
+            return SessionGates.SessionView(
+                recorded: sessionLoadSpecification, loaded: loadedView.specification,
+                savedResults: sessionInventory.results.map { .init(kind: $0.kind, name: $0.displayName) }
+            )
+        }
+        // Review a6 / owner card D2 (a): every window's state is known, weakly, to the open-dataset registry.
+        enrollInOpenDatasetRegistry()
+    }
+
+    /// A private, uniquely named `UserDefaults` suite for `init`'s
+    /// `preferences` fallback — see Finding C's note above. Nothing this
+    /// initializer does ever WRITES through it (only `AppPreferences.init`'s
+    /// own reads, all misses against a fresh suite), so unlike
+    /// `AppPreferencesTests.scratchDefaults()` there is nothing to remove
+    /// afterward: an unwritten suite leaves no plist behind.
+    private static func scratchPreferencesDefaults() -> UserDefaults {
+        let suite = "mac4dstem.appstate-default-preferences.\(UUID().uuidString)"
+        return UserDefaults(suiteName: suite) ?? .standard
+    }
+
+    /// The recents list and its location labels. S3's seam
+    /// (the archived notes §7) — see `Session/RecentDatasets.swift`.
+    /// Views read `recents.…`; no forwarding properties. // v2 S3
+    let recents: RecentDatasets
+    /// The session's recipe — which analyses ran, with which parameters. S5's
+    /// seam (the archived notes §7) — see `Session/SessionReplay.swift`.
+    /// No forwarding properties. // v2 S5
+    let replay = SessionReplay()
+    /// The state of the unattended promote run — S6's seam
+    /// (the archived notes §7) — see `Session/ReplayRun.swift`.
+    /// Views read `replayRun.…`; no forwarding properties. // v2 S6
+    let replayRun = ReplayRun()
+    /// The dataset epoch the promote run replays on, nil during its reopen
+    /// (`executeReplay` sets it). A file the user opens mid-run is not the
+    /// promote run's, and its own runs are not refused (`promoteRunRefusesUserRuns`).
+    @ObservationIgnored var promoteRunEpoch: Int?
+    /// The configured-open slot consumed by commit or discard. The payload's
+    /// preview/configuration remain owned by `PendingLoad`; no forwarding.
+    let promotionRun = PromotionRun<PendingLoad>()
+    /// The session's "may I?" policy gates — S7's seam
+    /// (the archived notes §7) — see `Session/SessionGates.swift`.
+    /// Views read `gates.…`; no forwarding properties. // v2 S7
+    let gates = SessionGates()
+    /// The strain product and its run controls — S8's seam
+    /// (the archived notes §7) — see `Session/StrainProduct.swift`.
+    /// Views read `strain.…`; no forwarding properties. // v2 S8
+    let strain = StrainProduct()
+    let diffractionGroups = DiffractionGroupsProduct()
+    let phaseMapping = PhaseMappingProduct()
+    /// Spatial precipitate objects. Session S3
+    /// (archived `docs/v3-features.md#precipitates-mp-plan`) wired its first
+    /// producer: `AppState+PhaseMapping.swift` publishes here from every
+    /// finished vector-matched phase map, via the pure
+    /// `PhaseMapObjectsBridge`. The pre-registered FULL-diffraction-pattern
+    /// classification route this owner was originally scoped for
+    /// (archived `docs/v3-features.md#precipitate-classification` §2) remains unbuilt and
+    /// would be a second producer, not a replacement. Neither producer nor
+    /// this owner adds a method of its own beyond the phase map's. Views read
+    /// `precipitateClassification.…` directly; no forwarding properties.
+    let precipitateClassification = PrecipitateClassificationProduct()
+    /// The specimen thickness behind the precipitate counts (typed, with its source); recorded on the objects run's lineage node
+    /// so the sidecar carries it. Set through `setPrecipitateThickness`.
+    private(set) var precipitateThickness: ThicknessEntry?
+    /// Composition and strain under each precipitate object (task 42), joined off the main actor from the quantified maps and the
+    /// strain map; the object report reads them. Recomputed by `refreshPrecipitateJoins`.
+    private(set) var precipitateJoins = PrecipitateJoins()
+    @ObservationIgnored var precipitateJoinGeneration = 0
+    /// Owner: the precipitate object report (`precipitateObjectReport`). The last refusal of the report said in the Output, so a
+    /// refusal is said once, not at every redraw that reads the report (mac4DSTEM#300).
+    @ObservationIgnored var lastPrecipitateReportRefusal: String?
+    /// The running join (one pooled fit per object can take a while): a newer request cancels it.
+    @ObservationIgnored var precipitateJoinTask: Task<Void, Never>?
+    /// What the standing composition per object was fitted with (the room's method hash; nil: not quantified).
+    @ObservationIgnored var precipitateCompositionKey: String?
+    /// The variant run's settings (suite task 40); nil is off. Recorded on the objects run's lineage node like the thickness; set through
+    /// `setPrecipitateVariantSettings`. Nothing is computed without them.
+    private(set) var precipitateVariantSettings: VariantSettings?
+    func assignPrecipitateVariantSettings(_ settings: VariantSettings?) { precipitateVariantSettings = settings }
+    func assignPrecipitateThickness(_ entry: ThicknessEntry?) { precipitateThickness = entry }
+    func assignPrecipitateJoins(_ joins: PrecipitateJoins) {
+        precipitateJoins = joins
+        // An object table that is already open follows its run (`PrecipitateReportUpdates`): the joins land after it opened.
+        if let report = precipitateObjectReport { onPrecipitateReportChange?(report) }
+    }
+    /// Set by the dataset window: hands the report to the app's relay for open object tables.
+    @ObservationIgnored var onPrecipitateReportChange: ((PrecipitateObjectReport) -> Void)?
+    /// The precipitate glyph overlay's switches (Precipitates section): a view choice of this window, never persisted or published.
+    var precipitateOverlay = PrecipitateOverlaySettings()
+    /// The object under the pointer on a scan pane (the overlay writes its readout beside it).
+    private(set) var precipitateHoverID: Int?
+    func updatePrecipitateHover(x: Int?, y: Int?) {
+        var id: Int?
+        if let x, let y, precipitateOverlay.onPanes, let set = cachedPrecipitateGlyphSet() {
+            id = set.hit(x: Double(x), y: Double(y), settings: precipitateOverlay)?.id
+        }
+        if id != precipitateHoverID { precipitateHoverID = id }
+    }
+    /// The glyphs for the scan panes, remembered per (classification run, minimum size).
+    @ObservationIgnored private let glyphSetCache = LastValueCache<GlyphKey, PrecipitateGlyphSet?>()
+    private struct GlyphKey: Equatable { var source: UUID?; var minimum: Int }
+    /// The glyph set of the current objects report, nil without one. Cheap after the first read per run and minimum size.
+    func cachedPrecipitateGlyphSet() -> PrecipitateGlyphSet? {
+        guard precipitateOverlay.onPanes, let source = precipitateClassification.sourceID else { return nil }
+        return glyphSetCache.value(for: GlyphKey(source: source, minimum: precipitateClassification.minimumObjectAreaPx)) {
+            precipitateObjectReport.map(PrecipitateGlyphSet.make)
+        }
+    }
+    /// Session S5: whether a Materials Project API key is stored, and the
+    /// save/remove actions the Settings scene drives — composition only, no
+    /// forwarding properties (`Session/MaterialsProjectSettings.swift`). This
+    /// is the one piece of state the owner's product decision (Materials
+    /// Project as the default phase source) needs on every window, so no
+    /// other existing owner is the honest home for it. Injectable in `init`
+    /// for the same reason `sessionSidecar` is: the default reads and writes
+    /// the REAL Keychain item, which a test must never touch.
+    let materialsProject: MaterialsProjectSettings
+    /// The Settings window's state (session S21, `ROADMAP.md` "Settings
+    /// window, Xcode-style sidebar"). Reached from here only for the few
+    /// places `AppState` itself must consult a default — seeding a fresh
+    /// window's colormap/intensity/engine choices and the primary "Open
+    /// Dataset…" behaviour in `init`/`requestOpenDataset` below, and the
+    /// keep-awake closure handed to `operationCenter`. Every VIEW reads
+    /// `AppPreferences` from `.environment(preferences)` instead
+    /// (`App/FourDSTEMStudioApp.swift`), never through this property. Injectable
+    /// for the same reason `materialsProject` is — a test that wants to
+    /// assert on a CHOSEN preference must supply its own suite-private
+    /// `AppPreferences(defaults:)` (`AppPreferencesTests.scratchDefaults()`'s
+    /// shape) — but unlike `materialsProject`/`sessionSidecar`, the omitted
+    /// case is ALSO safe: `init`'s fallback is a private scratch suite, never
+    /// `.standard` (Finding C, adversarial review 2026-09-21; see `init`'s
+    /// `scratchPreferencesDefaults()`), so a bare `AppState()` cannot read or
+    /// write the owner's real Settings either way.
+    let preferences: AppPreferences
+    /// Seam 5: the retained product, result
+    /// controls and their derived caches. Views read `resultPresentation.…`;
+    /// cross-owner combiners are placed in `AppState+ResultPresentation.swift`.
+    let resultPresentation = ResultPresentation()
+    /// The last reciprocal-pixel calibration attempt — S13's seam
+    /// (the archived notes §7) — see `Session/QCalibrationRun.swift`.
+    /// Views read `qCalibration.…`; no forwarding properties. // v2 S13
+    let qCalibration = QCalibrationRun()
+    /// The distortion fitted on the matrix's spots, pending until applied (mac4DSTEM#210).
+    let spotDistortion = SpotDistortionRun()
+    /// What happened this session, for the output strip
+    /// (the archived notes §7) — see `App/ActivityLog.swift`.
+    /// Views read `activityLog.messages`; no forwarding properties.
+    let activityLog = ActivityLog()
+
+    /// The ONE entry for recipe steps. Recording is suppressed while a
+    /// dataset load is in flight: the automatic re-establishing pass on open
+    /// (and after a promote or reconfigure) runs with whatever parameters the
+    /// fresh session holds — DEFAULTS — and recording it would overwrite an
+    /// adopted colleague's step with them. Merely opening a file must never
+    /// mutate its recipe (Gate B-lite refutation F1, 2026-08-24). // v2 S5
+    /// Also suppressed when the run was replay-initiated (`replaying`, passed
+    /// down from the executor through the entry point): replaying a recipe
+    /// must not mutate the recipe. Without this, a replayed disk detection's
+    /// `invalidating:` would DELETE the strain and ACOM steps mid-run, so a
+    /// replay that halted between them would have destroyed the very recipe
+    /// it was executing. Keyed on the CALLER, not on `replayRun.isRunning`
+    /// (Gate A findings A4/B3, 2026-08-25). A user-initiated run no longer
+    /// interleaves with the replay on its dataset — `beginCancellableOperation`
+    /// refuses it (`promoteRunRefusesUserRuns`) — but a run on a file opened
+    /// mid-replay is that file's own pipeline edit and records as one. The
+    /// recipe keeps its rehearsal values; what actually ran is the results'
+    /// own provenance and the run summary. // v2 S6
+    /// Widened from `private` (seam 2, the archived notes):
+    /// `App/AppState+ACOM.swift`'s `runACOM` calls it from outside this file.
+    ///
+    /// Lineage (ADR 047 R2): the node this run became is remembered as the run
+    /// that made the in-memory product of `kind` (`replay.producedStep`), and a
+    /// suppressed run FORGETS it — a product must not be credited to a node
+    /// whose settings it did not use. `stampsDisplayedProduct` is for the two
+    /// run sites (virtual detector, DPC) that publish BEFORE they record: the
+    /// product on screen is this run's, and gets its `lineage_step` now.
+    func recordReplayStep(kind: String,
+                                  parameters: [String: String],
+                                  invalidating downstream: [String] = [],
+                                  replaying: Bool,
+                                  stampsDisplayedProduct: Bool = false) {
+        guard !datasetSession.isLoading, !replaying else {
+            replay.forgetProducedStep(kind: kind)
+            // CR1 item 1: `publishProduct` stamped this product from the PREVIOUS run's
+            // step before this site recorded; a skipped run made no node, so the
+            // product must name none (a save would credit the wrong run).
+            if stampsDisplayedProduct { unstampDisplayedProduct(lineageKind: kind) }
+            return
+        }
+        let step = replay.record(kind: kind, parameters: parameters, invalidating: downstream,
+                                 under: ReplayParameterFrame.of(loadedView.specification))
+        if stampsDisplayedProduct { stampDisplayedProduct(lineageKind: kind, step: step) }
+    }
+    var recoveryRecord: DatasetRecoveryRecord? = WorkspaceRecoveryStore.recovery()
+    var descriptor: DatasetDescriptor?
+    var selectedScan = ScanPos(x: 0, y: 0)
+
+    var currentPattern: DiffractionPattern?
+    /// v2.5 step 3b-6: a result restored from the sidecar is published as the
+    /// product value straight from the map's own metadata — the status and
+    /// domain recorded at save time, never re-inferred from strings.
+    func publishRestoredProduct(
+        kind: String, displayName: String, valueUnits: String, payload: ProductPayload,
+        pixelSizeRow: Double?, pixelSizeColumn: Double?, pixelUnits: String?,
+        provenance: [String: String]
+    ) {
+        let domain = provenance["display_domain"].flatMap(ProductDomain.init) ?? activeResultDomain
+        let status = provenance["quantitative_status"].flatMap(ProductQuantitativeStatus.init)
+            ?? quantitativeStatus(for: kind, units: valueUnits)
+        resultPresentation.replaceProduct(DisplayedProduct(
+            origin: .restoredFromSidecar,
+            kind: kind, displayName: displayName, payload: payload, domain: domain,
+            sampling: ProductSampling(row: pixelSizeRow, column: pixelSizeColumn, units: pixelUnits),
+            valueUnits: valueUnits, quantitativeStatus: status, provenance: provenance))
+    }
+
+    /// v2.5 step 3e: a compute site publishes its product with ITS OWN
+    /// kind/name/units — condition 2 of plan §9d, one site at a time. Sampling
+    /// and provenance still come from the per-mode persistence metadata; a
+    /// product that is not the mode's own (the disagreement map published from
+    /// Disk detection, C7 session 3) passes its domain, sampling and own keys.
+    func publishProduct(
+        kind: String, displayName: String, valueUnits: String, payload: ProductPayload,
+        validityMask: [Bool]? = nil, qualityFields: [ProductQualityField] = [],
+        overlays: [ProductOverlayDescriptor] = [],
+        domain: ProductDomain? = nil, sampling: ProductSampling? = nil, extraProvenance: [String: String] = [:],
+        ownProvenanceOnly: Bool = false
+    ) {
+        let persisted = currentScalarPersistenceMetadata
+        let domain = domain ?? activeResultDomain
+        // FC2 item 1: a site that decides its whole provenance (the virtual detector) must not
+        // pick up the CURRENT mode's keys: replay, lineage rewind and the opening pass publish
+        // under whatever mode is current, and the executor never switches it.
+        var provenance = (ownProvenanceOnly ? [:] : persisted.provenance)
+            .merging(extraProvenance) { _, new in new }
+        // The run that made this product (ADR 047 R2), when the session recorded
+        // one — how a displayed or saved map finds its node in the graph.
+        if let lineageKind = SessionLineage.lineageKind(forProductKind: kind),
+           let step = replay.producedStep[lineageKind] {
+            provenance["lineage_step"] = step
+        }
+        provenance["display_domain"] = domain.rawValue
+        let status = provenance["quantitative_status"].flatMap(ProductQuantitativeStatus.init)
+            ?? quantitativeStatus(for: kind, units: valueUnits)
+        provenance["quantitative_status"] = status.rawValue
+        resultPresentation.publish(DisplayedProduct(
+            kind: kind, displayName: displayName, payload: payload, domain: domain,
+            validityMask: validityMask, qualityFields: qualityFields,
+            sampling: sampling ?? ProductSampling(row: persisted.row, column: persisted.column, units: persisted.units),
+            valueUnits: valueUnits, quantitativeStatus: status, provenance: provenance,
+            overlays: overlays))
+    }
+
+    /// Last structural scan-space image available for positioning regions.
+    /// This is navigation context, not a scientific result: selecting an ACOM
+    /// region must not replace the Bragg map/result that can still be saved.
+    var scanNavigationImage: FloatImage?
+    var scanNavigationVersion = 0
+    func bumpScanNavigationVersion() { scanNavigationVersion &+= 1 }
+
+    /// The navigator inset's display-normalised pixels, remembered per scan
+    /// navigation version. `normalized()` is O(scan) and the inset's body ran it
+    /// on every scrub tick (review 2026-10-07, F4). The pixels are in the key as
+    /// well as the version: they share the image's buffer, so an unchanged image
+    /// compares by identity without a walk, and an image replaced without a bump
+    /// (a dataset reopen resets the version to 0) cannot be served stale.
+    @ObservationIgnored private let scanNavigationNormCache =
+        LastValueCache<ScanNavigationNormKey, [Float]>()
+    var scanNavigationNormComputeCount: Int { scanNavigationNormCache.computeCount }
+
+    private struct ScanNavigationNormKey: Equatable {
+        var version: Int
+        var width: Int
+        var height: Int
+        var pixels: [Float]
+    }
+
+    func normalizedScanNavigationPixels(of image: FloatImage) -> [Float] {
+        scanNavigationNormCache.value(for: ScanNavigationNormKey(
+            version: scanNavigationVersion, width: image.width, height: image.height,
+            pixels: image.pixels)
+        ) { image.normalized() }
+    }
+    /// Set only while `resultPresentation.resultImage` is the scalar map restored from the stable
+    /// session sidecar. New scientific results clear it at publication.
+    /// Read-only inventory of supported objects in the stable companion file.
+    var sessionInventory: SessionSidecarInventory = .empty
+    var comparisonProductA: DisplayedProduct?
+    var comparisonProductB: DisplayedProduct?
+    /// Owner: the saved-result picks (`selectSavedSessionResult`, `loadSavedSessionResult`). The latest pick for the view and for
+    /// each comparison slot: an earlier pick whose file read finishes later does not land over it (mac4DSTEM#303).
+    @ObservationIgnored var savedResultPick = 0
+    @ObservationIgnored var comparisonPicks: [ComparisonSlot: Int] = [:]
+    /// Called after a saved result's file read, before it lands; tests hold one pick there while another finishes. Nil in the app.
+    @ObservationIgnored var savedResultReadForTesting: ((SessionResultDescriptor) async -> Void)?
+
+    var meanPattern: DiffractionPattern?
+    var maxPattern: DiffractionPattern?
+    var patternDisplayMode: PatternDisplayMode = .current {
+        didSet {
+            patternVersion &+= 1
+            Task { await detectCurrentPattern() }
+        }
+    }
+
+    /// v2.5 step 4a: calibration state lives in `CalibrationSession`. Every
+    /// reader goes there directly; the forwarders went in 7c slice 5b.
+    let calibrationSession = CalibrationSession()
+    /// Seam 1: the Parallax and single-slice
+    /// ptychography products and their run controls. Every reader goes
+    /// there directly; there are no forwarding properties.
+    let phaseContrast = PhaseContrastProduct()
+    let ptychography = PtychographySettings()
+    /// Full rotation-calibration result (objective curves) for the
+    /// diagnostics plot in the inspector.
+    var lastRotationResult: RotationCalibration.Result?
+    var patternVersion = 0
+
+    // DPC: cached CoM shift field so display-mode switches don't re-run the
+    // GPU. Widened from `private` (seam 4, the archived notes):
+    // `App/AppState+DPC.swift`'s `runDPC`/`applyDPCDisplay` read/write it
+    // from a different file.
+    @ObservationIgnored var comField: [Float]?
+
+    // Disk detection state. `diskParams` and its pure size-aware defaulting
+    // moved to `diskDetection` (seam 3, the archived notes); these
+    // stay because they read AppState-only or another owner's state
+    // (`descriptor`, `probeKernel`, `calibrationSession`, `resultPresentation.braggVectors`)
+    // that cannot move with it. `currentDiskDiagnostics`/`resultPresentation.braggVectors`/
+    // `completedDiskSummary` widen from `private(set)` and
+    // `liveDetectionRequest` from `private` — all four are now set/mutated
+    // from `App/AppState+DiskDetection.swift`, a different file.
+    var probeKernel: ProbeKernel?
+    var currentPeaks: [BraggPeak] = []
+    var currentDiskDiagnostics: DiskDetectionPatternDiagnostics?
+    var completedDiskSummary: DiskDetectionScanSummary?
+    @ObservationIgnored var liveDetectionRequest: UInt64 = 0
+    /// Seam 3: the disk-detection run controls'
+    /// one owner. Every reader goes there directly; there are no forwarding
+    /// properties.
+    let diskDetection = DiskDetectionProduct()
+
+    /// Return every detector control to the same size-aware defaults used
+    /// when this dataset was opened — now including the fitted probe radius if
+    /// one has been measured since, which is what makes the minimum-spacing
+    /// default physically meaningful. The pure construction is
+    /// `diskDetection.reset(qy:qx:probeRadius:)`; this wrapper resolves the
+    /// AppState-only inputs the owner cannot read itself.
+    func resetDiskDetectionParams() {
+        guard let descriptor else { return }
+        diskDetection.reset(qy: descriptor.qy, qx: descriptor.qx, probeRadius: fittedProbeRadius)
+    }
+
+    /// The probe radius to scale detector defaults with: the generated
+    /// kernel's, else the calibration's. Same precedence `diskDetectionContext`
+    /// uses, so the controls validate against the value they were derived from.
+    var fittedProbeRadius: Float? {
+        probeKernel?.probeRadius ?? calibrationSession.calibration.probeRadius
+    }
+
+    /// Re-derive the disk-detection defaults once a probe radius is known.
+    /// `diskParams` is seeded at dataset load, before any calibration has run,
+    /// so its minimum spacing is the detector-scaled placeholder rather than a
+    /// probe-scaled value. Measuring the probe is what makes the real default
+    /// computable — see `DiskDetectionParams.detectorAdapted`, where the
+    /// detector-scaled value is shown to suppress the shortest g-vectors on
+    /// two of the four training datasets.
+    /// Only replaces the spacing if the user has not chosen one: it is
+    /// compared against the placeholder's spacing *alone*, not the whole
+    /// parameter struct. Whole-struct equality looks safer and is worse — a
+    /// user who raises Maximum peaks (a natural response to a doubled yield)
+    /// or nudges any unrelated control would then be pinned to the
+    /// detector-scaled spacing permanently, with nothing on screen saying why.
+    /// The pure guard/compare/assign is `diskDetection.refreshForMeasuredProbe
+    /// (qy:qx:probeRadius:)`; this wrapper resolves the AppState-only inputs.
+    func refreshDiskDefaultsForMeasuredProbe() {
+        guard let descriptor else { return }
+        diskDetection.refreshForMeasuredProbe(qy: descriptor.qy, qx: descriptor.qx, probeRadius: fittedProbeRadius)
+    }
+
+    var diskDetectionContext: DiskDetectionContext? {
+        guard let descriptor else { return nil }
+        return DiskDetectionContext(
+            qy: descriptor.qy, qx: descriptor.qx,
+            probeRadius: probeKernel?.probeRadius ?? calibrationSession.calibration.probeRadius
+        )
+    }
+
+    var diskDetectionValidationIssues: [DiskDetectionValidationIssue] {
+        guard let context = diskDetectionContext else { return [] }
+        return diskDetection.diskParams.validationIssues(in: context)
+    }
+
+    var diskDetectionConfigurationIsValid: Bool {
+        !diskDetectionValidationIssues.contains { $0.severity == .error }
+    }
+
+    /// Full-scan vectors remain available for comparison, but downstream
+    /// analysis must not silently imply that newly previewed settings
+    /// produced them. C4(b): now also catches kernel/learned-detector drift.
+    var diskDetectionSettingsAreStale: Bool {
+        guard resultPresentation.braggVectors != nil else { return false }
+        // Disks restored without a recipe are stale whatever the recipe beside
+        // them says: no recorded settings produced them (mac4DSTEM#61). Here,
+        // not only in `hasCurrentBraggVectors`, so the run guards that read
+        // staleness directly (strain, ACOM, q from crystal) refuse them too.
+        if resultPresentation.braggVectorsWithoutRecipe { return true }
+        return ProductWorkflow.stalenessVerdict(recordedStep: recordedReplayStep(for: .disks),
+            currentSignature: currentReplaySignature(for: .disks), hasProduct: true) != .current
+    }
+
+    /// Why disks are not the ones a task may use (`ProductWorkflowReadiness.disksNotUsableReason`).
+    nonisolated static func disksNotUsableReason(hasDisks: Bool, settingsAreStale: Bool, storedDisksNote: String?) -> String? {
+        if hasDisks { return settingsAreStale ? "the detection settings changed since these disks were found" : nil }
+        guard let note = storedDisksNote, let dash = note.range(of: " — ") else { return nil }
+        return "the session's disks were not taken, " + note[dash.upperBound...]
+    }
+
+    var hasCurrentBraggVectors: Bool {
+        resultPresentation.braggVectors != nil && !diskDetectionSettingsAreStale
+    }
+
+    /// ACOM state, plan and map live in `ACOMSession` (v2.5 step 6a); the
+    /// forwarders went in 7c 4b. The run functions moved to
+    /// `App/AppState+ACOM.swift` in seam 2 and
+    /// still read the session directly; the session's hooks below carry the
+    /// effects that need the window.
+    let acomSession = ACOMSession()
+
+    /// Learned-vs-classical detector option and state; no forwarding
+    /// properties — see `Session/LearnedDetection.swift`.
+    let learnedDetection = LearnedDetectionSession()
+
+    /// Hand-clicked disk-centre labels (C7 session 4) — see `Session/DiskCentreLabels.swift`.
+    let diskCentreLabels = DiskCentreLabelStore()
+
+    /// The on-device training flow's state (C4b): the trained-model store, the pending review — see `App/DetectorTrainingSession.swift`.
+    let detectorTraining = DetectorTrainingSession()
+
+    /// `acomWorkPositionCount` and its dependents need `descriptor` (rx/ry),
+    /// which only AppState holds, so they stay here as orchestration over
+    /// `ACOMSession`'s moved `scanSelection`/`estimatedDuration` (seam 2,
+    /// the archived notes) rather than becoming forwarders — see the
+    /// "seam 2 additions" note atop `Session/ACOMSession.swift`.
+    var acomWorkPositionCount: Int {
+        guard let descriptor else { return 0 }
+        return acomSession.scanSelection(selectedX: selectedScan.x, selectedY: selectedScan.y)
+            .positionCount(width: descriptor.rx, height: descriptor.ry)
+    }
+
+    /// The library size for the selected phase: the preset's count, 4x for a monoclinic phase. One
+    /// source for the Work row, the estimate and the plan.
+    var acomTemplateCount: Int {
+        acomSession.quality.templateCount(for: resolvedACOMModel?.symmetry ?? .cubic)
+    }
+
+    var acomWorkSummary: String {
+        "\(acomWorkPositionCount.formatted(.number.grouping(.never))) positions × \(acomTemplateCount) templates"
+    }
+
+    var acomEstimatedDuration: TimeInterval? {
+        acomSession.estimatedDuration(
+            forPositions: acomWorkPositionCount, symmetry: resolvedACOMModel?.symmetry ?? .cubic)
+    }
+
+    /// What a full-scan run would cost, using the same throughput the panel
+    /// already shows for the current scope — deliberately not a second
+    /// estimator, so the suggestion cannot disagree with the "Expected" row.
+    var acomFullScanEstimatedDuration: TimeInterval? {
+        guard let descriptor else { return nil }
+        return acomSession.estimatedDuration(
+            forPositions: ACOMScanSelection.full.positionCount(
+                width: descriptor.rx, height: descriptor.ry
+            ),
+            symmetry: resolvedACOMModel?.symmetry ?? .cubic   // the Work row's library (#411)
+        )
+    }
+
+    /// A full scan this cheap is offered as one click instead of leaving the
+    /// user on a 32×32 preview. Measured motivation: sim_Au's full 84×100 scan
+    /// against 200 templates ran in 0.7 s while the panel estimated ~2 s.
+    /// 5 s is the ceiling because the run is already cancellable and reports
+    /// progress, so the cost of accepting is bounded and visible; and the
+    /// estimate is only offered at all once it is grounded (a measured
+    /// throughput, or the CPU baseline), never on an unmeasured GPU guess.
+    /// Only offered from `.preview` — a user who deliberately chose a region
+    /// is not second-guessed.
+    var acomFullScanSuggestion: String? {
+        guard acomSession.scope == .preview,
+              let seconds = acomFullScanEstimatedDuration,
+              seconds <= 5
+        else { return nil }
+        return seconds < 1
+            ? "Run the full scan instead — under 1 s"
+            : "Run the full scan instead — about \(Int(seconds.rounded())) s"
+    }
+
+    var acomEstimatedDurationText: String {
+        guard let seconds = acomEstimatedDuration else {
+            return "Run a preview to measure"
+        }
+        if seconds < 1 { return "under 1 s" }
+        let total = Int(seconds.rounded(.up))
+        return total >= 60
+            ? String(format: "about %d:%02d", total / 60, total % 60)
+            : "about \(total) s"
+    }
+
+    /// The analysis canvas temporarily shows a scan-space reference while a
+    /// region is being positioned. Results still reads the retained scientific
+    /// result, so the Bragg-vector map is never discarded or relabelled.
+    var showsACOMRegionReference: Bool {
+        navigation.workspaceArea == .map
+            && navigation.analysisMode == .acom
+            && acomSession.scope == .selectedRegion
+            && acomSession.regionSelectionActive
+            && scanNavigationImage != nil
+    }
+
+    var displayedResultImage: FloatImage? {
+        showsACOMRegionReference ? scanNavigationImage : resultPresentation.resultImage
+    }
+
+    var displayedResultRGBA: RGBAImage? {
+        showsACOMRegionReference ? nil : resultPresentation.resultRGBA
+    }
+
+    /// The result pane's title. Prepare with nothing to show kept the remembered task's name ("ACOM full scan · Reliability")
+    /// over "No Result Yet"; there it is empty.
+    var resultPaneTitle: String {
+        let hasResult = displayedQualityField != nil || displayedResultRGBA != nil || displayedResultImage != nil
+        return Self.resultPaneTitle(name: displayedResultName, hasResult: hasResult, inPrepare: navigation.workspaceArea == .prepare)
+    }
+
+    nonisolated static func resultPaneTitle(name: String, hasResult: Bool, inPrepare: Bool) -> String {
+        inPrepare && !hasResult ? "" : name
+    }
+
+    var displayedResultName: String {
+        showsACOMRegionReference
+            ? "Select ACOM region · real-space reference"
+            : currentResultDisplayName
+    }
+
+    var displayedResultKind: String {
+        showsACOMRegionReference ? "acom_region_reference" : currentResultKind
+    }
+
+    var displayedResultValueUnits: String {
+        showsACOMRegionReference ? "intensity" : currentResultValueUnits
+    }
+
+    var displayedResultColormap: ColormapKind {
+        showsACOMRegionReference ? .viridis : resultPresentation.resultColormap
+    }
+
+    var displayedResultRangeLo: Float {
+        showsACOMRegionReference ? 0 : resultPresentation.displayRangeLo
+    }
+
+    var displayedResultRangeHi: Float {
+        showsACOMRegionReference ? 1 : resultPresentation.displayRangeHi
+    }
+
+    var displayedResultGamma: Float {
+        showsACOMRegionReference ? 1 : resultPresentation.resultGamma
+    }
+
+    var displayedResultVersion: Int {
+        Self.displayedResultVersion(
+            regionReference: showsACOMRegionReference,
+            scanNavigation: scanNavigationVersion,
+            result: resultPresentation.resultVersion)
+    }
+
+    /// Both counters are small and independent, and both feed ONE
+    /// `MetalImageView` (which skips the texture upload when the version it is
+    /// given is unchanged). Toggling the region reference with equal counters
+    /// would have kept the previous texture on screen, so the reference's
+    /// counter is salted into its own range, as the quality-field mode already
+    /// does with `0x4000_0000` (review 2026-10-07, F3).
+    nonisolated static let regionReferenceVersionSalt = 0x2000_0000
+
+    nonisolated static func displayedResultVersion(
+        regionReference: Bool, scanNavigation: Int, result: Int
+    ) -> Int {
+        regionReference ? scanNavigation &+ regionReferenceVersionSalt : result
+    }
+
+    var displayedResultPixelMetadata:
+        (row: Double?, column: Double?, units: String?, provenance: [String: String]) {
+        if showsACOMRegionReference {
+            return (
+                calibrationSession.calibration.rPixelSize, calibrationSession.calibration.rPixelSize,
+                calibrationSession.calibration.rPixelUnits, ["display_role": "acom_region_reference"]
+            )
+        }
+        return currentResultPersistenceMetadata
+    }
+
+    /// The only semantic source used by result viewers and comparison/export
+    /// workflows.
+    var displayedProduct: DisplayedProduct? {
+        if showsACOMRegionReference, let image = scanNavigationImage {
+            return DisplayedProduct(
+                kind: "acom_region_reference",
+                displayName: "Select ACOM region · real-space reference",
+                payload: .scalar(image), domain: .scan,
+                sampling: ProductSampling(
+                    row: calibrationSession.calibration.rPixelSize, column: calibrationSession.calibration.rPixelSize,
+                    units: calibrationSession.calibration.rPixelUnits
+                ),
+                valueUnits: "intensity", quantitativeStatus: .relative,
+                provenance: ["display_role": "acom_region_reference"]
+            )
+        }
+        // Every analysis publishes its product at its compute site. The
+        // legacy assembly that once served unmigrated analyses was
+        // unreachable (it read `resultImage`/`resultRGBA`, which derive from
+        // `product`) and was removed 2026-09-28 (clean-up audit row 1).
+        return resultPresentation.product
+    }
+
+    var activeResultDomain: ProductDomain {
+        switch navigation.analysisMode {
+        case .disks: .detector
+        case .ptychography, .singleslicePtychography: .reconstruction
+        case .virtualDetector, .dpc, .strain, .acom, .diffractionGroups, .phaseMapping: .scan
+        }
+    }
+
+    func quantitativeStatus(for kind: String, units: String)
+        -> ProductQuantitativeStatus {
+        if kind.hasPrefix("acom_") {
+            return acomSession.lastRunSemantics?.productStatus(for: kind) ?? .exploratory
+        }
+        if kind == "dpc_color" || kind.contains("ipf") { return .categorical }
+        // DPC without the detector's calibration is in detector pixels: the room itself says "qualitative units", and the
+        // map beside it wore the green "Quantitative" badge. The badge follows the units the run used.
+        if kind.hasPrefix("dpc"), units.hasPrefix("detector_px") { return .relative }
+        if kind == "idpc_qualitative" || units.contains("intensity")
+            || units.contains("arbitrary") || units.contains("log_") {
+            return .relative
+        }
+        // Only named families are quantitative. An unknown kind — a future
+        // writer, a foreign sidecar — must not inherit the strongest claim
+        // (v2.5 step 3, negative control 2; docs/v2.5-plan.md §9e).
+        let quantitativeFamilies = ["strain", "local_lattice", "dpc", "idpc",
+                                    "virtual_detector", "disk_detection", "matched_template"]
+        if quantitativeFamilies.contains(where: { kind == $0 || kind.hasPrefix($0 + "_") }) {
+            return .quantitative
+        }
+        return .relative
+    }
+
+    /// The quality field currently shown instead of the scientific map, when
+    /// inspection is on and the displayed product carries one.
+    var displayedQualityField: ProductQualityField? {
+        resultPresentation.qualityField(for: displayedProduct)
+    }
+
+    var selectedEulerText: String? {
+        acomSession.orientationMap?.eulerText(x: selectedScan.x, y: selectedScan.y)
+    }
+
+    /// Whether the real-space ROI must be drawn on the scan image: simply
+    /// "is an ROI in force", because `displayedPattern` substitutes the
+    /// ROI-summed pattern for the current one whenever
+    /// `realSpaceShape != .point`, in every task — not just the ones that
+    /// nominally use a region. A rule scoped to only those tasks (virtual
+    /// detector, strain-from-region, ACOM-from-region) left an ROI invisible
+    /// elsewhere — e.g. Bragg disks and Strain kept showing a summed CBED
+    /// while the scan image drew only a point crosshair — which is not
+    /// cosmetic: the summed pattern is what "Use Current CBED / ROI" builds
+    /// the probe kernel from and what the "Current CBED · N peaks" read-out
+    /// counts, so an invisible ROI silently changed the science.
+    var realSpaceROIIsRelevant: Bool { realSpaceShape != .point }
+
+    /// The explicitly selected complete phase model — never a filename- or
+    /// dataset-derived fallback.
+    var resolvedACOMModel: CrystalModel? {
+        let model: CrystalModel?
+        switch acomSession.modelSelection {
+        case .none:
+            model = nil
+        case .library(let id):
+            model = CrystalModelLibrary.model(id: id)
+        case .customCubic:
+            model = CrystalModelLibrary.customCubic(
+                structure: acomSession.customStructure,
+                latticeA: acomSession.customLatticeA,
+                atomicNumber: acomSession.customZ
+            )
+        case .imported(let id):
+            model = acomSession.importedCrystalModels.first { $0.id == id }
+        }
+        guard let model, model.isUsable, model.supportsOrientationMapping else { return nil }
+        return model
+    }
+
+    var acomScaleSemantics: ACOMScaleSemantics {
+        if let value = calibrationSession.calibration.qPixelSize {
+            let wavelength = calibrationSession.acceleratingVoltage.flatMap {
+                DPC.electronWavelengthAngstrom(voltageKV: $0)
+            }
+            if let physical = CalibrationUnitConversion.reciprocalInvAngstromPerPixel(
+                value: value, units: calibrationSession.calibration.qPixelUnits,
+                wavelengthAngstrom: wavelength
+            ) {
+                return ACOMScaleSemantics(
+                    invAngstromPerPixel: physical,
+                    provenance: ACOMQScaleProvenance(calibrationSession.provenance.qScale)
+                )
+            }
+        }
+        return ACOMScaleSemantics(
+            invAngstromPerPixel: acomSession.exploratoryScale,
+            provenance: .exploratory
+        )
+    }
+
+    var acomScale: Double { acomScaleSemantics.invAngstromPerPixel }
+
+    var acomInterpretationLabel: String {
+        acomScaleSemantics.provenance.isPhysical
+            ? "Physical matching"
+            : "Exploratory matching"
+    }
+
+    /// Presentation-only orientation of the real-space viewer (backlog #17b).
+    /// The retained product, its scan indices, and the scientific bundle are
+    /// unaffected; see `RealSpaceDisplayOrientation` for why quarter turns only
+    /// and why this is never offered for the diffraction pane.
+    var realSpaceDisplayOrientation: RealSpaceDisplayOrientation = .identity
+
+    /// Display-only horizontal mirror, composed after the rotation.
+    var realSpaceDisplayMirrored = false
+
+    /// The comparison's "Same scale" (Results): A and B on one colour range. Here, not in the view, so the agent door sets it
+    /// (#297) and it outlives the comparison view being rebuilt for each new product.
+    var comparisonSameScale = false
+
+    /// The image panes' zooms while they are on screen, lent by the panes (`AgentDoorView.swift`, #297).
+    @ObservationIgnored let paneZooms = AgentPaneZooms()
+
+    /// The orientation as it applies to whatever is on screen right now.
+    /// Identity for anything that is not scan-domain, so a detector-domain
+    /// product shown in the same viewer is never transformed.
+    var effectiveRealSpaceDisplayOrientation: RealSpaceDisplayOrientation {
+        displayedProduct?.domain == .scan ? realSpaceDisplayOrientation : .identity
+    }
+
+    var effectiveRealSpaceDisplayMirrored: Bool {
+        displayedProduct?.domain == .scan ? realSpaceDisplayMirrored : false
+    }
+
+    var realSpaceDisplayIsDefault: Bool {
+        effectiveRealSpaceDisplayOrientation == .identity && !effectiveRealSpaceDisplayMirrored
+    }
+
+    /// Provenance recorded on every export so a rotated figure is never an
+    /// unrecorded one (ROADMAP P1.1). The publication PNG applies the
+    /// orientation; the scientific bundle stays in scan-index order and carries
+    /// these keys as metadata describing what the user was looking at.
+    var realSpaceDisplayProvenance: [String: String] {
+        [
+            "display_rotation_deg":
+                String(Int(effectiveRealSpaceDisplayOrientation.degrees)),
+            "display_flip": effectiveRealSpaceDisplayMirrored ? "horizontal" : "none"
+        ]
+    }
+
+    /// The picker's setter. Distinguishes a human choice from the programmatic
+    /// default below, which `didSet` alone cannot.
+    func selectACOMDisplay(_ mode: ACOMDisplayMode) {
+        acomSession.displayIsUserChosen = true
+        acomSession.display = mode
+    }
+
+    /// py4DSTEM's `plot_orientation_maps` leads with the IPF coloring, and it
+    /// is the map a user following the tutorial came for; Reliability is the
+    /// quality check, one click away. Promoted only when the crystal actually
+    /// has a symmetry to color by — `.identity` has no fundamental zone, so an
+    /// IPF key there would be a fabricated legend.
+    /// Widened from `private` (seam 2, the archived notes):
+    /// `App/AppState+ACOM.swift`'s `runACOM` calls it from outside this file.
+    func promoteIPFZDisplayIfDefault(for map: OrientationMap) {
+        guard !acomSession.displayIsUserChosen,
+              acomSession.display == .reliability,
+              map.symmetry != .identity
+        else { return }
+        acomSession.display = .ipfZ
+    }
+
+    var aperture = Aperture()
+    /// The session's sentence when its stored disks were not taken at open ("Stored disks not used — …"), nil otherwise.
+    /// Kept so the disk requirement can say why; set at every open.
+    var storedDisksNotUsedNote: String?
+
+    // Active pane + real-space region (virtual diffraction).
+    var activePane: ActivePane = .diffraction
+    var realSpaceShape: RegionShape = .point
+    var realSpaceRadius: Float = 6            // scan px half-extent / radius
+    /// Seam 4: the DPC display choice's one
+    /// owner, `dpc.dpcDisplay` (its `didSet` is now `dpc`'s own
+    /// `onDisplayChange` hook, wired in `init()`). Every reader goes there
+    /// directly; there are no forwarding properties.
+    let dpc = DPCProduct()
+    /// CBED and scientific products deliberately own separate color choices.
+    /// A diverging strain map must never recolor the diffraction evidence.
+    /// Draw fit-verification overlays (origin/ellipse, strain lattice,
+    /// matched ACOM template) on the diffraction pane.
+    var showFitOverlay = true
+    var patternColormap: ColormapKind = .viridis {
+        didSet { patternVersion &+= 1 }
+    }
+    var patternScaleUnit: PatternScaleUnit = .reciprocal
+    /// mrad labelling needs both a physical Q calibration and the voltage.
+    var patternScaleMradAvailable: Bool { dpcMilliradiansPerDetectorPixel != nil }
+    var logScale = true {
+        didSet { patternVersion &+= 1 }
+    }
+    /// Display contrast window for the diffraction pane. Kept independent of
+    /// the real-space result window so adjusting a CBED never changes a map.
+    var patternDisplayRangeLo: Float = 0
+    var patternDisplayRangeHi: Float = 1
+    var patternGamma: Float = 1
+    /// Navigation/selection seam (S22c): workspace, task and pane visibility
+    /// live on `navigation`; the recovery persist that the old `navigation.analysisMode`
+    /// didSet performed is wired through `navigation.onModeChange` in `init`.
+    let navigation = WorkspaceNavigation()
+    /// Owner: `SpectroscopySession` (v5.0 WP2) — the spectrum image and the room's state; a window's second
+    /// document, beside the 4D owners. The rest is in `AppState+Spectroscopy.swift`.
+    let spectroscopy = SpectroscopySession()
+    /// Owner: `EDXSession` (MacEMUI's ShellEDXModel) — the EDS room's spectrum image, picks, regions and fit, the room both apps share;
+    /// its 4D links are `AppState+EDS.swift`.
+    let edx = EDXSession(host: .mac4DSTEM)
+    /// Owner: `EDXRoomState` (MacEMUI's ShellSpectroscopy) — the EDS room's spectrum window, export in flight and display choices.
+    let edxRoom = EDXRoomState()
+    /// Set by the window (`DatasetWindow`): opens a file in a NEW window — see `routesOpenToNewWindow`.
+    @ObservationIgnored var openInNewWindow: ((_ url: URL, _ configure: Bool) -> Void)?
+
+    /// v2.5 step 5b: owned by `OperationCenter`; forwarded for the readers.
+    /// No default expression (unlike most of this file's stored properties):
+    /// its keep-awake closures are wired from `preferences` in `init`, so it
+    /// cannot be built before that resolves. See `OperationCenter`'s own
+    /// header for why the seam lives on `isBusy`'s `didSet` rather than here.
+    let operationCenter: OperationCenter
+    var isBusy: Bool { operationCenter.isBusy }
+    var statusText = "No file loaded" {
+        didSet { activityLog.record(statusText) }
+    }
+    var errorMessage: String?
+    /// Owner: the open (`claimOpen`, mac4DSTEM#303). True from the moment an open is claimed, synchronously on the main actor, until
+    /// it returns: the one-load guard. `datasetSession.isLoading` starts only after the open's first awaits, so two opens (a drop and
+    /// ⌘O, a double Finder open, an agent's open_file) both passed a guard on it alone.
+    private(set) var openInFlight = false
+    /// Owner: the run guard (`AppState+RunGuard.swift`, #313). The question asked before closing the window, opening another file
+    /// or quitting stops a running analysis; nil when none is asked.
+    var pendingRunInterruption: RunInterruption?
+    /// Closes this window without asking again, set by the window (`WindowCloseGuard`); the run guard calls it once confirmed.
+    @ObservationIgnored var closeWindowWithoutAsking: (() -> Void)?
+    /// Why the last compute step failed (`presentComputeFailure`), until the next operation begins: the agent door's
+    /// `operation.error` for a step that failed after it started (mac4DSTEM#266, #323). The person reads it in the status line.
+    var lastComputeFailure: String?
+
+    private(set) var openDatasetRequest = 0
+    private(set) var preprocessingExportRequest = 0
+
+    /// The primary "Open Dataset…" gesture (⌘O, the sidebar's default
+    /// button). `requestOpenDatasetWithOptions` below is always explicit —
+    /// its own separate menu item/button — so `preferences.openBehaviour`
+    /// only decides what THIS shared action does; it can never make the
+    /// explicit "Open with Options…" action skip the configurator.
+    func requestOpenDataset() {
+        configureOnOpen = preferences.openBehaviour == .options
+        openDatasetRequest &+= 1
+    }
+
+    /// Open the picker, then stop at L5's configurator instead of loading.
+    /// Separate from `requestOpenDataset` rather than a parameter on it, so the
+    /// plain path cannot acquire the configurator by accident.
+    func requestOpenDatasetWithOptions() {
+        configureOnOpen = true
+        openDatasetRequest &+= 1
+    }
+    func requestPreprocessingExport() { preprocessingExportRequest &+= 1 }
+
+    var productWorkflowReadiness: ProductWorkflowReadiness {
+        let readyKinds = Set(calibrationSession.readiness.items.compactMap { item in
+            item.status.isReady ? item.kind : nil
+        })
+        return ProductWorkflowReadiness(
+            hasOriginProbe: readyKinds.contains(.originProbe),
+            hasOrigin: calibrationSession.calibration.originProvenance.readinessProvenance != nil
+                && calibrationSession.calibration.originFitIsSane,
+            hasRotation: readyKinds.contains(.rotation),
+            hasQScale: readyKinds.contains(.qScale),
+            hasRScale: readyKinds.contains(.rScale),
+            hasVoltage: calibrationSession.hasUsableVoltage,
+            hasValidDiskDetectionSettings: diskDetectionConfigurationIsValid,
+            hasBraggVectors: hasCurrentBraggVectors,
+            hasACOMMaterial: acomSession.modelSelection != .none,
+            hasSupportedACOMMaterial: resolvedACOMModel != nil,
+            hasPhysicalACOMScale: acomScaleSemantics.provenance.isPhysical,
+            wantsLearnedDetector: learnedDetection.detectorClass == .learned,
+            hasLearnedDetectorAsset: LearnedDiskDetector.bundledAssetURL() != nil,
+            phaseListRefusal: phaseMapping.runRefusal,
+            disksNotUsableReason: Self.disksNotUsableReason(
+                hasDisks: resultPresentation.braggVectors != nil, settingsAreStale: diskDetectionSettingsAreStale,
+                storedDisksNote: storedDisksNotUsedNote)
+        )
+    }
+
+    // `recordedReplayStep(for:)` — which run a task's product is judged by — is
+    // lineage logic and lives in `AppState+Lineage.swift`.
+
+    /// A kind with no settings signature (phase mapping, groups) is judged by the lineage path
+    /// (`lineagePathOnlySignature`); `currentReplaySignature` (AppState+Lineage) adds calibration.
+    func settingsReplaySignature(for mode: AnalysisMode) -> [String: String]? {
+        if let pathOnly = lineagePathOnlySignature(for: mode) { return pathOnly }
+        let acomSignature = ReplayStepPlan.ACOMReplayPlan.currentSignatureIfResolved(
+            model: resolvedACOMModel, scale: acomScaleSemantics.invAngstromPerPixel,
+            backend: acomSession.effectiveBackend.rawValue, scope: acomSession.scope, quality: acomSession.quality,
+            refinesInPlaneAngle: acomSession.refinesInPlaneAngle)
+        return ProductWorkflow.currentReplaySignature(for: mode, virtualDetectorShape: resultPresentation.virtualShape.rawValue, aperture: aperture,
+            dpcOriginReference: calibrationSession.calibration.hasFittedOrigin ? "calibrated origins" : "global center", diskKernel: probeKernel,
+            diskParams: diskDetection.diskParams, learnedDetectorParameters: learnedDetection.replayParameters(for: learnedDetection.detectorClass),
+            strainSignature: strain.currentReplaySignature, acomSignature: acomSignature,
+            diskPeaksProvenance: resultPresentation.braggVectors?.detectionProvenance,
+            ptychographySettings: ptychography.replaySettings,
+            parallaxSignature: phaseContrast.parallaxCurrentSignature)
+    }
+
+    // The result-value cache moved to `resultPresentation` with the result
+    // controls. The diffraction cache stays here with the CBED state.
+    @ObservationIgnored private var patternValueRangeCache:
+        (version: Int, log: Bool, low: Double, high: Double)?
+
+    /// Raw-value endpoints currently assigned to the scalar result colorbar.
+    var resultDisplayedValueRange: (low: Double, high: Double)? {
+        resultPresentation.displayedValueRange(
+            image: displayedResultImage,
+            version: displayedResultVersion,
+            regionReference: showsACOMRegionReference,
+            colormap: displayedResultColormap,
+            rangeLo: displayedResultRangeLo,
+            rangeHi: displayedResultRangeHi
+        )
+    }
+
+    /// Raw-value endpoints of the quality field currently being inspected, for
+    /// its colorbar. `nil` when no quality field is being inspected.
+    var displayedQualityValueRange: (low: Double, high: Double)? {
+        guard let field = displayedQualityField else { return nil }
+        let (low, high) = field.image.minMax
+        return (Double(low), Double(high))
+    }
+
+    /// Raw intensity endpoints currently assigned to the CBED colorbar. When
+    /// log display is active, transform-space clipping is inverted back to
+    /// intensity so the labels remain physically interpretable.
+    var patternDisplayedValueRange: (low: Double, high: Double)? {
+        guard let pattern = displayedPattern else { return nil }
+        let low: Double
+        let high: Double
+        if let c = patternValueRangeCache, c.version == patternVersion,
+           c.log == logScale {
+            low = c.low
+            high = c.high
+        } else {
+            var scanLow = Double.greatestFiniteMagnitude
+            var scanHigh = -Double.greatestFiniteMagnitude
+            for pixel in pattern.pixels where pixel.isFinite {
+                let value = logScale ? log10(1 + Double(max(pixel, 0))) : Double(pixel)
+                scanLow = min(scanLow, value)
+                scanHigh = max(scanHigh, value)
+            }
+            guard scanLow <= scanHigh else { return nil }
+            low = scanLow
+            high = scanHigh
+            patternValueRangeCache = (patternVersion, logScale, low, high)
+        }
+        let span = high - low
+        let clippedLow = low + span * Double(patternDisplayRangeLo)
+        let clippedHigh = low + span * Double(patternDisplayRangeHi)
+        if logScale {
+            return (pow(10, clippedLow) - 1, pow(10, clippedHigh) - 1)
+        }
+        return (clippedLow, clippedHigh)
+    }
+
+    /// Fractional progress [0,1] of the running long operation, or nil when
+    /// idle / indeterminate. Drives the performance panel's progress bar.
+    var progress: Double? {
+        get { operationCenter.progress }
+        set { operationCenter.progress = newValue }
+    }
+    /// Cooperative: it asks, and the load unwinds at its next checkpoint.
+    func cancelDatasetLoad() {
+        guard datasetSession.requestCancellation() else { return }
+        statusText = "Cancelling…"
+    }
+    /// Short label and unit budget for the performance panel.
+    var activeOperation: String? { operationCenter.activeOperation }
+
+    var canCancelActiveOperation: Bool { operationCenter.canCancel }
+
+    func beginCancellableOperation(
+        _ name: String, status: String, totalUnits: Int? = nil
+    )
+        -> AnalysisCancellationToken {
+        // While a promote run replays the recipe, only its own work may become
+        // the operation: `begin` cancels the operation it replaces, so a run the
+        // user started between or during steps cancelled the step and took
+        // Cancel with it. Such a run gets a token already cancelled and unwinds
+        // at its first check, as a cancel; the promote run keeps Cancel.
+        if promoteRunRefusesUserRuns {
+            let refused = AnalysisCancellationToken()
+            refused.cancel()
+            statusText = "\(name) not started — the promote run is replaying the recipe; wait for it, or cancel it first"
+            return refused
+        }
+        let token = operationCenter.begin(name: name, totalUnits: totalUnits)
+        lastComputeFailure = nil
+        statusText = status
+        return token
+    }
+
+    /// Whether a run the user starts now would cut into the promote run: one is
+    /// replaying on this dataset (or reopening for it), and the caller is not
+    /// its own work (`PromoteRunContext`). Entry points with side effects before
+    /// `beginCancellableOperation` ask it first.
+    var promoteRunRefusesUserRuns: Bool {
+        guard replayRun.isRunning, !PromoteRunContext.isPromoteRun else { return false }
+        return promoteRunEpoch.map { $0 == datasetSession.epoch } ?? true
+    }
+
+    func finishCancellableOperation(_ token: AnalysisCancellationToken) {
+        operationCenter.finish(token)
+    }
+
+    func activeOperationMetrics(at now: Date = Date())
+        -> AnalysisOperationMetrics? {
+        operationCenter.metrics(at: now)
+    }
+
+    /// Cross-file operation helpers keep extensions from reaching into the
+    /// token identity itself while still rejecting late progress/status work.
+    func isCurrentOperation(_ token: AnalysisCancellationToken) -> Bool {
+        operationCenter.isCurrent(token)
+    }
+
+    func updateCancellableOperation(
+        _ token: AnalysisCancellationToken, progress fraction: Double, status: String
+    ) {
+        guard operationCenter.update(token, progress: fraction) else { return }
+        showReadout(status)   // progress is a readout; see ActivityLog.record
+        // While the dataset is still opening, this operation IS the load: mirror
+        // its measured progress into the welcome card rather than leaving that
+        // card parked on its last named stage while work is visibly happening.
+        if datasetSession.isLoading {
+            datasetSession.mirrorOperationProgress(progress, status)
+        }
+    }
+
+    func cancelActiveOperation() {
+        guard let name = operationCenter.cancel() else { return }
+        statusText = "Cancelling \(name)…"
+    }
+
+    // The result normalization caches moved to `resultPresentation`; the CBED
+    // cache stays here with the diffraction-pattern state.
+    @ObservationIgnored private var patternNormCache: (version: Int, log: Bool, pixels: [Float])?
+
+    /// Display-normalized pixels of `displayedPattern`, cached per patternVersion.
+    func normalizedPatternPixels() -> [Float] {
+        guard let pattern = displayedPattern else { return [] }
+        if let c = patternNormCache, c.version == patternVersion, c.log == logScale {
+            return c.pixels
+        }
+        let pixels = pattern.normalized(useLog: logScale)
+        patternNormCache = (patternVersion, logScale, pixels)
+        return pixels
+    }
+
+    /// Display-normalized pixels of the active analysis canvas, cached per
+    /// scientific-result or region-reference version.
+    func normalizedResultPixels() -> [Float] {
+        resultPresentation.normalizedResultPixels(
+            image: displayedResultImage,
+            version: displayedResultVersion,
+            regionReference: showsACOMRegionReference,
+            colormap: displayedResultColormap
+        )
+    }
+
+    /// Display-normalized pixels of the quality field currently being
+    /// inspected, cached per (result version, field name) — mirrors
+    /// `normalizedResultPixels()`.
+    func normalizedQualityPixels() -> [Float] {
+        resultPresentation.normalizedQualityPixels(
+            field: displayedQualityField, version: displayedResultVersion
+        )
+    }
+
+    /// True when the displayed scalar result contains masked (no-data) pixels,
+    /// which render as neutral gray. Drives the colorbar's masked swatch.
+    func displayedResultHasMaskedPixels() -> Bool {
+        resultPresentation.displayedResultHasMaskedPixels(
+            image: displayedResultImage,
+            version: displayedResultVersion,
+            regionReference: showsACOMRegionReference,
+            colormap: displayedResultColormap
+        )
+    }
+
+    var displayedPattern: DiffractionPattern? {
+        // A real-space region ROI drives the CBED with the summed pattern —
+        // but only in Current mode (R20, owner 2026-09-01): Mean and Max are
+        // whole-scan statistics, and a region sum silently replacing them
+        // while their tab stayed selected was wrong. Point already behaved
+        // this way; Rectangle/Circle now match it.
+        if patternDisplayMode == .current,
+           realSpaceShape != .point, let vd = resultPresentation.virtualDiffractionPattern { return vd }
+        switch patternDisplayMode {
+        case .current: return currentPattern
+        case .mean: return meanPattern ?? currentPattern
+        case .max: return maxPattern ?? currentPattern
+        }
+    }
+
+    var patternMinMax: (Float, Float)? { displayedPattern?.minMax }
+
+    var hasDataset: Bool { descriptor?.is4D == true }
+
+    /// Narrow handoff used by the export workflow without exposing the mutable
+    /// reader slot to views. The returned value is an actor and remains safe to
+    /// use from the detached preprocessing task.
+    func currentDataSourceForExport() -> (any FourDDataSource)? { datasetSession.reader }
+
+    func changeMode(_ mode: AnalysisMode) {
+        // v2.5 step 3c: the published product survives a task switch on its
+        // own; the navigation relabel cache that used to live here is gone.
+        navigation.analysisMode = mode
+        navigation.workspaceArea = mode.workspaceArea
+        presentProductForEnteredMode(mode)   // owner card S5 (2): no stale map before a mode's first run
+        if mode == .acom, acomSession.scope == .selectedRegion {
+            acomSession.regionSelectionActive = true
+            Task { await ensureScanNavigator() }
+        }
+    }
+
+    /// Navigate at the product level without starting scientific work. Whole-
+    /// scan operations are always launched from an explicit action in their
+    /// task panel, so moving around the app is immediate and side-effect free.
+    func selectWorkspace(_ area: WorkspaceArea) {
+        guard !isWorkspaceWithheld(area) else { return }   // a 4D room in a spectrum-only window
+        navigation.workspaceArea = area
+        if let preferred = area.defaultAnalysisMode,
+           !area.analysisModes.contains(navigation.analysisMode) {
+            changeMode(preferred)
+        } else if !area.analysisModes.isEmpty {
+            // The current task already belongs to the destination (menu Go to <room>, the shortcuts),
+            // so `changeMode` did not run: present the room's own result here, as it would
+            // (polish lane R). Idempotent by design — an own product on screen is left alone.
+            presentProductForEnteredMode(navigation.analysisMode)
+        }
+    }
+
+    /// Review e6: whether the current room has a primary task at all — the
+    /// same cases in which the toolbar (`WorkspaceView.primaryActionTitle`)
+    /// shows a verb, and the same branches `runPrimaryWorkspaceTask` acts on.
+    var hasPrimaryWorkspaceTask: Bool {
+        switch navigation.workspaceArea {
+        case .prepare:
+            return !calibrationSession.calibration.hasFittedOrigin
+                || !calibrationSession.calibration.hasRotation
+        case .image, .braggDisks:
+            return true
+        case .map:
+            return [.strain, .acom, .phaseMapping].contains(navigation.analysisMode)
+        case .reconstruct:
+            if navigation.analysisMode == .dpc || navigation.analysisMode == .singleslicePtychography {
+                return true
+            }
+            return phaseContrast.parallaxPreprocess == nil
+                || phaseContrast.parallaxAlignment?.isComplete != true
+                || phaseContrast.parallaxHigherOrderFit == nil
+                || phaseContrast.parallaxCorrection == nil
+                || !parallaxStage4IsComplete(phaseContrast)
+        case .spectroscopy:   // Quantify (v5.0 R3)
+            return hasSpectrumImage
+        case .results:
+            return false
+        }
+    }
+
+    /// Review e6: the ONE answer to "may the primary task run now" that the
+    /// Analysis › Run Current Task menu item (⌘R) binds to — a verb exists,
+    /// the dataset is open, nothing is running, and (outside Prepare and
+    /// Results, as in the toolbar) `ProductWorkflow.readiness` says ready.
+    var canRunPrimaryWorkspaceTask: Bool {
+        // The Spectroscopy room's Quantify runs on a spectrum image alone, with no 4D cube and no readiness check.
+        if navigation.workspaceArea == .spectroscopy { return hasSpectrumImage && !isBusy && !edx.isBusy && edx.canQuantify }
+        guard hasDataset, !isBusy, hasPrimaryWorkspaceTask else { return false }
+        if navigation.workspaceArea != .prepare && navigation.workspaceArea != .results {
+            guard case .ready = ProductWorkflow.readiness(
+                for: navigation.analysisMode, readiness: productWorkflowReadiness
+            ) else { return false }
+        }
+        return true
+    }
+
+    /// The prominent, user-facing action for the current workspace. This is
+    /// intentionally separate from `runCurrentAnalysis`, whose legacy contract
+    /// only refreshes lightweight/cached views for some modes. A run that
+    /// returns `.failed(reason)` puts the reason in `statusText` (review e6:
+    /// phase mapping's refusals were returned and never shown).
+    func runPrimaryWorkspaceTask() async {
+        var outcome: AnalysisRunOutcome?
+        let statusBefore = statusText   // a run that reported its own failure (presentComputeFailure) keeps its richer line
+        switch navigation.workspaceArea {
+        case .prepare:
+            if !calibrationSession.calibration.hasFittedOrigin {
+                await calibrateOrigin()
+            } else if !calibrationSession.calibration.hasRotation {
+                await calibrateRotation()
+            }
+        case .image:
+            // Compute Image (owner 2026-10-07, "yes compute image should be back!"): the full-detector pass, recorded as a step.
+            if navigation.analysisMode == .diffractionGroups {
+                outcome = await runDiffractionGroups()
+            } else {
+                outcome = await runVirtualDetector()
+            }
+        case .braggDisks:
+            outcome = await runDiskDetection()
+        case .map:
+            switch navigation.analysisMode {
+            case .strain: outcome = await runStrainMapping()
+            case .acom: outcome = await runACOM()
+            case .phaseMapping: outcome = await runPhaseMapping()
+            default: break
+            }
+        case .reconstruct:
+            if navigation.analysisMode == .dpc {
+                await runCurrentAnalysis()
+            } else if navigation.analysisMode == .singleslicePtychography {
+                outcome = await runSingleslicePtychography()   // v2.5 step 7a: its own task
+            } else if phaseContrast.parallaxPreprocess == nil {
+                outcome = await prepareParallaxPreview()
+            } else if phaseContrast.parallaxAlignment?.isComplete != true {
+                outcome = await alignParallaxNextLevel()
+            } else if phaseContrast.parallaxHigherOrderFit == nil {
+                outcome = fitParallaxAberrations()
+            } else if phaseContrast.parallaxCorrection == nil {
+                outcome = await correctParallaxPhase()
+            } else if !parallaxStage4IsComplete(phaseContrast) {
+                outcome = await upsampleParallaxBF()
+            }
+        case .spectroscopy:
+            // Quantify: fit the selected region and record the step (ADR 054 item 8); the fit is live after this.
+            await quantifyEDS()
+        case .results:
+            break
+        }
+        if case .failed(let reason)? = outcome, statusText == statusBefore { statusText = reason }
+    }
+
+    /// One load at a time: the bundled HDF5 is not thread-safe (`OneLoadGuardTests`).
+    func openFile(url: URL) {
+        if routesOpenToNewWindow(url, configure: false) { return }   // a spectrum-only window (v5.0 WP2)
+        // Every open path funnels here (menus, toolbar, welcome, sidebar, Recents, Finder); opening would cancel an
+        // in-flight sidecar save unwritten (review 2026-10-02 c4).
+        if isBusy, SessionSidecarLocator.isSaveInFlight(activeOperation) {
+            statusText = "Still saving the session file — open \(url.lastPathComponent) when the save finishes"; return
+        }
+        if askBeforeInterruptingRun(.open(url, configure: false)) { return }   // a running analysis is asked about first (#313)
+        guard claimOpen() else { return }
+        Task { await openFileAsync(url: url, claimed: true) }
+    }
+
+    /// The one-load guard (mac4DSTEM#303): claims this window's open now, synchronously, or refuses with the sentence when an open
+    /// is already claimed or loading. Every open claims here before its first await; the open releases the claim when it returns.
+    func claimOpen() -> Bool {
+        guard !openInFlight, !datasetSession.isLoading else {
+            statusText = "Already opening a dataset — wait for that one to finish, or cancel it."
+            return false
+        }
+        openInFlight = true
+        return true
+    }
+
+    /// Releases the claim `claimOpen` took (the open returned, whatever its outcome).
+    func releaseOpenClaim() { openInFlight = false }
+
+    /// The load specification a previous session recorded for this file, if any.
+    /// Read BEFORE the load, because it decides what gets read. Reopening a
+    /// session reopens the **source** file and re-applies the specification to
+    /// it — it never re-derives from reduced data, which is the property that
+    /// makes a crop a view rather than a new dataset.
+    /// A specification that no longer fits the file — the dataset was replaced,
+    /// or a sidecar was copied next to a different cube — is dropped rather than
+    /// clamped, with the reason said out loud. Loading a *different* region than
+    /// the session recorded, silently, is the failure this guards.
+    /// Internal rather than private so `SessionSidecarLocatorTests` can drive the
+    /// WIRING, not just the pure decision. Gate D showed that reverting this
+    /// function's URL derivation to the pre-S1 form — the literal defect S1
+    /// exists to fix — left the whole suite green, because every test addressed
+    /// the locator and none addressed the call site. // v2 S1
+    func recordedLoadSpecification(
+        forSourcePath path: String, source: DatasetDescriptor
+    ) async -> LoadSpecification? {
+        // THROUGH THE SEAM, not around it. This call site used to derive the
+        // sidecar path itself and never consult the security-scoped bookmark, so
+        // a companion the app *had* been granted access to was readable for
+        // results and calibration and unreadable for the crop that produced
+        // them. // v2 S1
+        // Existence is checked AT the url we are about to read, not by a second
+        // independent derivation. Gate D's mutation of this line was invisible
+        // while the guard re-derived the path on its own: the call site could
+        // read one file and test another. // v2 S1
+        // NOT `try?`. A refused read and "this session recorded no crop" are
+        // different facts, and collapsing them is what made this defect quiet:
+        // the sidecar says the session was a cropped view, the read is refused,
+        // nil comes back, and the dataset opens at FULL EXTENT without a word.
+        // Right numbers, wrong extent. Measured cause is EPERM from the sandbox
+        // (docs/open-items.md, 2026-08-19), which no amount of retrying fixes —
+        // so it is said out loud instead. // v2 S1
+        guard let session = await readSession(forSourcePath: path) else { return nil }
+        let url = session.url
+        let read = session.read.map(\.loadSpecification)
+
+        let specification: LoadSpecification
+        switch SessionSidecarLocator.recordedOutcome(
+            from: read, sidecar: url.lastPathComponent
+        ) {
+        case .noneRecorded:
+            return nil
+        case .unreadable(let message):
+            // The LOCATOR, not `statusText`. Gate D measured that `statusText`
+            // set here is overwritten three lines later by `activate`'s
+            // `beginDatasetLoadingStage`, and again by the preview and whole-cube
+            // passes — so the first version of this reported the refusal into a
+            // channel the user could never read it from. // v2 S1
+            sessionSidecar.noteUnreadable(message)
+            // Loading proceeds at full extent, so from here on a sidecar
+            // rewrite would erase the crop this session never restored and
+            // relabel its results — refused until the dataset is reopened
+            // with the recorded view restored (S5 finding F9). // v2 S7
+            gates.noteSidecarRestoreFailed(.unreadable, message: message)
+            statusText = message
+            return nil
+        case .recorded(let recorded):
+            specification = recorded
+        }
+        guard (try? LoadView(source: source, specification: specification)) != nil else {
+            let message = "The saved session describes a region this file does not have; loading it whole."
+            // The gate, not only `statusText` — the sibling branch above
+            // learned in S1 that `statusText` set here is overwritten before
+            // anyone can read it, and this branch had kept exactly that
+            // defect. The inspector renders the gate's failure. // v2 S7
+            gates.noteSidecarRestoreFailed(.doesNotFit, message: message)
+            statusText = message
+            return nil
+        }
+        return specification
+    }
+
+    /// Reads the session of the source at `path` from where the locator says it is; nil when no file is there. A
+    /// sidecar stamped for another source (`scan.h5`'s `scan.mac4dstem.h5`, with `scan.dm4` being opened) is left
+    /// alone: this source's session moves to its own name (`SessionSidecarLocator.keepApart`), the log says so, and
+    /// that file is read instead when it exists. Both open-path reads go through here, so they agree on the file.
+    func readSession(forSourcePath path: String) async -> (url: URL, read: Result<SessionSidecarSnapshot, Error>)? {
+        var url = sessionSidecar.location(forSourcePath: path)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        var read = await Self.loadSession(from: url, forSourcePath: path)
+        if case .failure(let error) = read,
+           case BraggVectorEMDWriter.WriterError.belongsToAnotherSource(let sentence) = error,
+           sessionSidecar.keepApart(forSourcePath: path, from: url) {
+            url = sessionSidecar.location(forSourcePath: path)
+            activityLog.record("\(sentence) This dataset's session is kept in \(url.lastPathComponent).")
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            read = await Self.loadSession(from: url, forSourcePath: path)
+        }
+        return (url, read)
+    }
+
+    private nonisolated static func loadSession(
+        from url: URL, forSourcePath path: String
+    ) async -> Result<SessionSidecarSnapshot, Error> {
+        await Task.detached(priority: .utility) { () -> Result<SessionSidecarSnapshot, Error> in
+            do { return .success(try BraggVectorEMDWriter.loadSession(from: url, forSourcePath: path)) }
+            catch { return .failure(error) }
+        }.value
+    }
+
+    /// The load specification recorded by the session sidecar for the open
+    /// dataset, if any. Compared against `loadedView.specification` so a
+    /// restored result computed on a different view can be labelled as such.
+    var sessionLoadSpecification: LoadSpecification?
+
+    /// Which destination the next file-importer result goes to.
+    var configureOnOpen = false
+
+    /// Skip a session sidecar for exactly one reopen of this dataset identity.
+    var ignoreSessionForDatasetID: String?
+
+    /// Fitted origin maps displaced by a manual aperture-center drag, with the
+    /// fit's own lineage parameters (a manual record can collapse into the fit's
+    /// node in place, so Restore re-records the fit from these).
+    @ObservationIgnored var supersededFittedOrigin:
+        (maps: OriginMaps, provenance: OriginProvenance, lineage: [String: String]?)?
+    var canRestoreFittedOrigin = false
+
+    // MARK: - Calibration and phase contrast: AppState+Calibration.swift, AppState+PhaseContrast.swift
+
+    // MARK: - DPC: run + display derivation in AppState+DPC.swift, display
+    // choice in Session/DPCProduct.swift (seam 4). What
+    // stays here (`dpcMilliradiansPerDetectorPixel`, `idpcOriginFitRefusal`,
+    // `idpcPhysicalCalibration`) are combiners over `calibrationSession`/
+    // `gates` with no dependency on `dpc`'s own state — see
+    // `Session/DPCProduct.swift`'s header for why the plan's "Moves" naming
+    // of `dpcMilliradiansPerDetectorPixel` was corrected.
+    //
+    // Deleted (moved verbatim to `App/AppState+DPC.swift`; diffed against
+    // the pre-seam file — identical apart from `dpcDisplay` →
+    // `dpc.dpcDisplay`): `runDPC(replaying:)`, `flipRotation180()`,
+    // `applyDPCDisplay() -> String?`.
+
+    var dpcMilliradiansPerDetectorPixel: Float? {
+        guard let qSize = calibrationSession.calibration.qPixelSize,
+              qSize.isFinite, qSize > 0 else { return nil }
+        if CalibrationUnitConversion.normalized(calibrationSession.calibration.qPixelUnits) == "mrad" {
+            return Float(qSize)
+        }
+        guard let invAngstrom =
+                CalibrationUnitConversion.reciprocalInvAngstromPerPixel(
+                    value: qSize, units: calibrationSession.calibration.qPixelUnits
+                ) else { return nil }
+        guard let voltageKV = calibrationSession.acceleratingVoltage else { return nil }
+        return DPC.milliradiansPerDetectorPixel(
+            voltageKV: voltageKV, invAngstromPerPixel: invAngstrom
+        )
+    }
+
+    /// Why physical iDPC specifically REFUSES the fitted origin, or nil.
+    /// Distinct from "not yet calibrated" (missing origin, rotation or pixel
+    /// sizes — the generic requirements note in the DPC controls): this is
+    /// non-nil only when an origin fit EXISTS and the gate judges it
+    /// non-quantitative, so the controls can say the true reason instead of
+    /// listing requirements that are all met. // v2 S7
+    /// Same JUDGEMENT as the gate (non-nil exactly when
+    /// `gates.originQuantitativeRefusal` is), but with iDPC's own remedy:
+    /// the Q-surface's "or enter the scale manually" cannot move this
+    /// residual and so cannot bring physical iDPC back — a remedy that does
+    /// nothing where it is printed (Gate B, 2026-08-25).
+    var idpcOriginFitRefusal: String? {
+        let calibration = calibrationSession.calibration
+        return calibration.originFitJudgement.map {
+            // Under a beam stop the remedy is the Friedel method or a manual origin, never a re-fit.
+            if !calibration.originBeamStopIsAcceptable { return $0 + " " + calibration.beamStopRemedy(manualQ: false) }
+            if calibration.originResidualIsAcceptable, !calibration.originFriedelResidualIsAcceptable {
+                return $0 + " " + DSTEMCore.Calibration.friedelRunRemedy(manualQ: false)
+            }
+            // The window pull is a biased measurement, the same for every fit function and every re-run (2026-10-31).
+            return calibration.originWindowPullIsAcceptable
+                ? $0 + " Try another Origin fit (Constant / Plane / Parabola) and re-run Calibrate Origin."
+                : $0 + " Changing the Origin fit function or re-running Calibrate Origin gives the same origins."
+        }
+    }
+
+    var idpcPhysicalCalibration: IDPCPhysicalCalibration? {
+        // A scale alone is insufficient: quantitative integration also needs
+        // per-position descan correction and a detector field rotated into the
+        // scan frame.
+        guard calibrationSession.calibration.hasFittedOrigin, calibrationSession.calibration.hasRotation else { return nil }
+        // The SAME gate Q calibration takes, asked through the same owner
+        // (`SessionGates`, S7's seam). This call site used to derive the
+        // policy from `hasFittedOrigin` alone, so an origin fit whose RMS
+        // residual exceeded the probe radius — refused for a Q measurement —
+        // was still admitted into "iDPC projected phase (rad)". A fit the
+        // gate refuses renders qualitative iDPC instead, with the refusal
+        // shown by the DPC controls (`idpcOriginFitRefusal`). // v2 S7
+        guard gates.originQuantitativeRefusal(for: calibrationSession.calibration) == nil else {
+            return nil
+        }
+        return DPC.physicalIDPCCalibration(
+            realPixelSize: calibrationSession.calibration.rPixelSize,
+            realPixelUnits: calibrationSession.calibration.rPixelUnits,
+            reciprocalPixelSize: calibrationSession.calibration.qPixelSize,
+            reciprocalPixelUnits: calibrationSession.calibration.qPixelUnits,
+            voltageKV: calibrationSession.acceleratingVoltage
+        )
+    }
+
+    /// A whole-scan product computed earlier this session and still retained,
+    /// so it can be brought back to the viewer without recomputing it.
+    enum ComputedProduct: String, CaseIterable, Identifiable, Sendable {
+        case strain, orientation
+        var id: String { rawValue }
+        var displayName: String {
+            switch self {
+            case .strain: "Strain map"
+            case .orientation: "Orientation map"
+            }
+        }
+    }
+
+    /// Bring a retained product back to the viewer.
+    /// Deliberately an **explicit action**, not a side effect of `changeMode`:
+    /// navigating between tasks must never silently relabel the visible
+    /// result, which `testNavigationDoesNotRelabelTheVisibleScientificResult`
+    /// pins. The navigation/restored overrides are cleared first, because the
+    /// user is now asking for a specific product rather than carrying the
+    /// previous one along.
+
+    // MARK: - Fit-verification overlays (diffraction pane)
+
+    /// A value over a snapshot (`Session/FitOverlayPresentation.swift`, C5's
+    /// first extraction): gating and the reopen boundary are pinned there.
+    var fitOverlays: FitOverlayPresentation {
+        FitOverlayPresentation(
+            enabled: showFitOverlay,
+            analysis: navigation.analysisMode == .strain ? .strain
+                : navigation.analysisMode == .acom ? .acom : .other,
+            inPrepare: navigation.workspaceArea == .prepare,
+            showsCurrentPattern: patternDisplayMode == .current,
+            pointSelection: realSpaceShape == .point,
+            descriptor: descriptor, selectedX: selectedScan.x, selectedY: selectedScan.y,
+            calibration: calibrationSession.calibration,
+            ellipseFit: calibrationSession.lastEllipseFit,
+            braggVectors: resultPresentation.braggVectors, strainMap: strain.map,
+            orientationPlan: acomSession.orientationPlan,
+            orientationMap: acomSession.orientationMap,
+            hasOrientationMap: acomSession.hasOrientationMap,
+            // The scale the map was matched at: a Q edit keeps a stale map, and its
+            // templates must not be redrawn at a scale they were never matched at.
+            invAngstromPerPixel: acomSession.lastRunSemantics?.scale.invAngstromPerPixel ?? acomScale
+        )
+    }
+
+    /// Remembered per (scan shape, origin validity mask): the mask walk is
+    /// O(scan), and the real-space pane reads the overlay on every zoom or
+    /// hover tick (review 2026-10-07, F1).
+    let originTrimCache = OriginTrimOverlayCache()
+
+    /// `fitOverlays.originTrim` — same gate (the Fit overlay toggle, Prepare, a
+    /// descriptor), same overlay — but computed once per input change rather
+    /// than once per read.
+    var originTrimOverlay: FitOverlays.OriginTrimOverlay? {
+        guard showFitOverlay, navigation.workspaceArea == .prepare,
+              let d = descriptor else { return nil }
+        return originTrimCache.overlay(
+            origins: calibrationSession.calibration.origin, scanWidth: d.rx, scanHeight: d.ry)
+    }
+
+    /// The object table's outline for the scan pane, remembered per
+    /// (classification run, selected ids); the outline is O(selected pixels)
+    /// and was rebuilt on every body.
+    @ObservationIgnored private let highlightOutlineCache =
+        LastValueCache<HighlightOutlineKey, [PrecipitateHighlight.Edge]>()
+    var highlightOutlineComputeCount: Int { highlightOutlineCache.computeCount }
+
+    private struct HighlightOutlineKey: Equatable {
+        var source: UUID?
+        var ids: Set<Int>
+    }
+
+    func cachedPrecipitateHighlightOutline(for selection: PrecipitateTableSelection)
+        -> [PrecipitateHighlight.Edge] {
+        // The cheap gates first, exactly `precipitateHighlightOutline`'s: a
+        // stale selection, another window's run or another picture is empty
+        // and never reaches the cache.
+        guard displayedProduct?.kind == "precipitate_objects",
+              let source = precipitateClassification.sourceID, selection.sourceID == source,
+              !selection.objectIDs.isEmpty else { return [] }
+        return highlightOutlineCache.value(
+            for: HighlightOutlineKey(source: source, ids: selection.objectIDs)
+        ) { precipitateHighlightOutline(for: selection) }
+    }
+}

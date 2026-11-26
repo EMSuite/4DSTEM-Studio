@@ -24,8 +24,8 @@ resolve_mac4dstem_developer_dir
 # the reason v2.5.1 shipped universal. A gate that does not build the way the
 # release builds is not covering the release.
 xcodebuild \
-  -project "$REPO/mac4DSTEM.xcodeproj" \
-  -scheme mac4DSTEM \
+  -project "$REPO/FourDSTEMStudio.xcodeproj" \
+  -scheme FourDSTEMStudio \
   -configuration Release \
   -destination "$MAC4DSTEM_RELEASE_DESTINATION" \
   -derivedDataPath "$WORK/DerivedData" \
@@ -47,7 +47,7 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO")" = \
 # (2026-09-03: the 2.5 bump found it asserting 2.0 / 1). The audit's claim is
 # that the bundle carries what the project declares, and only that.
 MARKETING="$(sed -n 's/^MARKETING_VERSION = \([0-9.]*\).*/\1/p' "$REPO/Config/Version.xcconfig")"
-BUILD="$(grep -m1 'CURRENT_PROJECT_VERSION = ' "$REPO/mac4DSTEM.xcodeproj/project.pbxproj" | sed 's/.*= \(.*\);/\1/')"
+BUILD="$(grep -m1 'CURRENT_PROJECT_VERSION = ' "$REPO/FourDSTEMStudio.xcodeproj/project.pbxproj" | sed 's/.*= \(.*\);/\1/')"
 test -n "$MARKETING" && test -n "$BUILD"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO")" = "$MARKETING"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO")" = "$BUILD"
@@ -58,7 +58,7 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO")" = "$BUILD"
 # here re-breaks at every floor change, which is the same mistake the version
 # assertion above made and had fixed. What this gate is for is that the SHIPPED
 # bundle agrees with the project, not that the floor is any particular number.
-FLOOR="$(grep -m1 'MACOSX_DEPLOYMENT_TARGET = ' "$REPO/mac4DSTEM.xcodeproj/project.pbxproj" | sed 's/.*= \(.*\);/\1/')"
+FLOOR="$(grep -m1 'MACOSX_DEPLOYMENT_TARGET = ' "$REPO/FourDSTEMStudio.xcodeproj/project.pbxproj" | sed 's/.*= \(.*\);/\1/')"
 test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$INFO")" = "$FLOOR"
 # Derived from Info.plist rather than hardcoded: the compiled icon is named
 # after ASSETCATALOG_COMPILER_APPICON_NAME, so it moved from AppIcon.icns to

@@ -27,7 +27,7 @@ let commonSwiftSettings: [SwiftSetting] = [
 ]
 
 let package = Package(
-    name: "mac4DSTEM",
+    name: "FourDSTEMStudio",
     platforms: [.macOS(.v26)],
     products: [
         .library(name: "DSTEMCore", targets: ["DSTEMCore"]),
@@ -86,7 +86,7 @@ let package = Package(
                            .product(name: "ImagoFilters", package: "ImagoKit"),   // the EDS room's map filter (macTEM's EDXMapFilter)
                            .product(name: "ShellMetal", package: "EMSuiteUI"),
                            .product(name: "ShellEDXModel", package: "EMSuiteUI")],
-            path: "mac4DSTEM/Core",
+            path: "FourDSTEMStudio/Core",
             // No `-DACCELERATE_NEW_LAPACK` any more: the LAPACK call it served (DiffractionEmbedding's `dsyevd_`) is CuboKit's.
             swiftSettings: commonSwiftSettings
         ),
@@ -112,7 +112,7 @@ let package = Package(
                            .product(name: "ShellMetal", package: "EMSuiteUI"),
                            .product(name: "ShellEDXModel", package: "EMSuiteUI"),
                            .product(name: "ShellLayout", package: "EMSuiteUI")],
-            path: "mac4DSTEM/Session",
+            path: "FourDSTEMStudio/Session",
             swiftSettings: commonSwiftSettings
         ),
         // The Quick Look thumbnail pixels and the preview card (CoreGraphics and SwiftUI over FormatoKit's `Peek`): linked by the
@@ -130,7 +130,7 @@ let package = Package(
         .target(
             name: "DSTEMTraining",
             dependencies: ["DSTEMCore", .product(name: "CuboBragg", package: "CuboKit")],
-            path: "mac4DSTEM/Training",
+            path: "FourDSTEMStudio/Training",
             swiftSettings: commonSwiftSettings
         ),
     ]

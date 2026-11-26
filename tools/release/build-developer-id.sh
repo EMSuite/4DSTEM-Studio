@@ -17,7 +17,7 @@ mkdir -p "$OUT"
 VERSION_SET="$(sed -n 's/^MARKETING_VERSION = \([0-9.]*\).*/\1/p' "$ROOT/Config/Version.xcconfig")"
 
 xcodebuild archive \
-  -project "$ROOT/mac4DSTEM.xcodeproj" -scheme mac4DSTEM \
+  -project "$ROOT/FourDSTEMStudio.xcodeproj" -scheme FourDSTEMStudio \
   -configuration Release -destination "$MAC4DSTEM_RELEASE_DESTINATION" \
   -archivePath "$ARCHIVE" \
   -clonedSourcePackagesDirPath "$ROOT/build/SourcePackages" \
@@ -97,7 +97,7 @@ if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.get-task-allow' \
     "$OUT/entitlements.plist" >/dev/null 2>&1; then
   echo "FAIL: distribution app contains get-task-allow" >&2; exit 1
 fi
-# The sandboxed installer is reached through the download's one exception (mac4DSTEM-Direct.entitlements).
+# The sandboxed installer is reached through the download's one exception (FourDSTEMStudio-Direct.entitlements).
 /usr/libexec/PlistBuddy -c 'Print :com.apple.security.temporary-exception.mach-lookup.global-name' "$OUT/entitlements.plist" \
   | grep -q -- '-spki' || { echo "FAIL: the download cannot reach Sparkle's installer (mach-lookup exception)" >&2; exit 1; }
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"

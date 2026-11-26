@@ -6,7 +6,7 @@
   "bump-minor-pre-major": true,
   "packages": {
     ".": {
-      "package-name": "mac4DSTEM",
+      "package-name": "FourDSTEMStudio",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {

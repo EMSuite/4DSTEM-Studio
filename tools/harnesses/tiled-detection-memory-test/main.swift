@@ -12,7 +12,7 @@ import ShellMetal   // MetalEngine (MacEMUI) loads its library from its own bund
 // Second mode, `learned` (Gate D S11, 2026-09-29): the same measurement on
 // LearnedDiskDetector.detectAll(data:) — the learned twin, whose tile loop
 // awaits Core ML and so cannot sit inside one autorelease pool. It loads the
-// shipped mac4DSTEM/Resources/DiskDetector package (path in argv[2]). Measured: it does NOT
+// shipped FourDSTEMStudio/Resources/DiskDetector package (path in argv[2]). Measured: it does NOT
 // grow per tile — each batch awaits Core ML, a real suspension, and the
 // worker's autorelease pool drains at that job boundary (an `await
 // Task.yield()` per tile does the same for the classical loop with its pool

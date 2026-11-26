@@ -474,7 +474,7 @@ do {
             // `FloatImage(width: qx, height: qy)`, so the CBED viewer, the PNG
             // export and any probe measured off it would inherit a transposed
             // shape with entirely plausible intensities. Nothing else in
-            // mac4DSTEMTests/ or tools/ asserts any pattern's qy or qx. The
+            // FourDSTEMStudioTests/ or tools/ asserts any pattern's qy or qx. The
             // fixture's 9x11 detector is what makes this discriminating; at a
             // square detector it would prove nothing.
             guard resident.qy == streamed.qy, resident.qx == streamed.qx else {

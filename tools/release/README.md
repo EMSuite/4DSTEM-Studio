@@ -1,4 +1,4 @@
-# Releasing mac4DSTEM
+# Releasing 4DSTEM Studio
 
 The repository can build and audit an unsigned/ad-hoc Release without private
 credentials. Public distribution additionally requires the release owner’s Apple
@@ -66,10 +66,10 @@ build has no updater, because the store updates it and refuses an app that updat
   CFBundleDisplayName): App Review refuses "Mac" in an App Store app's name (guideline 5.2.5, 5.2.0 rejected
   2026-11-16), and the website DMG followed in 5.4.3 (#496). An installed `mac4DSTEM.app` updates in place and keeps its
   file name; Info-Direct.plist's `SUBundleName` is the name a normalizing Sparkle installs to (#497). `Config/Version.xcconfig` sets both (`MACEM_APP_NAME_YES`/`_NO`), the module
-  stays `mac4DSTEM`, the bundle identifier is unchanged, and `AppName.display` puts the build's name in the app's
+  is `FourDSTEMStudio` since 5.5.0 (#510), the bundle identifier is unchanged, and `AppName.display` puts the build's name in the app's
   sentences. `build-app-store.sh` checks the product carries the name, without "mac", under the same identifier.
 - **One switch.** `MACEM_STORE_BUILD` (NO unless the store script sets YES) picks `Info.plist` or `Info-Direct.plist`,
-  `mac4DSTEM.entitlements` or `mac4DSTEM-Direct.entitlements`, and the `SPARKLE` compile condition. The store build links
+  `FourDSTEMStudio.entitlements` or `FourDSTEMStudio-Direct.entitlements`, and the `SPARKLE` compile condition. The store build links
   with `-dead_strip_dylibs` (the three HDF5 frameworks kept with `-needed_framework`, because FormatoKit opens them by path
   and dead-stripping dropped their load commands too) and its last build phase removes the framework Xcode embeds for the package, so the store app
   has no Sparkle code, load command, plist key or entitlement exception; `build-app-store.sh` checks all four.
@@ -92,7 +92,7 @@ build has no updater, because the store updates it and refuses an app that updat
 
 **The key.** `build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys` (there after one `tools/release.sh` or any
 build that resolves the packages into `build/SourcePackages`) makes the EdDSA pair, keeps the private half in the login
-keychain and prints the public half, which goes under `SUPublicEDKey` in `mac4DSTEM/Info-Direct.plist` (it is public; it
+keychain and prints the public half, which goes under `SUPublicEDKey` in `FourDSTEMStudio/Info-Direct.plist` (it is public; it
 may be committed and pasted). Back the private half up at once (Keys and backups, below). A lost key is not the end of
 updates: Sparkle accepts an update with a new key when the new app meets the old app's designated requirement
 (`SUUpdateValidator.m`: "Either DSA must be valid, or Apple Code Signing must be valid"), and ours is Xcode's default,

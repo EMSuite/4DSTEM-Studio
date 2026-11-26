@@ -1,0 +1,1333 @@
+@testable import ShellControls
+import AppKit
+import DiffractoCore
+import DiffractoScattering
+import DSTEMCore
+import DSTEMSession
+import XCTest
+@testable import FourDSTEMStudio
+
+final class ProductWorkflowTests: XCTestCase {
+    func testPublicationFigureBurnsScaleCaptionAndColorbar() throws {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let baseContext = try XCTUnwrap(CGContext(
+            data: nil, width: 16, height: 12,
+            bitsPerComponent: 8, bytesPerRow: 16 * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        baseContext.setFillColor(NSColor.systemRed.cgColor)
+        baseContext.fill(CGRect(x: 0, y: 0, width: 16, height: 12))
+        let base = try XCTUnwrap(baseContext.makeImage())
+
+        let withScale = AppState.burnScaleBar(
+            on: base, unitsPerDataPixel: 0.5, unitLabel: "nm"
+        )
+        XCTAssertEqual(withScale.width, 512)
+        XCTAssertEqual(withScale.height, 384)
+
+        let figure = AppState.publicationFigure(
+            image: withScale, title: "Strain ε_xx",
+            caption: "scan space · quantitative · 0.5 nm/px · basis_mode=consensus",
+            valueRange: (low: -0.025, high: 0.025), valueUnits: "strain",
+            colormap: .rdbu
+        )
+        XCTAssertEqual(figure.width, 624)
+        XCTAssertEqual(figure.height, 478)
+
+        var pixels = [UInt8](repeating: 0, count: figure.width * figure.height * 4)
+        let raster = try XCTUnwrap(CGContext(
+            data: &pixels, width: figure.width, height: figure.height,
+            bitsPerComponent: 8, bytesPerRow: figure.width * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        raster.draw(figure, in: CGRect(x: 0, y: 0,
+                                       width: figure.width, height: figure.height))
+
+        func rgb(x: Int, y: Int) -> (UInt8, UInt8, UInt8) {
+            let offset = (y * figure.width + x) * 4
+            return (pixels[offset], pixels[offset + 1], pixels[offset + 2])
+        }
+        func isInk(_ value: (UInt8, UInt8, UInt8)) -> Bool {
+            value.0 > 20 || value.1 > 20 || value.2 > 20
+        }
+        func isNearWhite(_ value: (UInt8, UInt8, UInt8)) -> Bool {
+            value.0 > 225 && value.1 > 225 && value.2 > 225
+        }
+
+        var captionInk = 0
+        for y in 0..<76 {
+            for x in 18..<500 where isInk(rgb(x: x, y: y)) { captionInk += 1 }
+        }
+        for y in (figure.height - 76)..<figure.height {
+            for x in 18..<500 where isInk(rgb(x: x, y: y)) { captionInk += 1 }
+        }
+        XCTAssertGreaterThan(captionInk, 100, "title/provenance caption disappeared")
+
+        var colorbarColors = Set<UInt32>()
+        for y in 76..<(76 + withScale.height) {
+            let value = rgb(x: 550, y: y)
+            colorbarColors.insert(
+                UInt32(value.0) << 16 | UInt32(value.1) << 8 | UInt32(value.2)
+            )
+        }
+        XCTAssertGreaterThan(colorbarColors.count, 100, "colorbar lost its numeric gradient")
+
+        var whitePixels = 0
+        for y in 76..<(76 + withScale.height) {
+            for x in 18..<(18 + withScale.width) where isNearWhite(rgb(x: x, y: y)) {
+                whitePixels += 1
+            }
+        }
+        XCTAssertGreaterThan(whitePixels, 200, "burned scale bar/label disappeared")
+    }
+
+    func testEveryAnalysisHasOneProductWorkspace() {
+        let routed = WorkspaceArea.allCases.flatMap(\.analysisModes)
+        XCTAssertEqual(Set(routed.map(\.id)).count, AnalysisMode.allCases.count)
+        XCTAssertEqual(routed.count, AnalysisMode.allCases.count)
+
+        for mode in AnalysisMode.allCases {
+            XCTAssertTrue(mode.workspaceArea.analysisModes.contains(mode))
+        }
+    }
+
+    // MARK: - The workspaces follow the data (ADR 046, owner 2026-09-30)
+
+    /// Each moved task is routed to its ADR 046 room, in this order.
+    /// `testEveryAnalysisHasOneProductWorkspace` above guarantees every mode is
+    /// routed to exactly one area; this pins WHICH, so moving a task is a
+    /// deliberate edit rather than a silent one.
+    ///
+    /// The ORDER is pinned too, because `defaultAnalysisMode` is
+    /// `analysisModes.first` and that is where ⌘-key navigation lands: Imaging
+    /// opens on the virtual detector, not on grouping; Crystal Maps on strain.
+    func testWorkspacesFollowTheData() {
+        XCTAssertEqual(WorkspaceArea.image.analysisModes, [.virtualDetector, .diffractionGroups])
+        XCTAssertEqual(WorkspaceArea.braggDisks.analysisModes, [.disks])
+        XCTAssertEqual(WorkspaceArea.map.analysisModes, [.strain, .acom, .phaseMapping])
+        XCTAssertEqual(AnalysisMode.diffractionGroups.workspaceArea, .image)
+        XCTAssertEqual(AnalysisMode.disks.workspaceArea, .braggDisks)
+        XCTAssertEqual(AnalysisMode.phaseMapping.workspaceArea, .map)
+        XCTAssertEqual(WorkspaceArea.image.defaultAnalysisMode, .virtualDetector)
+        XCTAssertEqual(WorkspaceArea.map.defaultAnalysisMode, .strain)
+        // Accessibility identifiers are `workspace.<rawValue>`; the old ones keep their spelling.
+        XCTAssertEqual(WorkspaceArea.allCases.map(\.rawValue),
+                       ["prepare", "image", "braggDisks", "map", "reconstruct", "spectroscopy", "results"])
+    }
+
+    /// Phase mapping matches the peaks disk detection finds and looks for none
+    /// of its own, so it must carry the Bragg prerequisite. Without this the
+    /// task would offer an enabled button on a dataset with no peaks, run, and
+    /// report an empty map as a result.
+    /// Drive 2026-09-30: the toolbar's Map Phases was enabled with no phases,
+    /// then refused on click. The phase list is a requirement, so the verb,
+    /// the checklist and replay agree. Mutation: `phaseListRefusal` ignored.
+    func testPhaseMappingRequiresARunnablePhaseList() {
+        let noPhases = ProductWorkflowReadiness(hasBraggVectors: true, hasPhysicalACOMScale: true,
+                                                phaseListRefusal: "Two phases are marked as the matrix.")
+        let unmet = ProductWorkflow.prerequisiteItems(for: .phaseMapping, readiness: noPhases)
+            .filter { !$0.isSatisfied }
+        XCTAssertEqual(unmet.map(\.id), ["phases"])
+        XCTAssertEqual(unmet.first?.title, "Two phases are marked as the matrix.",
+                       "the row names the actual refusal, not a fixed sentence (Fable review)")
+        XCTAssertFalse(ProductWorkflow.mayRun(.phaseMapping, readiness: noPhases, isBusy: false))
+        var ready = noPhases
+        ready.phaseListRefusal = nil
+        XCTAssertTrue(ProductWorkflow.mayRun(.phaseMapping, readiness: ready, isBusy: false))
+    }
+
+    func testPhaseMappingRequiresBraggVectors() {
+        XCTAssertEqual(AnalysisMode.phaseMapping.prerequisiteFamily, .requiresBraggVectors)
+        let unmet = ProductWorkflow.prerequisiteItems(
+            for: .phaseMapping,
+            readiness: ProductWorkflowReadiness(hasBraggVectors: false, hasPhysicalACOMScale: true))
+        XCTAssertEqual(unmet.map(\.id), ["braggVectors", "qScale", "phases"])
+        XCTAssertEqual(unmet.first?.isSatisfied, false)
+        XCTAssertEqual(ProductWorkflow.prerequisites(
+            for: .phaseMapping,
+            readiness: ProductWorkflowReadiness(hasBraggVectors: false, hasPhysicalACOMScale: true)),
+            ["Detect Bragg disks first"])
+        let met = ProductWorkflow.prerequisiteItems(
+            for: .phaseMapping,
+            readiness: ProductWorkflowReadiness(hasBraggVectors: true, hasPhysicalACOMScale: true))
+        XCTAssertTrue(met.allSatisfy(\.isSatisfied))
+    }
+
+    /// The library is in Å⁻¹ and the peaks in detector pixels; without a
+    /// physical Q scale the run matched through the exploratory slider value
+    /// and returned 29 241 / 29 241 not indexed with no word of why (owner's
+    /// drive, 2026-09-24). The task must not be offered until the scale the
+    /// matcher reads is physical.
+    ///
+    /// Mutations: the `qScale` item removed (red: ready with Bragg vectors
+    /// and no scale); satisfied by `hasQScale` instead of
+    /// `hasPhysicalACOMScale` (red: a Q in mrad with no voltage reads ready,
+    /// though it cannot be converted to Å⁻¹).
+    func testPhaseMappingRequiresAPhysicalQScale() {
+        let noScale = ProductWorkflowReadiness(hasBraggVectors: true)
+        XCTAssertEqual(ProductWorkflow.prerequisites(for: .phaseMapping, readiness: noScale),
+                       ["Set the Q pixel scale"])
+        XCTAssertFalse(ProductWorkflow.mayRun(.phaseMapping, readiness: noScale, isBusy: false))
+        let item = ProductWorkflow.prerequisiteItems(for: .phaseMapping, readiness: noScale)
+            .first { $0.id == "qScale" }
+        XCTAssertEqual(item?.resolution, .prepare, "the checklist must point at Prepare")
+
+        let mradWithoutVoltage = ProductWorkflowReadiness(
+            hasQScale: true, hasBraggVectors: true, hasPhysicalACOMScale: false)
+        let unmet = ProductWorkflow.prerequisites(for: .phaseMapping, readiness: mradWithoutVoltage)
+        XCTAssertEqual(unmet.count, 1, "unmet: \(unmet)")
+        XCTAssertTrue(unmet.first?.contains("voltage") == true, "unmet: \(unmet)")
+
+        XCTAssertTrue(ProductWorkflow.mayRun(
+            .phaseMapping,
+            readiness: ProductWorkflowReadiness(hasBraggVectors: true, hasPhysicalACOMScale: true),
+            isBusy: false))
+    }
+
+    /// The run and Find Matrix Zone Axis refuse on the same predicate the
+    /// button reads, so a caller that skips the button (replay) gets a reason
+    /// instead of a silent all-"not indexed" map. Mutation: the refusal
+    /// returning nil for an exploratory scale (red on a fresh state); or
+    /// ignoring a physical one (red after `setManualQPixelSize`).
+    func testPhaseMappingRefusalFollowsThePhysicalQScale() {
+        let state = AppState()
+        XCTAssertEqual(state.acomScaleSemantics.provenance, .exploratory)
+        XCTAssertNotNil(state.phaseMappingQScaleRefusal)
+        XCTAssertFalse(state.productWorkflowReadiness.hasPhysicalACOMScale)
+        state.setManualQPixelSize(0.25)
+        XCTAssertNil(state.phaseMappingQScaleRefusal)
+        XCTAssertTrue(state.productWorkflowReadiness.hasPhysicalACOMScale)
+    }
+
+    /// Results carry no unvalidated badge, so phase mapping shows no such guidance.
+    /// Red before the guidance lost its "Unvalidated:" line.
+    func testPhaseMappingGuidanceDoesNotBadgeItAsUnvalidated() {
+        let guidance = ProductWorkflow.guidance(
+            for: .phaseMapping, readiness: ProductWorkflowReadiness(hasBraggVectors: true))
+        XCTAssertFalse(guidance.contains { $0.lowercased().contains("unvalidated") },
+                       "guidance is \(guidance)")
+    }
+
+    /// Grouping needs the cube and nothing else — no origin, no R–Q rotation,
+    /// no Bragg vectors. A prerequisite appearing here would gate a task that
+    /// has none, and the room would look broken on a freshly opened dataset.
+    func testDiffractionGroupingHasNoPrerequisites() {
+        XCTAssertTrue(
+            ProductWorkflow.prerequisites(
+                for: .diffractionGroups, readiness: ProductWorkflowReadiness()
+            ).isEmpty,
+            "grouping needs only the cube; a default (nothing calibrated) readiness must gate nothing"
+        )
+    }
+
+    /// The sidebar lists a workspace's tasks under the workspace's own name, so a task named like its
+    /// workspace reads the same words twice ("Bragg Disks › Bragg disks", owner 2026-09-30).
+    func testNoTaskRepeatsItsWorkspaceName() {
+        for mode in AnalysisMode.allCases {
+            XCTAssertNotEqual(mode.productTitle.lowercased(), mode.workspaceArea.title.lowercased(),
+                              "\(mode) repeats its workspace's name")
+        }
+    }
+
+    func testPrimaryNavigationUsesUserOutcomes() {
+        // S22c re-cut: the five steps follow the physics families — Imaging
+        // (no prerequisites), Bragg (disks → strain/orientation), Phase
+        // (voltage-only: DPC first, ptychography behind it).
+        XCTAssertEqual(
+            WorkspaceArea.allCases.map(\.title),
+            ["Prepare", "Imaging", "Bragg Disks", "Crystal Maps", "Reconstruction", "Spectroscopy", "Results"]
+        )
+        XCTAssertEqual(WorkspaceArea.braggDisks.defaultAnalysisMode, .disks)
+        XCTAssertEqual(WorkspaceArea.reconstruct.defaultAnalysisMode, .dpc)
+        XCTAssertEqual(AnalysisMode.dpc.workspaceArea, .reconstruct,
+                       "DPC belongs to the phase-contrast workspace")
+        XCTAssertNil(WorkspaceArea.prepare.defaultAnalysisMode)
+        XCTAssertNil(WorkspaceArea.results.defaultAnalysisMode)
+    }
+
+    /// #365: a hand-set origin with no probe is an origin; DPC's guidance must not ask for it. Mutation: the `.dpc` branch back on
+    /// `hasOriginProbe` alone (red: "add origin, …").
+    func testDPCGuidanceDoesNotAskForAnOriginThatIsSet() {
+        var readiness = ProductWorkflowReadiness()
+        readiness.hasOrigin = true
+        let line = ProductWorkflow.guidance(for: .dpc, readiness: readiness).first ?? ""
+        XCTAssertTrue(line.contains("qualitative units"), line)
+        XCTAssertFalse(line.contains("origin"), line)
+        readiness.hasRotation = true; readiness.hasQScale = true; readiness.hasRScale = true; readiness.hasVoltage = true
+        XCTAssertTrue(ProductWorkflow.guidance(for: .dpc, readiness: readiness).isEmpty,
+                      "an origin without a probe and the rest calibrated is quantitative DPC")
+        XCTAssertTrue((ProductWorkflow.guidance(for: .dpc, readiness: ProductWorkflowReadiness()).first ?? "").contains("add origin"))
+    }
+
+    func testPrerequisitesAreActionableAndTaskSpecific() {
+        let empty = ProductWorkflowReadiness()
+        XCTAssertTrue(ProductWorkflow.prerequisites(
+            for: .virtualDetector, readiness: empty
+        ).isEmpty)
+        XCTAssertTrue(ProductWorkflow.prerequisites(for: .dpc, readiness: empty).isEmpty)
+        XCTAssertTrue(ProductWorkflow.guidance(for: .dpc, readiness: empty)
+            .first?.contains("qualitative units") == true)
+        XCTAssertEqual(ProductWorkflow.prerequisites(
+            for: .strain, readiness: empty
+        ), ["Detect Bragg disks first"])
+        XCTAssertEqual(ProductWorkflow.prerequisites(
+            for: .acom,
+            readiness: ProductWorkflowReadiness(hasBraggVectors: true)
+        ), ["Choose an ACOM material model"])
+        XCTAssertEqual(ProductWorkflow.prerequisites(
+            for: .acom,
+            readiness: ProductWorkflowReadiness(
+                hasBraggVectors: true, hasACOMMaterial: true,
+                hasSupportedACOMMaterial: true
+            )
+        ), [])
+        XCTAssertEqual(ProductWorkflow.prerequisites(
+            for: .acom,
+            readiness: ProductWorkflowReadiness(
+                hasBraggVectors: true, hasACOMMaterial: true,
+                hasSupportedACOMMaterial: false
+            )
+        ), ["The selected ACOM material is not supported"])
+
+        let reconstructionMissing = ProductWorkflow.prerequisites(
+            for: .ptychography,
+            readiness: ProductWorkflowReadiness(
+                hasOriginProbe: true, hasRotation: true,
+                hasQScale: true, hasRScale: true
+            )
+        )
+        XCTAssertEqual(reconstructionMissing, ["Set the accelerating voltage"])
+    }
+
+    func testPrerequisiteChecklistItemsMatchPrerequisiteStrings() {
+        let complete = ProductWorkflowReadiness(
+            hasOriginProbe: true, hasRotation: true, hasQScale: true,
+            hasRScale: true, hasVoltage: true, hasBraggVectors: true,
+            hasACOMMaterial: true, hasSupportedACOMMaterial: true,
+            hasPhysicalACOMScale: true
+        )
+        let syntheticStates = [
+            ProductWorkflowReadiness(),
+            complete,
+            // sim_Au's measured Reconstruct blocker: everything but R scale.
+            ProductWorkflowReadiness(
+                hasOriginProbe: true, hasRotation: true, hasQScale: true,
+                hasRScale: false, hasVoltage: true
+            ),
+            ProductWorkflowReadiness(
+                hasBraggVectors: true, hasACOMMaterial: true,
+                hasSupportedACOMMaterial: false
+            ),
+            // C7 session 2: the learned detector wanted but not built in.
+            ProductWorkflowReadiness(wantsLearnedDetector: true, hasLearnedDetectorAsset: false)
+        ]
+        for mode in AnalysisMode.allCases {
+            for readiness in syntheticStates {
+                let items = ProductWorkflow.prerequisiteItems(
+                    for: mode, readiness: readiness
+                )
+                // The checklist's unmet rows are exactly the legacy gating
+                // strings, in the same order — the two surfaces cannot drift.
+                XCTAssertEqual(
+                    items.filter { !$0.isSatisfied }.map(\.title),
+                    ProductWorkflow.prerequisites(for: mode, readiness: readiness)
+                )
+                // Row ids are unique so accessibility identifiers are stable.
+                XCTAssertEqual(Set(items.map(\.id)).count, items.count)
+            }
+            XCTAssertTrue(
+                ProductWorkflow.prerequisiteItems(for: mode, readiness: complete)
+                    .allSatisfy(\.isSatisfied)
+            )
+        }
+
+        // The sim_Au case: the checklist shows all five rows with only R scale
+        // unmet, and points it at the Prepare workspace.
+        let simAu = ProductWorkflow.prerequisiteItems(
+            for: .ptychography,
+            readiness: ProductWorkflowReadiness(
+                hasOriginProbe: true, hasRotation: true, hasQScale: true,
+                hasRScale: false, hasVoltage: true
+            )
+        )
+        XCTAssertEqual(simAu.count, 5)
+        XCTAssertEqual(simAu.filter { !$0.isSatisfied }.map(\.id), ["rScale"])
+        XCTAssertEqual(
+            simAu.first { $0.id == "rScale" }?.title, "Set the R pixel scale"
+        )
+        XCTAssertEqual(simAu.first { $0.id == "rScale" }?.resolution, .prepare)
+
+        // Cross-task prerequisites navigate to the producing task; in-panel
+        // ones point at the panel instead of navigating away.
+        let strainItems = ProductWorkflow.prerequisiteItems(
+            for: .strain, readiness: ProductWorkflowReadiness()
+        )
+        XCTAssertEqual(strainItems.map(\.resolution), [.task(.disks)])
+        let acomItems = ProductWorkflow.prerequisiteItems(
+            for: .acom, readiness: ProductWorkflowReadiness(hasBraggVectors: true)
+        )
+        XCTAssertEqual(acomItems.first { $0.id == "braggVectors" }?.isSatisfied, true)
+        guard case .taskPanel = acomItems.first(where: { $0.id == "acomMaterial" })?.resolution
+        else { return XCTFail("ACOM material should resolve in its own panel") }
+    }
+
+    /// C4(a): the one composition every panel run button binds to instead of
+    /// re-deriving all or part of it — busy always wins, then readiness.
+    /// "Reconstruct Object" and "Prepare Parallax Preview" used to check only
+    /// `isBusy` and ran ahead of the toolbar's own five-calibration gate
+    /// (`docs/consolidation-plan.md` §4 finding 2); this pins the shared
+    /// function both now call.
+    func testMayRunComposesBusyThenReadinessAndNothingElse() {
+        let unmet = ProductWorkflowReadiness()
+        XCTAssertFalse(ProductWorkflow.mayRun(.strain, readiness: unmet, isBusy: false),
+                       "no Bragg vectors yet")
+        XCTAssertFalse(ProductWorkflow.mayRun(.strain, readiness: unmet, isBusy: true))
+
+        let ready = ProductWorkflowReadiness(hasBraggVectors: true)
+        XCTAssertTrue(ProductWorkflow.mayRun(.strain, readiness: ready, isBusy: false))
+        XCTAssertFalse(ProductWorkflow.mayRun(.strain, readiness: ready, isBusy: true),
+                       "busy always wins, however ready the task is")
+
+        let fullCalibration = ProductWorkflowReadiness(
+            hasOriginProbe: true, hasRotation: true, hasQScale: true,
+            hasRScale: true, hasVoltage: true
+        )
+        XCTAssertTrue(ProductWorkflow.mayRun(.singleslicePtychography, readiness: fullCalibration, isBusy: false))
+        XCTAssertFalse(ProductWorkflow.mayRun(.singleslicePtychography, readiness: unmet, isBusy: false),
+                       "missing calibration blocks single-slice ptychography exactly as it blocks parallax")
+        XCTAssertFalse(ProductWorkflow.mayRun(.ptychography, readiness: unmet, isBusy: false))
+
+        // A task with no prerequisites is gated by busy alone.
+        XCTAssertTrue(ProductWorkflow.mayRun(.virtualDetector, readiness: unmet, isBusy: false))
+        XCTAssertFalse(ProductWorkflow.mayRun(.virtualDetector, readiness: unmet, isBusy: true))
+    }
+
+    /// IPF·Z is promoted over the Reliability default only for a user who has
+    /// not chosen a display. The flag is what separates "still on the default"
+    /// from "asked for Reliability", which `didSet` alone cannot see — if it
+    /// stopped being set, a completed map would overrule a deliberate choice.
+    func testChoosingAnACOMDisplayIsRecordedSoItIsNotLaterOverridden() {
+        let state = AppState()
+        XCTAssertEqual(state.acomSession.display, .reliability)
+        XCTAssertFalse(state.acomSession.displayIsUserChosen)
+
+        state.selectACOMDisplay(.score)
+        XCTAssertEqual(state.acomSession.display, .score)
+        XCTAssertTrue(state.acomSession.displayIsUserChosen)
+
+        // Re-selecting the default is still a choice, not a reset.
+        state.selectACOMDisplay(.reliability)
+        XCTAssertEqual(state.acomSession.display, .reliability)
+        XCTAssertTrue(state.acomSession.displayIsUserChosen)
+    }
+
+    /// The hint is a forward pointer, so what it *doesn't* say matters as much
+    /// as what it does: repeating the calibration checklist or the task group
+    /// labels would be noise on the exact screens that already say it.
+    func testNextStepHintPointsForwardAndStaysSilentWhereTheUIAlreadyExplains() {
+        var readiness = ProductWorkflowReadiness()
+
+        // Prepare: silent while the checklist is still naming missing fields.
+        XCTAssertNil(ProductWorkflow.nextStepHint(
+            for: .prepare, readiness: readiness, calibrationReady: false
+        ))
+        XCTAssertNotNil(ProductWorkflow.nextStepHint(
+            for: .prepare, readiness: readiness, calibrationReady: true
+        ))
+
+        // Bragg Disks and Crystal Maps: silent before disks exist — the
+        // Requirements section already names the missing Bragg vectors.
+        for area in [WorkspaceArea.braggDisks, .map] {
+            XCTAssertNil(ProductWorkflow.nextStepHint(
+                for: area, readiness: readiness, calibrationReady: true
+            ), "\(area)")
+        }
+
+        // Image points at the Bragg path only while it is still unsatisfied.
+        XCTAssertNotNil(ProductWorkflow.nextStepHint(
+            for: .image, readiness: readiness, calibrationReady: true
+        ))
+
+        readiness.hasBraggVectors = true
+        XCTAssertNil(ProductWorkflow.nextStepHint(
+            for: .image, readiness: readiness, calibrationReady: true
+        ))
+        for area in [WorkspaceArea.braggDisks, .map] {
+            XCTAssertNotNil(ProductWorkflow.nextStepHint(
+                for: area, readiness: readiness, calibrationReady: true
+            ), "\(area)")
+        }
+
+        // Terminal for this purpose regardless of state.
+        for ready in [false, true] {
+            XCTAssertNil(ProductWorkflow.nextStepHint(
+                for: .results, readiness: readiness, calibrationReady: ready
+            ))
+            XCTAssertNil(ProductWorkflow.nextStepHint(
+                for: .reconstruct, readiness: readiness, calibrationReady: ready
+            ))
+        }
+    }
+
+    /// Every task belongs to exactly one prerequisite family, and `.disks` must
+    /// be the producer — a single "requires Bragg vectors" label spanning Map
+    /// would be wrong about the one task that satisfies it.
+    func testTaskPrerequisiteFamiliesSplitTheBraggDependencyCorrectly() {
+        XCTAssertEqual(AnalysisMode.disks.prerequisiteFamily, .producesBraggVectors)
+        XCTAssertEqual(AnalysisMode.strain.prerequisiteFamily, .requiresBraggVectors)
+        XCTAssertEqual(AnalysisMode.acom.prerequisiteFamily, .requiresBraggVectors)
+        for mode in [AnalysisMode.virtualDetector, .dpc, .ptychography] {
+            XCTAssertEqual(mode.prerequisiteFamily, .phaseContrast, "\(mode)")
+        }
+
+        // Grouping must not drop or duplicate a task in any workspace.
+        for area in WorkspaceArea.allCases {
+            let grouped = area.taskFamilyGroups.flatMap(\.modes)
+            XCTAssertEqual(Set(grouped), Set(area.analysisModes), "\(area)")
+            XCTAssertEqual(grouped.count, area.analysisModes.count, "\(area)")
+        }
+    }
+
+    /// The family caption exists to *distinguish* families, so it is drawn only
+    /// where there is more than one to distinguish (design pass 2026-08-05,
+    /// refining #4). Reconstruct had it sitting over a single task, and Image
+    /// over a single family — noise in both.
+    func testFamilyCaptionsAreDrawnOnlyWhereThereIsMoreThanOneFamily() {
+        // ADR 046 put the Bragg producer and its consumers in separate rooms,
+        // so no workspace holds two families today; the rule stays for any
+        // future task mix.
+        XCTAssertFalse(WorkspaceArea.map.showsTaskFamilyLabels, "Crystal Maps: all three consume Bragg vectors")
+        XCTAssertFalse(WorkspaceArea.braggDisks.showsTaskFamilyLabels, "Bragg Disks has one task")
+        XCTAssertFalse(
+            WorkspaceArea.reconstruct.showsTaskFamilyLabels,
+            "Reconstruct has one task; a caption above it says nothing"
+        )
+        XCTAssertFalse(
+            WorkspaceArea.image.showsTaskFamilyLabels,
+            "Image has two tasks but one family; there is nothing to distinguish"
+        )
+
+        // Workspaces with no tasks must not claim to need captions.
+        for area in [WorkspaceArea.prepare, .spectroscopy, .results] {
+            XCTAssertTrue(area.taskFamilyGroups.isEmpty, "\(area)")
+            XCTAssertFalse(area.showsTaskFamilyLabels, "\(area)")
+        }
+
+        // The rule must agree with the grouping it labels.
+        for area in WorkspaceArea.allCases {
+            XCTAssertEqual(
+                area.showsTaskFamilyLabels, area.taskFamilyGroups.count > 1, "\(area)"
+            )
+        }
+    }
+
+    func testNavigationDoesNotRelabelTheVisibleScientificResult() {
+        let state = AppState()
+        // v2.5 step 3f: sites publish products with their own labels; this
+        // test pins that navigation never relabels a published product.
+        state.publishProduct(kind: "virtual_annulus", displayName: "Virtual detector · Annulus",
+                             valueUnits: "intensity", payload: .scalar(FloatImage(width: 1, height: 1, pixels: [1])))
+        XCTAssertEqual(state.currentResultDisplayName, "Virtual detector · Annulus")
+        XCTAssertEqual(state.displayedProduct?.domain, .scan)
+
+        // owner card S5 (a), 2026-10-02: entering a room clears another room's product; with no DPC
+        // result there is nothing to show, and the VD image is never shown under the DPC room's label.
+        state.changeMode(.dpc)
+        XCTAssertNil(state.displayedProduct)
+        XCTAssertNotEqual(state.currentResultDisplayName, "Virtual detector · Annulus")
+
+        state.publishProduct(kind: "dpc_magnitude", displayName: "DPC magnitude",
+                             valueUnits: "detector_px", payload: .scalar(FloatImage(width: 1, height: 1, pixels: [2])))
+        XCTAssertEqual(state.currentResultDisplayName, "DPC magnitude")
+        XCTAssertEqual(state.displayedProduct?.domain, .scan)
+
+        state.changeMode(.disks)
+        state.publishProduct(kind: "bragg_vector_map", displayName: "Bragg vector map",
+                             valueUnits: "log_intensity", payload: .scalar(FloatImage(width: 1, height: 1, pixels: [3])))
+        XCTAssertEqual(state.displayedProduct?.domain, .detector)
+    }
+
+    /// C7 session 2: the inspector's Provenance rows read the published
+    /// product, and until this the Bragg vector map carried nothing of the
+    /// detector that made it — the class, threshold and model hash lived
+    /// only in `BraggVectors.detectionProvenance`, which the EMD writer alone
+    /// read. The app's real classical path on the demo cube, so the call
+    /// site is what is tested, not a seam beside it.
+    func testBraggVectorMapProvenanceCarriesTheDetectorIdentity() async throws {
+        let state = AppState()
+        await state.openDemoFixture(calibrated: false)
+        state.navigation.analysisMode = .disks
+        await state.runDiskDetection()
+        XCTAssertNotNil(state.resultPresentation.braggVectors, "Demo disk detection published no Bragg vectors")
+        let provenance = try XCTUnwrap(state.resultPresentation.product).provenance
+        XCTAssertEqual(provenance["source_product"], "bragg_vector_map")
+        XCTAssertEqual(provenance["detector_class"], "classical")
+        XCTAssertNil(provenance["learned_model_sha256"], "a classical map names no model")
+        XCTAssertNil(provenance["kernel_source"], "only the detector's identity joins the map's rows")
+    }
+
+    func testDPCScalarAnglePublishesRadianEncodingProvenance() {
+        let state = AppState()
+        state.navigation.analysisMode = .dpc
+        state.dpc.dpcDisplay = .angle
+        state.publishProduct(kind: "dpc_angle", displayName: "DPC angle", valueUnits: "rad",
+                             payload: .scalar(FloatImage(width: 1, height: 1, pixels: [.pi / 2])))
+
+        XCTAssertEqual(state.currentResultKind, "dpc_angle")
+        XCTAssertEqual(state.currentResultValueUnits, "rad")
+        XCTAssertEqual(
+            state.currentResultPersistenceMetadata.provenance[
+                ScalarResultMap.dpcAngleEncodingKey
+            ],
+            ScalarResultMap.dpcAngleRadiansEncoding
+        )
+        XCTAssertEqual(
+            state.exportedImageProvenanceRecord()["value_units"] as? String,
+            "rad"
+        )
+        let sidecarMap = state.currentScalarResultMapForPersistence()
+        XCTAssertEqual(sidecarMap?.pixels, [.pi / 2])
+        XCTAssertEqual(sidecarMap?.valueUnits, "rad")
+        XCTAssertEqual(
+            sidecarMap?.provenance[ScalarResultMap.dpcAngleEncodingKey],
+            ScalarResultMap.dpcAngleRadiansEncoding
+        )
+    }
+
+    func testRestoredForeignDPCAngleEncodingIsNotRelabeled() {
+        let state = AppState()
+        // v2.5 step 3d: a restored result is a product with a restored origin.
+        state.publishRestoredProduct(
+            kind: "dpc_angle", displayName: "Imported DPC angle", valueUnits: "degrees",
+            payload: .scalar(FloatImage(width: 1, height: 1, pixels: [90])),
+            pixelSizeRow: nil, pixelSizeColumn: nil, pixelUnits: nil,
+            provenance: [ScalarResultMap.dpcAngleEncodingKey: "degrees"])
+
+        let map = state.currentScalarResultMapForPersistence()
+        XCTAssertEqual(map?.pixels, [90])
+        XCTAssertEqual(map?.valueUnits, "degrees")
+        XCTAssertEqual(
+            map?.provenance[ScalarResultMap.dpcAngleEncodingKey], "degrees"
+        )
+    }
+
+    func testACOMRegionUsesScanReferenceWithoutReplacingBraggResult() {
+        let state = AppState()
+        state.descriptor = DatasetDescriptor(
+            filePath: "/tmp/example.h5", datasetPath: "/data",
+            shape: [153, 106, 256, 256], dtypeDescription: "float32",
+            chunkShape: nil
+        )
+        state.calibrationSession.calibration.rPixelSize = 2
+        state.calibrationSession.calibration.rPixelUnits = "nm"
+        state.calibrationSession.calibration.qPixelSize = 0.01
+        state.calibrationSession.calibration.qPixelUnits = "Å⁻¹"
+        state.navigation.analysisMode = .disks
+        state.navigation.workspaceArea = .map
+        state.publishProduct(
+            kind: "bragg_vector_map", displayName: "Bragg vector map", valueUnits: "log_intensity",
+            payload: .scalar(FloatImage(width: 256, height: 256,
+                                        pixels: [Float](repeating: 1, count: 256 * 256))))
+        state.scanNavigationImage = FloatImage(
+            width: 106, height: 153,
+            pixels: [Float](repeating: 2, count: 106 * 153)
+        )
+
+        state.changeMode(.acom)
+        state.acomSession.scope = .selectedRegion
+
+        XCTAssertTrue(state.showsACOMRegionReference)
+        XCTAssertEqual(state.displayedResultImage?.width, 106)
+        XCTAssertEqual(state.displayedResultImage?.height, 153)
+        XCTAssertEqual(state.displayedResultKind, "acom_region_reference")
+        XCTAssertEqual(state.displayedResultPixelMetadata.units, "nm")
+
+        // owner card S5 (a), 2026-10-02: entering ACOM with no ACOM result clears the Bragg map from
+        // the underlying result (the reference above still displays). Re-showing it on return to Disks
+        // needs held vectors: ProductKindModeSwitchTests.testReturningToDisksReShowsTheBraggMapFromHeldVectors.
+        XCTAssertNil(state.resultPresentation.product)
+        XCTAssertNotEqual(state.currentResultKind, "bragg_vector_map")
+    }
+
+    func testCalibrationReadinessExplainsWhatEveryFieldUnlocks() {
+        XCTAssertEqual(CalibrationReadinessKind.allCases.count, 5)
+        for kind in CalibrationReadinessKind.allCases {
+            XCTAssertTrue(kind.unlockSummary.hasPrefix("Unlocks")
+                          || kind.unlockSummary.hasPrefix("Corrects"))
+            XCTAssertTrue(kind.unlockSummary.hasSuffix("."))
+        }
+        XCTAssertTrue(CalibrationReadinessKind.qScale.unlockSummary.contains("reciprocal"))
+        XCTAssertTrue(CalibrationReadinessKind.rScale.unlockSummary.contains("scale bars"))
+    }
+
+    /// Drive 3 step 3 (2026-09-29): Return in the Manual field with the value
+    /// untouched flipped "From session" to "Manual". Committing what is already
+    /// in effect is not an edit; committing a different value still is. The rule
+    /// is the field's (`NumberEntryField.resolve`: the text a field shows for the
+    /// value in effect commits nothing — lane N, P1, 2026-10-04, which replaced a
+    /// 5e-7 tolerance in the setters), so each commit here goes through it as
+    /// `OptionalNumericField` does.
+    /// Mutation: delete the shown-text guard in `NumberEntryField.resolve` -> red (0,1904 is read back as 0.1904).
+    func testCommittingTheUnchangedManualScaleKeepsProvenance() {
+        typealias Field = NumberEntryField<Double, FloatingPointFormatStyle<Double>>
+        let entry = DecimalEntryFormat(FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...6)))
+        func commit(_ typed: String, current: Double?, _ set: (Double) -> Void) {
+            if case .set(let value?) = Field.resolve(typed: typed, current: current, emptyClears: false, entry: entry) {
+                set(value)
+            }
+        }
+        let state = AppState()
+        state.calibrationSession.calibration.qPixelSize = 0.1904
+        state.calibrationSession.calibration.qPixelUnits = "nm⁻¹"
+        state.calibrationSession.provenance.qScale = .sessionSidecar
+        state.calibrationSession.calibration.rPixelSize = 0.5
+        state.calibrationSession.calibration.rPixelUnits = "nm"
+        state.calibrationSession.provenance.rScale = .sessionSidecar
+
+        // Return on the field's own text: the value in effect, and a finer one
+        // the field shows at six places: both are "unchanged".
+        commit(entry.format(0.1904), current: state.manualQPixelSize, state.setManualQPixelSize)
+        XCTAssertEqual(state.calibrationSession.provenance.qScale, .sessionSidecar)
+        state.calibrationSession.calibration.qPixelSize = 0.19040012 // shown as 0,1904
+        commit(entry.format(0.19040012), current: state.manualQPixelSize, state.setManualQPixelSize)
+        XCTAssertEqual(state.calibrationSession.provenance.qScale, .sessionSidecar)
+        XCTAssertEqual(state.calibrationSession.calibration.qPixelSize, 0.19040012,
+                       "an unchanged commit must not rewrite the stored value either")
+        commit(entry.format(0.5), current: state.manualRPixelSize, state.setManualRPixelSize)
+        XCTAssertEqual(state.calibrationSession.provenance.rScale, .sessionSidecar)
+
+        // A different value, even by one displayed digit, is an edit.
+        commit("0.190401", current: state.manualQPixelSize, state.setManualQPixelSize)
+        XCTAssertEqual(state.calibrationSession.provenance.qScale, .manual)
+        XCTAssertEqual(state.calibrationSession.calibration.qPixelSize, 0.190401)
+        commit("0.25", current: state.manualRPixelSize, state.setManualRPixelSize)
+        XCTAssertEqual(state.calibrationSession.provenance.rScale, .manual)
+        XCTAssertEqual(state.calibrationSession.calibration.rPixelSize, 0.25)
+    }
+
+    /// An index-unit placeholder is not a value in the shown unit, so entering
+    /// the same number as the placeholder (1) is a real first entry.
+    func testCommittingOverAnIndexPlaceholderIsStillAnEdit() {
+        let state = AppState()
+        state.calibrationSession.calibration.qPixelSize = 1
+        state.calibrationSession.calibration.qPixelUnits = "pixels"
+        state.setManualQPixelSize(1)
+        XCTAssertEqual(state.calibrationSession.provenance.qScale, .manual)
+        XCTAssertEqual(state.calibrationSession.calibration.qPixelUnits, "nm⁻¹")
+    }
+
+    func testManualFieldHelpNamesTheManualStateOnItsOwn() {
+        let known = "Choose a phase model to calibrate Q from a known crystal."
+        // Manual: the field's own sentence, never the fall-back text.
+        XCTAssertEqual(PrepareSettings.manualScaleHelp(status: .ready(.manual), otherwise: known),
+                       "Your value. Entering another replaces it.")
+        // Non-manual ready states keep the override warning; not-ready keeps `otherwise`.
+        XCTAssertEqual(PrepareSettings.manualScaleHelp(status: .ready(.sessionSidecar), otherwise: known),
+                       "Replaces the value restored from session; provenance becomes Manual.")
+        XCTAssertEqual(PrepareSettings.manualScaleHelp(status: .missing, otherwise: known), known)
+    }
+
+    func testManualPixelScaleReplacesIndexUnitsWithExplicitPhysicalUnits() {
+        let state = AppState()
+        state.calibrationSession.calibration.rPixelSize = 1
+        state.calibrationSession.calibration.rPixelUnits = "pixels"
+        state.calibrationSession.calibration.qPixelSize = 1
+        state.calibrationSession.calibration.qPixelUnits = "pixels"
+
+        XCTAssertEqual(state.manualRPixelUnits, "nm")
+        XCTAssertEqual(state.manualQPixelUnits, "nm⁻¹")
+        XCTAssertNil(state.manualRPixelSize)
+        XCTAssertNil(state.manualQPixelSize)
+
+        state.setManualRPixelSize(0.5)
+        XCTAssertEqual(state.calibrationSession.calibration.rPixelSize, 0.5)
+        XCTAssertEqual(state.calibrationSession.calibration.rPixelUnits, "nm")
+        XCTAssertEqual(state.manualRPixelSize, 0.5)
+        XCTAssertEqual(state.calibrationSession.provenance.rScale, .manual)
+
+        state.setManualRPixelUnits("Å")
+        XCTAssertEqual(state.calibrationSession.calibration.rPixelUnits, "Å")
+        let rItem = state.calibrationSession.readiness.items.first { $0.kind == .rScale }
+        XCTAssertEqual(rItem?.status, .ready(.manual))
+        if let rItem {
+            XCTAssertTrue(PrepareSettings.shouldShowManualScaleEditor(
+                for: rItem.kind, status: rItem.status
+            ))
+        }
+
+        state.setManualQPixelSize(0.25)
+        XCTAssertEqual(state.calibrationSession.calibration.qPixelUnits, "nm⁻¹")
+        XCTAssertEqual(state.calibrationSession.provenance.qScale, .manual)
+        let qItem = state.calibrationSession.readiness.items.first { $0.kind == .qScale }
+        XCTAssertEqual(qItem?.status, .ready(.manual))
+        if let qItem {
+        XCTAssertTrue(PrepareSettings.shouldShowManualScaleEditor(
+                for: qItem.kind, status: qItem.status
+            ))
+        }
+        XCTAssertEqual(state.acomScale, 0.025, accuracy: 1e-12)
+        state.setManualQPixelUnits("Å⁻¹")
+        XCTAssertEqual(state.calibrationSession.calibration.qPixelUnits, "Å⁻¹")
+        XCTAssertEqual(state.calibrationSession.provenance.qScale, .manual)
+        let qItemAfterUnitChange = state.calibrationSession.readiness.items.first { $0.kind == .qScale }
+        XCTAssertEqual(qItemAfterUnitChange?.status, .ready(.manual))
+        if let qItemAfterUnitChange {
+            XCTAssertTrue(PrepareSettings.shouldShowManualScaleEditor(
+                for: qItemAfterUnitChange.kind, status: qItemAfterUnitChange.status
+            ))
+        }
+        XCTAssertEqual(state.acomScale, 0.25, accuracy: 1e-12)
+    }
+
+    func testManualScaleEditorsRemainReachableAfterReadiness() {
+        XCTAssertTrue(PrepareSettings.shouldShowManualScaleEditor(
+            for: .rScale, status: .ready(.importedFile)
+        ))
+        XCTAssertTrue(PrepareSettings.shouldShowManualScaleEditor(
+            for: .qScale, status: .ready(.manual)
+        ))
+        XCTAssertTrue(PrepareSettings.shouldShowManualScaleEditor(
+            for: .qScale, status: .ready(.sessionSidecar)
+        ), "restoring a saved manual scale must not lock its editor")
+        XCTAssertTrue(PrepareSettings.shouldShowManualScaleEditor(
+            for: .qScale, status: .missing
+        ))
+        XCTAssertTrue(PrepareSettings.shouldShowManualScaleEditor(
+            for: .qScale, status: .ready(.importedFile)
+        ), "a file's Q calibration can be invalid (py4DSTEM read_dm.py); the user must be able to override it")
+        XCTAssertFalse(PrepareSettings.shouldShowManualScaleEditor(
+            for: .qScale, status: .ready(.measuredInApp)
+        ))
+        XCTAssertFalse(PrepareSettings.shouldShowManualScaleEditor(
+            for: .rotation, status: .ready(.manual)
+        ))
+        // The hover text says what an entry replaces, except when nothing is
+        // replaced; an already-manual value has its own sentence.
+        XCTAssertEqual(PrepareSettings.manualScaleHelp(status: .missing, otherwise: "fallback"), "fallback")
+        XCTAssertEqual(PrepareSettings.manualScaleHelp(status: .ready(.manual), otherwise: "fallback"),
+                       "Your value. Entering another replaces it.")
+        XCTAssertEqual(
+            PrepareSettings.manualScaleHelp(status: .ready(.importedFile), otherwise: "fallback"),
+            "Replaces the value imported from file; provenance becomes Manual.")
+    }
+
+    /// UI review 2026-09-04, finding (f): the sidebar's check and the
+    /// inspector's rows must give ONE verdict on staleness, and the maps
+    /// computed from the disks inherit it. C4(b) generalized the source of
+    /// truth from a disks-only bool to (recorded step, current signature).
+    func testProductStateIsOneVerdictAcrossSurfaces() {
+        let matching = SessionReplayRecord.Step(kind: "disk_detection", parameters: ["corr_power": "1"], recorded: Date())
+        let mismatched = SessionReplayRecord.Step(kind: "disk_detection", parameters: ["corr_power": "9"], recorded: Date())
+        let currentSignature = ["corr_power": "1"]
+
+        XCTAssertEqual(
+            ProductWorkflow.productState(for: .disks, hasProduct: false, recordedStep: matching, currentSignature: currentSignature),
+            .none, "no product is no product, whatever the settings did")
+        XCTAssertEqual(
+            ProductWorkflow.productState(for: .disks, hasProduct: true, recordedStep: matching, currentSignature: currentSignature),
+            .current)
+        XCTAssertEqual(
+            ProductWorkflow.productState(for: .disks, hasProduct: true, recordedStep: mismatched, currentSignature: currentSignature),
+            .stale(reason: ProductWorkflow.staleReason(changedKeys: ["corr_power"])))
+        // The invalidation case, generalized: disk re-detection deletes
+        // strain/ACOM's own recorded step (`invalidating: ["strain",
+        // "acom"]`), so a retained map outlives it — recordedStep nil,
+        // hasProduct true, is stale with nothing to name.
+        XCTAssertEqual(
+            ProductWorkflow.productState(for: .strain, hasProduct: true, recordedStep: nil, currentSignature: currentSignature),
+            .stale(reason: ProductWorkflow.staleReason(changedKeys: [])),
+            "a strain map whose recorded step was invalidated by disk re-detection must not stay green")
+        XCTAssertEqual(
+            ProductWorkflow.productState(for: .acom, hasProduct: true, recordedStep: nil, currentSignature: currentSignature),
+            .stale(reason: ProductWorkflow.staleReason(changedKeys: [])))
+        // Kinds with no signature builder (ptychography/parallax) are never
+        // judged stale, whatever the recorded step says.
+        XCTAssertEqual(
+            ProductWorkflow.productState(for: .ptychography, hasProduct: true, recordedStep: mismatched, currentSignature: nil),
+            .current, "no recorder for this kind — never stale")
+        XCTAssertFalse(TaskProductState.none.isProduced)
+        XCTAssertTrue(TaskProductState.stale(reason: "x").isProduced)
+    }
+
+    // MARK: - C4(b): the generalized staleness verdict
+
+    /// Plan §4 test 1: a recorded step matching the current signature is
+    /// current; one changed value must flip the verdict to stale.
+    func testStalenessVerdictComparesRecordedAgainstCurrentSignature() {
+        let recorded = SessionReplayRecord.Step(
+            kind: "disk_detection", parameters: ["corr_power": "1", "sigma_dp": "0"], recorded: Date())
+        XCTAssertEqual(
+            ProductWorkflow.stalenessVerdict(
+                recordedStep: recorded, currentSignature: ["corr_power": "1", "sigma_dp": "0"], hasProduct: true),
+            .current)
+        XCTAssertEqual(
+            ProductWorkflow.stalenessVerdict(
+                recordedStep: recorded, currentSignature: ["corr_power": "2", "sigma_dp": "0"], hasProduct: true),
+            .stale(changedKeys: ["corr_power"]))
+    }
+
+    /// Plan §4 test 2: `.stale` names only the keys that actually changed —
+    /// two changed keys are both named, and a third, unchanged key never
+    /// appears (which is also what keeps strain's output-only `resolved_g*`
+    /// out of the picture, since they are simply absent from a signature
+    /// that only ever carries `reference_mode`/`basis_mode`).
+    func testStalenessVerdictNamesOnlyTheChangedKeys() {
+        let recorded = SessionReplayRecord.Step(
+            kind: "disk_detection", parameters: ["a": "1", "b": "2", "c": "3"], recorded: Date())
+        let verdict = ProductWorkflow.stalenessVerdict(
+            recordedStep: recorded, currentSignature: ["a": "9", "b": "8", "c": "3"], hasProduct: true)
+        guard case .stale(let changedKeys) = verdict else {
+            return XCTFail("two changed values must report stale, not \(verdict)")
+        }
+        XCTAssertEqual(Set(changedKeys), ["a", "b"])
+        XCTAssertFalse(changedKeys.contains("c"), "an unchanged key must never be named")
+    }
+
+    /// Plan §4 test 3: a product that survives its own recorded step being
+    /// removed — the disk-re-detection invalidation case — is stale even
+    /// though there is no recorded step to diff against.
+    func testStalenessVerdictTreatsAnInvalidatedStepAsStale() {
+        XCTAssertEqual(
+            ProductWorkflow.stalenessVerdict(
+                recordedStep: nil, currentSignature: ["reference_mode": "whole-scan"], hasProduct: true),
+            .stale(changedKeys: []))
+    }
+
+    /// Plan §4 test 4: a kind with no signature builder (ptychography,
+    /// parallax) is never stale, regardless of what the recorded step says —
+    /// there is nothing to compare it against.
+    func testStalenessVerdictNeverStaleWithNoSignatureBuilder() {
+        let recorded = SessionReplayRecord.Step(kind: "ptychography", parameters: ["anything": "1"], recorded: Date())
+        XCTAssertEqual(
+            ProductWorkflow.stalenessVerdict(recordedStep: recorded, currentSignature: nil, hasProduct: true), .current)
+        XCTAssertEqual(
+            ProductWorkflow.stalenessVerdict(recordedStep: nil, currentSignature: nil, hasProduct: true), .current)
+    }
+
+    /// Plan §4 test 5, the §1 coverage gap this slice closes: the disk
+    /// detection signature moves when the learned detector's threshold
+    /// changes, even though `diskParams` itself never did — the old
+    /// `completedDiskParams != diskParams` compare could not see this.
+    func testDiskDetectionSignatureIncludesTheLearnedDetectorThreshold() throws {
+        let state = AppState()
+        state.probeKernel = try XCTUnwrap(ProbeKernel.synthetic(radius: 4, qy: 32, qx: 32))
+        state.learnedDetection.detectorClass = .learned
+        state.learnedDetection.threshold = 0.5
+        let recordedAtHalf = SessionReplayRecord.Step(
+            kind: "disk_detection",
+            parameters: try XCTUnwrap(state.currentReplaySignature(for: .disks)),
+            recorded: Date())
+
+        state.learnedDetection.threshold = 0.9
+        let verdict = ProductWorkflow.stalenessVerdict(
+            recordedStep: recordedAtHalf,
+            currentSignature: state.currentReplaySignature(for: .disks),
+            hasProduct: true)
+        guard case .stale(let changedKeys) = verdict else {
+            return XCTFail("a changed learned threshold, with diskParams unchanged, must be stale, not \(verdict)")
+        }
+        XCTAssertEqual(changedKeys, ["learned_threshold"])
+    }
+
+    /// Plan §4 test 6: with no resolved crystal model, ACOM's current
+    /// signature is nil (never a mismatch to force-unwrap or misreport) —
+    /// the guard `ReplayStepPlan.ACOMReplayPlan.currentSignatureIfResolved`
+    /// adds around the model-required `recordedParameters`.
+    func testACOMSignatureIsNilUntilAModelIsResolved() {
+        let state = AppState()
+        XCTAssertNil(state.resolvedACOMModel)
+        XCTAssertNil(state.currentReplaySignature(for: .acom),
+                     "no resolved crystal model means no signature yet, never a mismatch")
+        XCTAssertEqual(
+            ProductWorkflow.stalenessVerdict(
+                recordedStep: SessionReplayRecord.Step(kind: "acom", parameters: ["material": "au_fcc"], recorded: Date()),
+                currentSignature: state.currentReplaySignature(for: .acom),
+                hasProduct: true),
+            .current,
+            "a nil signature must never be reported stale, even with a recorded step present")
+    }
+
+    /// Finding (b): "Pattern min" under "Current scan position" must name a
+    /// mean, a max or a region sum when that is what is on screen.
+    func testPatternSourceNounNamesWhatIsOnScreen() {
+        XCTAssertEqual(PatternSourceLabel.noun(mode: .current, roiSummed: false), "Pattern")
+        XCTAssertEqual(PatternSourceLabel.noun(mode: .current, roiSummed: true), "ROI-sum pattern")
+        XCTAssertEqual(PatternSourceLabel.noun(mode: .mean, roiSummed: false), "Mean pattern")
+        XCTAssertEqual(PatternSourceLabel.noun(mode: .max, roiSummed: true), "Max pattern",
+                       "Mean and Max are whole-scan statistics; a region never sums into them")
+    }
+
+    func testACOMRequiresExplicitMaterialAndPreservesScaleMeaning() {
+        let state = AppState()
+        XCTAssertEqual(state.acomSession.modelSelection, .none)
+        XCTAssertEqual(state.acomScaleSemantics.provenance, .exploratory)
+        XCTAssertEqual(state.acomScale, 0.01, accuracy: 1e-12)
+        XCTAssertFalse(state.productWorkflowReadiness.hasACOMMaterial)
+
+        state.acomSession.modelSelection = .library("not_a_model")
+        XCTAssertTrue(state.productWorkflowReadiness.hasACOMMaterial)
+        XCTAssertFalse(state.productWorkflowReadiness.hasSupportedACOMMaterial)
+        XCTAssertNotNil(state.acomSession.modelSelectionIssue)
+
+        state.acomSession.modelSelection = .library("au_fcc")
+        XCTAssertTrue(state.productWorkflowReadiness.hasSupportedACOMMaterial)
+        XCTAssertEqual(state.resolvedACOMModel?.displayName, "Gold (FCC)")
+        state.acomSession.exploratoryScale = 0.02
+        XCTAssertEqual(state.acomScale, 0.02, accuracy: 1e-12)
+        XCTAssertEqual(state.acomScaleSemantics.provenance, .exploratory)
+
+        state.setManualQPixelSize(0.25)
+        XCTAssertEqual(state.acomScaleSemantics.provenance, .manual)
+        XCTAssertTrue(state.productWorkflowReadiness.hasPhysicalACOMScale)
+    }
+
+    func testCrystalModelLibraryIsCompleteAndSymmetryValidated() {
+        let models = CrystalModelLibrary.models
+        XCTAssertEqual(Set(models.map(\.id)).count, models.count)
+        XCTAssertFalse(models.isEmpty)
+        for model in models {
+            XCTAssertTrue(model.isUsable, "\(model.displayName): \(model.validationIssues)")
+            XCTAssertFalse(model.structure.sites.isEmpty)
+            XCTAssertFalse(try model.structure.kinematicReflections(kMax: 1.2).kept.isEmpty)
+            XCTAssertEqual(model.provenance["crystal_model_id"], model.id)
+            XCTAssertEqual(model.provenance["crystal_symmetry"], model.symmetry.rawValue)
+        }
+
+        let invalid = CrystalModelLibrary.customCubic(
+            structure: .fcc, latticeA: 0, atomicNumber: 79
+        )
+        XCTAssertFalse(invalid.isUsable)
+        XCTAssertTrue(invalid.validationIssues.contains {
+            $0.code == "invalid_cell_lengths"
+        })
+    }
+
+    func testACOMRunSemanticsNeverPromotesFallbackScale() {
+        let exploratory = ACOMRunSemantics(
+            materialModelID: "au_fcc", materialDescription: "Gold (FCC)",
+            scale: ACOMScaleSemantics(
+                invAngstromPerPixel: 0.01, provenance: .exploratory
+            )
+        )
+        XCTAssertEqual(exploratory.productStatus(for: "acom_reliability"), .exploratory)
+        XCTAssertEqual(exploratory.productStatus(for: "acom_ipf_z"), .exploratory)
+        XCTAssertEqual(exploratory.provenance["interpretation"], "exploratory")
+
+        let physical = ACOMRunSemantics(
+            materialModelID: "au_fcc", materialDescription: "Gold (FCC)",
+            scale: ACOMScaleSemantics(
+                invAngstromPerPixel: 0.02, provenance: .importedFile
+            )
+        )
+        XCTAssertEqual(physical.productStatus(for: "acom_reliability"), .relative)
+        XCTAssertEqual(physical.productStatus(for: "acom_score"), .relative)
+        XCTAssertEqual(physical.productStatus(for: "acom_phi1"), .quantitative)
+        XCTAssertEqual(physical.productStatus(for: "acom_ipf_z"), .categorical)
+        XCTAssertEqual(physical.provenance["q_scale_provenance"], "imported_file")
+    }
+
+    /// The origin the map was computed against travels with the run
+    /// (2026-09-05, closing the open item): no snapshot means no origin keys,
+    /// a snapshot means exactly its keys, and it wins over a same-named key
+    /// the material's own provenance might carry.
+    func testACOMRunSemanticsCarriesTheOriginSnapshotItWasComputedAgainst() {
+        let scale = ACOMScaleSemantics(invAngstromPerPixel: 0.02, provenance: .importedFile)
+        let bare = ACOMRunSemantics(
+            materialModelID: "au_fcc", materialDescription: "Gold (FCC)", scale: scale
+        )
+        XCTAssertNil(bare.provenance["origin_reference"], "no snapshot, no origin claim")
+
+        let snapshotted = ACOMRunSemantics(
+            materialModelID: "au_fcc", materialDescription: "Gold (FCC)", scale: scale,
+            materialProvenance: ["origin_reference": "stale-material-key", "cif_source": "test"],
+            originProvenance: [
+                "origin_reference": "fitted_mean",
+                "origin_reference_is_measured": "true",
+                "origin_fit_residual_px": "0.42",
+                "origin_fit_excluded_fraction": "0.05",
+            ]
+        )
+        let provenance = snapshotted.provenance
+        XCTAssertEqual(provenance["origin_reference"], "fitted_mean", "the compute-time snapshot wins")
+        XCTAssertEqual(provenance["origin_reference_is_measured"], "true")
+        XCTAssertEqual(provenance["origin_fit_residual_px"], "0.42")
+        XCTAssertEqual(provenance["origin_fit_excluded_fraction"], "0.05")
+        XCTAssertEqual(provenance["cif_source"], "test", "material keys survive beside the snapshot")
+        XCTAssertEqual(provenance["material_model_id"], "au_fcc")
+    }
+
+    func testRejectedStrainPixelsAreNoDataRatherThanZeroStrain() {
+        let map = StrainMap(
+            width: 2, height: 1,
+            exx: [0.125, 0], eyy: [0, 0], exy: [0, 0], theta: [0, 0],
+            mask: [true, false],
+            localG1x: [1, 0], localG1y: [0, 0],
+            localG2x: [0, 0], localG2y: [1, 0],
+            localResidualPixels: [0.01, 0],
+            refG1: (1, 0), refG2: (0, 1),
+            referencePositionCount: 1, indexedFraction: 0.5,
+            diagnostics: StrainFitDiagnostics(
+                automaticBasis: true, referenceMaskApplied: false,
+                basisObservationCount: 1, basisSupportCount: 1,
+                basisSupportFraction: 1, basisResidualPixels: 0,
+                basisConditionNumber: 1, indexingTolerancePixels: 1,
+                localResidualMedianPixels: 0.01,
+                referenceCandidateCount: 1, referenceRejectedCount: 0
+            )
+        )
+        let image = map.component(.exx)
+        XCTAssertEqual(image.pixels[0], 0.125)
+        XCTAssertTrue(image.pixels[1].isNaN)
+        XCTAssertEqual(image.normalized(symmetric: true)[1], FloatImage.invalidDisplayValue)
+    }
+
+    func testDisplayedProductCarriesDomainMaskUnitsQualityAndCursorValues() throws {
+        let image = FloatImage(width: 2, height: 1, pixels: [1.25, .nan])
+        let quality = FloatImage(width: 2, height: 1, pixels: [0.02, 0.9])
+        let product = DisplayedProduct(
+            kind: "strain_exx", displayName: "Strain",
+            payload: .scalar(image), domain: .scan,
+            qualityFields: [ProductQualityField(
+                name: "fit residual", units: "detector_px", image: quality
+            )],
+            sampling: ProductSampling(row: 0.5, column: 0.5, units: "nm"),
+            valueUnits: "strain", quantitativeStatus: .quantitative,
+            provenance: ["method": "local_lattice_fit"]
+        )
+        XCTAssertEqual(product.domain, .scan)
+        XCTAssertEqual(product.provenance["display_domain"], "scan")
+        XCTAssertEqual(product.validityMask, [true, false])
+        XCTAssertEqual(try XCTUnwrap(product.sample(x: 0, y: 0)).value, 1.25)
+        XCTAssertEqual(product.sample(x: 0, y: 0)?.quality["fit residual"], 0.02)
+        XCTAssertNil(product.sample(x: 1, y: 0)?.value)
+        XCTAssertTrue(product.sample(x: 1, y: 0)?.accessibilityText.contains("no data") == true)
+        XCTAssertNil(product.sample(x: 2, y: 0))
+    }
+
+    func testDifferenceRequiresNumericSemanticParityAndPreservesNoData() throws {
+        func product(_ values: [Float], units: String = "strain",
+                     domain: ProductDomain = .scan) -> DisplayedProduct {
+            DisplayedProduct(
+                kind: "strain", displayName: "strain",
+                payload: .scalar(FloatImage(width: 2, height: 1, pixels: values)),
+                domain: domain,
+                sampling: ProductSampling(row: 1, column: 1, units: "nm"),
+                valueUnits: units, quantitativeStatus: .quantitative
+            )
+        }
+        let difference = try XCTUnwrap(ProductComparison.difference(
+            product([3, .nan]), product([1, 2])
+        ))
+        guard case .scalar(let image) = difference.payload else {
+            return XCTFail("Expected scalar difference")
+        }
+        XCTAssertEqual(image.pixels[0], 2, accuracy: 1e-7)
+        XCTAssertTrue(image.pixels[1].isNaN)
+        XCTAssertEqual(difference.validityMask, [true, false])
+        XCTAssertEqual(
+            ProductComparison.compatibility(product([1, 2]), product([1, 2], units: "rad")),
+            .incompatible("Value units differ.")
+        )
+        XCTAssertNil(ProductComparison.difference(
+            product([1, 2]), product([1, 2], domain: .detector)
+        ))
+    }
+
+    func testStrainQualityViewsRetainMaskMeaning() {
+        let map = StrainMap(
+            width: 2, height: 1, exx: [0, 0], eyy: [0, 0], exy: [0, 0], theta: [0, 0],
+            mask: [true, false], localG1x: [1, 0], localG1y: [0, 0],
+            localG2x: [0, 0], localG2y: [1, 0], localResidualPixels: [0.125, 0],
+            refG1: (1, 0), refG2: (0, 1), referencePositionCount: 1,
+            indexedFraction: 0.5,
+            diagnostics: StrainFitDiagnostics(
+                automaticBasis: true, referenceMaskApplied: false,
+                basisObservationCount: 1, basisSupportCount: 1,
+                basisSupportFraction: 1, basisResidualPixels: 0,
+                basisConditionNumber: 1, indexingTolerancePixels: 1,
+                localResidualMedianPixels: 0.125,
+                referenceCandidateCount: 1, referenceRejectedCount: 0
+            )
+        )
+        XCTAssertEqual(map.component(.residual).pixels[0], 0.125)
+        XCTAssertTrue(map.component(.residual).pixels[1].isNaN)
+        XCTAssertEqual(map.component(.indexed).pixels[0], 1)
+        XCTAssertTrue(map.component(.indexed).pixels[1].isNaN)
+    }
+
+    /// `ProductComparison.compatibility`'s dimension guard (width AND height)
+    /// has no test today — only "Value units differ" is pinned by message,
+    /// and domain-differs is pinned only indirectly through `difference`
+    /// returning nil. A width-only or height-only mismatch currently falls
+    /// through to this guard correctly, but nothing would notice if either
+    /// half of the conjunction were dropped: the pair would be reported
+    /// `.compatible` and `difference` would then walk pixel arrays whose
+    /// geometry silently disagrees.
+    func testCompatibilityRejectsMismatchedWidthOrHeightBeforeOtherChecks() throws {
+        func product(width: Int, height: Int) -> DisplayedProduct {
+            DisplayedProduct(
+                kind: "strain", displayName: "strain",
+                payload: .scalar(FloatImage(width: width, height: height,
+                                            pixels: [Float](repeating: 1, count: width * height))),
+                domain: .scan,
+                sampling: ProductSampling(row: 1, column: 1, units: "nm"),
+                valueUnits: "strain", quantitativeStatus: .quantitative
+            )
+        }
+        XCTAssertEqual(
+            ProductComparison.compatibility(product(width: 2, height: 1), product(width: 3, height: 1)),
+            .incompatible("Pixel dimensions differ."),
+            "width-only mismatch must be caught by the dimensions guard"
+        )
+        XCTAssertEqual(
+            ProductComparison.compatibility(product(width: 2, height: 1), product(width: 2, height: 2)),
+            .incompatible("Pixel dimensions differ."),
+            "height-only mismatch must be caught by the dimensions guard"
+        )
+        XCTAssertNil(ProductComparison.difference(
+            product(width: 2, height: 1), product(width: 3, height: 1)
+        ), "difference must refuse mismatched geometry rather than mis-zip the pixel arrays")
+    }
+}
+
+// MARK: - v2.5 step 5a negative controls (docs/v2.5-plan.md §10f)
+
+@MainActor
+final class TaskReadinessTests: XCTestCase {
+    private func readiness(diskSettingsValid: Bool, bragg: Bool = false) -> ProductWorkflowReadiness {
+        ProductWorkflowReadiness(
+            hasOriginProbe: false, hasRotation: false, hasQScale: false, hasRScale: false,
+            hasVoltage: false, hasValidDiskDetectionSettings: diskSettingsValid,
+            hasBraggVectors: bragg, hasACOMMaterial: false, hasSupportedACOMMaterial: false,
+            hasPhysicalACOMScale: false)
+    }
+
+    func testInvalidDiskSettingsBlockTheTaskOnEverySurface() {
+        // Before 5a only the tools-panel button knew; the header ran anyway.
+        XCTAssertEqual(ProductWorkflow.readiness(for: .disks, readiness: readiness(diskSettingsValid: true)), .ready)
+        guard case .unavailable(let reason) = ProductWorkflow.readiness(for: .disks, readiness: readiness(diskSettingsValid: false)) else {
+            return XCTFail("invalid settings must make the task unavailable")
+        }
+        XCTAssertEqual(reason, "Fix the disk-detection settings")
+        XCTAssertEqual(ProductWorkflow.prerequisites(for: .disks, readiness: readiness(diskSettingsValid: false)), [reason])
+    }
+
+    // MARK: - C7 session 2: the learned-detector asset prerequisite and guidance
+
+    func testLearnedDetectorWantedWithoutTheAssetAddsAPrerequisite() {
+        var wanted = ProductWorkflowReadiness()
+        wanted.wantsLearnedDetector = true
+        wanted.hasLearnedDetectorAsset = false
+        let items = ProductWorkflow.prerequisiteItems(for: .disks, readiness: wanted)
+        XCTAssertEqual(items.map(\.id), ["learnedAsset"])
+        XCTAssertFalse(items[0].isSatisfied)
+
+        var satisfied = wanted
+        satisfied.hasLearnedDetectorAsset = true
+        XCTAssertEqual(ProductWorkflow.prerequisiteItems(for: .disks, readiness: satisfied), [])
+
+        var notWanted = ProductWorkflowReadiness()
+        notWanted.hasLearnedDetectorAsset = false
+        XCTAssertEqual(ProductWorkflow.prerequisiteItems(for: .disks, readiness: notWanted), [],
+                       "the classical room never gates on an asset it does not need")
+    }
+
+    func testBothDiskPrerequisitesCanAppearTogether() {
+        var readiness = ProductWorkflowReadiness()
+        readiness.hasValidDiskDetectionSettings = false
+        readiness.wantsLearnedDetector = true
+        readiness.hasLearnedDetectorAsset = false
+        XCTAssertEqual(
+            ProductWorkflow.prerequisiteItems(for: .disks, readiness: readiness).map(\.id),
+            ["diskSettings", "learnedAsset"]
+        )
+    }
+
+    func testDiskGuidanceIsNonEmptyOnlyWhenTheLearnedDetectorIsWanted() {
+        XCTAssertEqual(ProductWorkflow.guidance(for: .disks, readiness: ProductWorkflowReadiness()), [])
+        var wanted = ProductWorkflowReadiness()
+        wanted.wantsLearnedDetector = true
+        XCTAssertFalse(ProductWorkflow.guidance(for: .disks, readiness: wanted).isEmpty)
+    }
+
+    func testAReplayedStepRefusesForTheChecklistsReason() {
+        // No Bragg vectors: the checklist blocks strain with one title, and the
+        // replay executor must refuse quoting that same title, not its own.
+        let state = AppState()
+        let checklist = ProductWorkflow.prerequisites(for: .strain, readiness: state.productWorkflowReadiness)
+        XCTAssertEqual(checklist, ["Detect Bragg disks first"])
+        let refusal = state.replayRefusal(for: .strain)
+        XCTAssertNotNil(refusal)
+        XCTAssertTrue(refusal?.contains("Detect Bragg disks first") == true, refusal ?? "nil")
+        XCTAssertNil(state.replayRefusal(for: .virtualDetector), "nothing gates virtual imaging")
+    }
+}
+
+// MARK: - v2.5 step 7a: the Phase split (plan §11b, §11f)
+
+@MainActor
+final class PhaseSplitTests: XCTestCase {
+    func testPhaseHasThreeIndependentTasksWithSharedCalibrationPrerequisites() {
+        XCTAssertEqual(WorkspaceArea.reconstruct.analysisModes, [.dpc, .ptychography, .singleslicePtychography])
+        let readiness = ProductWorkflowReadiness()
+        XCTAssertEqual(ProductWorkflow.prerequisites(for: .singleslicePtychography, readiness: readiness),
+                       ProductWorkflow.prerequisites(for: .ptychography, readiness: readiness),
+                       "same calibration list, separate state")
+        XCTAssertNotEqual(AnalysisMode.ptychography.productTitle, AnalysisMode.singleslicePtychography.productTitle)
+        XCTAssertEqual(AnalysisMode.singleslicePtychography.workspaceArea, .reconstruct)
+    }
+
+    func testSwitchingPhaseTaskNeverClearsAnotherTasksState() {
+        let state = AppState()
+        state.changeMode(.singleslicePtychography)
+        state.ptychography.stepSize = 0.75
+        state.changeMode(.ptychography)
+        XCTAssertEqual(state.ptychography.stepSize, 0.75)
+        state.changeMode(.dpc)
+        state.changeMode(.singleslicePtychography)
+        XCTAssertEqual(state.ptychography.stepSize, 0.75)
+    }
+
+    /// The seam's own contract (`App/PtychographySettings.swift`'s header):
+    /// `AppState` holds it as `ptychography` without forwarding properties —
+    /// the same contract `StrainProductTests.testAppStateHoldsTheSeamWithoutForwardingProperties`
+    /// pins for `strain`.
+    func testAppStateHoldsThePtychographySeamWithoutForwardingProperties() {
+        // @Observable underscores stored properties, so strip the prefix
+        // before matching — without this the filter can never match and the
+        // test is vacuous.
+        let names = Mirror(reflecting: AppState()).children.compactMap { child in
+            child.label.map { $0.hasPrefix("_") ? String($0.dropFirst()) : $0 }
+        }
+        XCTAssertTrue(names.contains("ptychography"), "the facade holds the seam")
+        let forwarded = names.filter { $0.hasPrefix("ptychography") && $0 != "ptychography" }
+        XCTAssertTrue(
+            forwarded.isEmpty,
+            "no ptychography* stored property may shadow the seam: \(forwarded)"
+        )
+    }
+
+    /// Settings survive a dataset reopen; only the published result is
+    /// cleared (`AppState.activate` nils `singleslicePtychography` and
+    /// leaves `ptychography` untouched — pre-existing behavior, unchanged by
+    /// the seam extraction). `openDemoFixture` drives the same `activate`
+    /// path the file-open pipeline does, with no disk I/O. This is the
+    /// seam's save/reopen contract: `ptychography` is a stable `let`
+    /// reference constructed once with `AppState` itself, never recreated by
+    /// a dataset change — a regression that reconstructed it fresh on each
+    /// `activate` would silently discard the user's edited settings on
+    /// every reopen, and this is the test that would catch it.
+    func testPtychographySettingsSurviveADatasetReopen() async throws {
+        let state = AppState()
+        await state.openDemoFixture()
+        state.ptychography.iterations = 42
+        state.ptychography.stepSize = 0.75
+
+        await state.openDemoFixture()
+
+        XCTAssertEqual(state.ptychography.iterations, 42)
+        XCTAssertEqual(state.ptychography.stepSize, 0.75)
+    }
+}

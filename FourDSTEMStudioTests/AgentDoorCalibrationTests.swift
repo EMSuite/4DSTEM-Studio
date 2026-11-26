@@ -169,9 +169,8 @@ final class AgentDoorCalibrationTests: XCTestCase {
         door.enroll(state) { [weak state] in state?.agentSummary() ?? [:] }
         door.runsAllowed = true
 
-        let noDisks = try await call("run_calibration", ["step": "origin_from_bragg_peaks"])
-        XCTAssertTrue(noDisks.refused)
-        XCTAssertTrue(noDisks.text.contains("Detect All Disks"), noDisks.text)
+        // origin_from_bragg_peaks no longer refuses without a detection: it runs Detect All Disks first, as the row's button
+        // (#511, OriginSpotPatternTests).
         let innerBefore = state.calibrationSession.ellipseFitInnerRadius   // the open sets it from the detector's size
         let annulus = try await call("run_calibration", ["step": "ellipse", "fit_inner_px": 30, "fit_outer_px": 20])
         XCTAssertTrue(annulus.refused, "an inner radius above the outer is refused")

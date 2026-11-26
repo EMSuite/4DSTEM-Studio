@@ -19,6 +19,9 @@ package final class CalibrationSession {
     package var calibration = Calibration()
     package var provenance = CalibrationProvenance()
     package var acceleratingVoltage: Double?
+    /// The probe's convergence semi-angle in mrad, typed (#511): with the voltage and the Q scale it gives the probe radius the
+    /// optics imply, which the Origin & probe row shows and checks a typed radius against. Per dataset, like the voltage.
+    package var convergenceSemiAngleMrad: Double?
     package var originFitFunction: OriginFitFunction = .plane
     /// How per-position origins are measured before the smooth fit. `.friedel`
     /// is the beamstop-tolerant path (`get_origin_friedel`), opt-in. // v3.1
@@ -185,7 +188,8 @@ package final class CalibrationSession {
 
     /// The per-item readiness report, one owner (Core computes it).
     package var readiness: CalibrationReadinessReport {
-        CalibrationReadinessReport.make(calibration: calibration, provenance: provenance)
+        CalibrationReadinessReport.make(calibration: calibration, provenance: provenance,
+                                        convergenceSemiAngleMrad: convergenceSemiAngleMrad, voltageKV: acceleratingVoltage)
     }
 
     /// A voltage is usable only when finite and positive; a stored 0 is a

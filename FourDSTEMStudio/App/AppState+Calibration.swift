@@ -175,6 +175,17 @@ extension AppState {
         }
     }
 
+    /// The spot pattern's origin in one step (#511): Detect All Disks when no current detection exists, then the origin from
+    /// those peaks. The route py4DSTEM takes on a spot pattern (`find_Bragg_disks`, then `measure_origin` and `fit_origin` on the
+    /// Bragg vectors), where its centre-of-mass `get_origin` follows the brightest disk. A detection that fails or is cancelled
+    /// stops here with its own status line; the origin is left as it was.
+    func originFromBraggPeaksInOneStep() async {
+        if !hasCurrentBraggVectors {
+            guard await runDiskDetection() == .published, resultPresentation.braggVectors != nil else { return }
+        }
+        await calibrateOriginFromBraggPeaks()
+    }
+
     /// The origin from the detected Bragg peaks (mac4DSTEM#138; `OriginCalibration.fromBraggPeaks`), opt-in: for a crystal
     /// whose strong reflections pull the centre of mass off the direct beam. Needs a full-scan disk detection; replaces the
     /// fitted origin maps and recentres the aperture, as Calibrate Origin does, and leaves the probe radius alone.

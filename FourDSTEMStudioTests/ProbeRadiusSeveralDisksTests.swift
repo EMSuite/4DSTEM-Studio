@@ -81,7 +81,7 @@ final class ProbeRadiusSeveralDisksTests: XCTestCase {
         func row(_ state: AppState) -> String {
             state.calibrationSession.readiness.items.first { $0.kind == .originProbe }?.detail ?? "no Origin & probe row"
         }
-        let hint = "Spot pattern: after Detect All Disks use Origin from Bragg Peaks"
+        let hint = "Spot pattern: use Origin from Bragg Peaks (it detects the disks first)"
         let source = SaturatedSpotPatternSource()
         let state = AppState()
         await state.activate(descriptor: try await source.discoverPrimaryDataset(), reader: source, runInitialAnalysis: false)

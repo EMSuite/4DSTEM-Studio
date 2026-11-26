@@ -132,6 +132,7 @@ enum CalibrationReadinessRow {
     /// centre with nothing set aside destroyed nothing, and is not orange.
     static func isWarning(_ item: CalibrationReadinessItem, canRestoreFittedOrigin: Bool) -> Bool {
         if item.status == .ready(.fitAnyway) { return true }
+        if item.flag != nil { return true }   // #511: a flagged centre of mass is a caveat on a value that may read ready
         return item.kind == .originProbe && item.status.isReady && canRestoreFittedOrigin
     }
 
@@ -182,6 +183,19 @@ enum CalibrationReadinessRow {
     ) -> some View {
         switch kind {
         case .originProbe:
+            // A flagged centre of mass (#511): the spot pattern's route, one click from the row that flags it.
+            if CalibrationReadinessReport.originIsFlagged(calibration: appState.calibrationSession.calibration,
+                                                          provenance: appState.calibrationSession.provenance) {
+                InspectorActionRow {
+                    Button("Origin from Bragg Peaks") {
+                        PendingEdits.run { await appState.originFromBraggPeaksInOneStep() }
+                    }
+                    .disabled(appState.isBusy)
+                    .accessibilityIdentifier("calibration.action.originFromBraggPeaks")
+                    .help("Detects all disks (when no current detection exists), then follows the direct beam among them, as "
+                          + "py4DSTEM measure_origin and fit_origin: the origin a spot pattern needs.")
+                }
+            }
             InspectorActionRow {
                 Button(originActionTitle(status: status)) {
                     PendingEdits.run { await appState.calibrateOrigin() }

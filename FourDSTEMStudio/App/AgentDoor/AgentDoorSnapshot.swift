@@ -233,8 +233,12 @@ extension AppState {
             // The readiness report in the door's locale: its details are the checklist's, with a point (issue #233; a German Mac
             // gave "0,01904" beside the JSON's 0.01904).
             "items": CalibrationReadinessReport.make(calibration: calibration, provenance: calibrationSession.provenance,
+                                                     convergenceSemiAngleMrad: calibrationSession.convergenceSemiAngleMrad,
+                                                     voltageKV: calibrationSession.acceleratingVoltage,
                                                      locale: Mac4DSTEMAgentDoor.textLocale).items.map { item in
-                ["item": item.kind.rawValue, "state": item.status.displayName, "ready": item.status.isReady, "detail": item.detail] as [String: Any]
+                // "flag": what the row's own check flagged (#511), so a scattered centre of mass never reads as measured.
+                ["item": item.kind.rawValue, "state": item.stateText, "ready": item.status.isReady, "detail": item.detail,
+                 "flag": AgentJSON.orNull(item.flag)] as [String: Any]
             },
             "q_pixel_size": AgentJSON.number(calibration.qPixelSize),
             "q_pixel_units": AgentJSON.orNull(calibration.qPixelUnits),
@@ -244,6 +248,11 @@ extension AppState {
             "qr_flip": calibration.rotationRad == nil ? NSNull() : (calibration.transposeQR ?? false) as Any,   // py4DSTEM's QR_flip (#275)
             "probe_radius_px": AgentJSON.number(calibration.probeRadius),
             "accelerating_voltage_kv": AgentJSON.number(calibrationSession.acceleratingVoltage),
+            "convergence_semiangle_mrad": AgentJSON.number(calibrationSession.convergenceSemiAngleMrad),
+            // The probe radius the optics imply (#511); null until the convergence angle, voltage and Q scale are all known.
+            "expected_probe_radius_px": AgentJSON.number(CalibrationReadinessReport.expectedProbeRadiusPixels(
+                convergenceSemiAngleMrad: calibrationSession.convergenceSemiAngleMrad,
+                voltageKV: calibrationSession.acceleratingVoltage, calibration: calibration)),
         ]
         if let origin = calibration.meanOrigin {
             out["mean_origin_px"] = ["x": AgentJSON.number(origin.x), "y": AgentJSON.number(origin.y)]

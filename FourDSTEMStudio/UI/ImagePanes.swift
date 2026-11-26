@@ -270,9 +270,11 @@ struct DiffractionPane: View {
             let fitTemplate = fit.template
             let fitOrigin = fit.originPoint
             let fitEllipse = fit.ellipse
+            let originFlagged = CalibrationReadinessReport.originIsFlagged(
+                calibration: appState.calibrationSession.calibration, provenance: appState.calibrationSession.provenance)
             let fitLegend = PatternFitOverlay.legendText(
                 strain: fitStrain, template: fitTemplate,
-                originPoint: fitOrigin, ellipse: fitEllipse)
+                originPoint: fitOrigin, ellipse: fitEllipse, originFlagged: originFlagged)
 
             ZStack {
                 ZStack {
@@ -377,7 +379,8 @@ struct DiffractionPane: View {
                                 ? fit.storedPeaksAtSelection : [],
                             probeRadius: appState.probeKernel?.probeRadius,
                             patternWidth: qx, patternHeight: qy,
-                            box: box
+                            box: box,
+                            originFlagged: originFlagged
                         )
                     }
                 }

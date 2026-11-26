@@ -179,6 +179,21 @@ struct PrepareSettings: View {
                     .labelsHidden()
                     .accessibilityIdentifier("calibration.acceleratingVoltage")
                 }
+                // The convergence semi-angle (#511): with the voltage and the Q scale, the Origin & probe row shows the probe
+                // radius the optics imply and flags a typed radius more than 20 % off it.
+                InspectorRow("Convergence") {
+                    OptionalNumericField(
+                        title: "Convergence semi-angle (mrad)",
+                        value: appState.calibrationSession.convergenceSemiAngleMrad,
+                        format: .number.precision(.fractionLength(0...3)),
+                        unit: "mrad",
+                        onCommit: appState.setConvergenceSemiAngle
+                    )
+                    .labelsHidden()
+                    .accessibilityIdentifier("calibration.convergenceSemiAngle")
+                    .help("The probe's convergence semi-angle α. With the voltage and the Q scale it gives the expected probe radius "
+                          + "(α/λ in reciprocal space), which the Origin & probe row shows and checks a typed radius against.")
+                }
                 // "Not set" alone left open whether anything was wrong (a scan whose file states no voltage, 5.3.0 walk).
                 if !session.hasUsableVoltage {
                     InspectorNote(Self.voltageNotSetNote)
@@ -286,15 +301,15 @@ struct PrepareSettings: View {
                 .disabled(appState.isBusy)
                 .accessibilityIdentifier("calibration.calibrateOrigin")
                 Button {
-                    PendingEdits.run { await appState.calibrateOriginFromBraggPeaks() }
+                    PendingEdits.run { await appState.originFromBraggPeaksInOneStep() }
                 } label: {
                     Label("Origin from Bragg Peaks", systemImage: "circle.grid.cross")
                 }
-                .disabled(appState.isBusy || appState.resultPresentation.braggVectors == nil)
+                .disabled(appState.isBusy)
                 .accessibilityIdentifier("calibration.originFromBraggPeaks")
                 .tooltip("Follows the direct beam among the detected Bragg disks (py4DSTEM measure_origin + "
                     + "fit_origin) instead of the centre of mass. For crystals whose strong disks pull the centre of "
-                    + "mass off the beam. Needs Detect All Disks first.",
+                    + "mass off the beam. Runs Detect All Disks first when there is no current detection.",
                     hint: "For crystals whose strong disks pull the centre of mass")
                 Button {
                     PendingEdits.run { await appState.calibrateRotation() }
@@ -404,7 +419,7 @@ struct PrepareSettings: View {
         }
     }
 
-    /// The R–Q rotation typed by hand (#275): py4DSTEM's QR_rotation in degrees and QR_flip, the convention the "R–Q rotation"
+    /// The R–Q rotation typed by hand (#275): py4DSTEM's QR_rotation_degrees and QR_flip, the convention the "R–Q rotation"
     /// row shows, applied only by the button, as the typed ellipse is. For a dataset whose centre-of-mass field cannot decide
     /// the rotation, or a value known from another tool.
     @ViewBuilder
@@ -412,7 +427,7 @@ struct PrepareSettings: View {
         let degrees = rotationDraftDegrees
             ?? calibration.rotationRad.map { RQRotationConvention.displayDegrees(fromApp: $0) } ?? 0
         let transpose = rotationDraftTranspose ?? calibration.transposeQR ?? false
-        let help = "Enter the R–Q rotation by hand in py4DSTEM's convention (QR_rotation, degrees) and whether the detector axes are transposed (QR_flip): the numbers the R–Q rotation row shows. It replaces a measured rotation; DPC, strain and parallax follow it."
+        let help = "Enter the R–Q rotation by hand in py4DSTEM's convention (QR_rotation_degrees; the file's QR_rotation is in radians) and whether the detector axes are transposed (QR_flip): the numbers the R–Q rotation row shows. It replaces a measured rotation; DPC, strain and parallax follow it."
         InspectorRow("Typed θ") {
             NumericField(
                 "R–Q rotation in degrees",

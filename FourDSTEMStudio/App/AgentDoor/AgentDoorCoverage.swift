@@ -39,12 +39,14 @@ enum AgentDoorCoverage {
         "bottomWorkspace.lineage.rewind": .tool("rewind_lineage"),
         "bottomWorkspace.lineage.rewindUnavailable": .tool("get_lineage"),
         "calibration.acceleratingVoltage": .tool("set_calibration"),
+        "calibration.convergenceSemiAngle": .tool("set_calibration"),   // convergence_mrad (#511)
         "calibration.action.ellipse": .tool("run_calibration"),
         "calibration.action.originProbe": .tool("run_calibration"),
         "calibration.action.qCrystal": .tool("run_calibration"),
         "calibration.action.restoreFittedOrigin": .tool("run_calibration"),
         "status.footer.stop": .tool("stop_run"),   // the infobar's Cancel, app-side since #361
-        "calibration.action.originFromDetector": .tool("set_calibration"),   // origin_x and origin_y: the centre it reads (#348)
+        "calibration.action.originFromDetector": .tool("set_calibration"),
+        "calibration.action.originFromBraggPeaks": .tool("run_calibration"),   // step origin_from_bragg_peaks, detection included (#511)   // origin_x and origin_y: the centre it reads (#348)
         "calibration.manualOrigin": .tool("set_calibration"),
         "calibration.manualOrigin.x": .tool("set_calibration"),
         "calibration.manualOrigin.y": .tool("set_calibration"),
@@ -300,6 +302,7 @@ enum AgentDoorCoverage {
         "welcome.loadingStatus": .seen,
         "welcome.localStorageNotice": .seen,
         "welcome.openWithOptions": .tool("open_file_with_options"),
+        "welcome.tutorials": .personOnly("opens a web page in the person's browser; the door has nothing to run"),
         "workspace.guidance": .seen,
         "workspace.guidance.improve": .seen,
         "workspace.nextStepHint": .seen,

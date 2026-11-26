@@ -32,10 +32,13 @@ extension Mac4DSTEMAgentDoor {
                       AgentParameter("r_pixel_size", .number(1e-9...1e9), summary: "Scan step, in r_units."),
                       AgentParameter("r_units", .text, summary: "Å (A), nm or pm. Default: the unit in force, else nm."),
                       AgentParameter("voltage_kv", .number(1...10_000), summary: "Accelerating voltage, kV."),
+                      AgentParameter("convergence_mrad", .number(0.001...1_000), summary: "Convergence semi-angle, mrad. With the "
+                                         + "voltage and the Q scale, get_window's calibration gives expected_probe_radius_px and "
+                                         + "flags a typed probe radius more than 20 % off it."),
                       AgentParameter("origin_x", .number(-100_000...100_000), summary: "Beam centre column, detector pixels (with origin_y). "
                                          + "Not a measurement: quantitative steps still ask for Calibrate Origin."),
                       AgentParameter("origin_y", .number(-100_000...100_000), summary: "Beam centre row, detector pixels (with origin_x)."),
-                      AgentParameter("qr_rotation_deg", .number(-720...720), summary: "R–Q rotation in degrees, py4DSTEM's QR_rotation "
+                      AgentParameter("qr_rotation_deg", .number(-720...720), summary: "R–Q rotation in degrees, py4DSTEM's QR_rotation_degrees "
                                          + "(the sign get_window shows). Replaces a measured one; the transpose in force stays unless "
                                          + "qr_flip is given."),
                       AgentParameter("qr_flip", .boolean, summary: "Detector axes transposed, py4DSTEM's QR_flip. Alone, it changes "
@@ -75,6 +78,7 @@ extension Mac4DSTEMAgentDoor {
             }
             // The voltage first (mrad needs its wavelength), then each unit before its size, as the row's picker and field.
             if let kV = arguments["voltage_kv"].flatMap(Double.init) { state.setManualAcceleratingVoltage(kV) }
+            if let alpha = arguments["convergence_mrad"].flatMap(Double.init) { state.setConvergenceSemiAngle(alpha) }
             if let unit = qUnits?.unit { state.setManualQPixelUnits(unit) }
             if let size = arguments["q_pixel_size"].flatMap(Double.init) { state.setManualQPixelSize(size) }
             if let unit = rUnits?.unit { state.setManualRPixelUnits(unit) }
@@ -86,7 +90,8 @@ extension Mac4DSTEMAgentDoor {
         },
         AgentTool(name: "run_calibration", title: "Calibrate",
                   summary: "Starts one of Prepare's measured calibration steps, as its button does: origin (Calibrate Origin, also "
-                      + "the probe radius), origin_from_bragg_peaks (after Detect All Disks), ellipse (Fit Ellipse in the fit annulus) "
+                      + "the probe radius), origin_from_bragg_peaks (the spot pattern's origin: runs Detect All Disks first when no current detection exists; the "
+                      + "origin row's flag says when it is needed), ellipse (Fit Ellipse in the fit annulus) "
                       + "rotation (Measure R–Q Rotation; calibrates the origin first if needed), q_from_material (Calibrate from Selected "
                       + "Material: ACOM's phase model against the detected disks), restore_fitted_origin, fit_distortion_from_spots "
                       + "(a single crystal's stretch, shown in get_window, nothing applied), apply_spot_distortion, flip_rotation_180 (Flip 180°: the rotation measurement cannot tell θ from θ + 180°), or manual_ellipse "
@@ -116,10 +121,8 @@ extension Mac4DSTEMAgentDoor {
                 if let method = call.arguments["origin_method"].flatMap(OriginMethod.init(rawValue:)) { session.originMethod = method }
                 Task { await state.calibrateOrigin() }
             case .originFromBraggPeaks:
-                guard state.resultPresentation.braggVectors != nil else {
-                    return .refusal(status: 409, message: "Detect All Disks first: this follows the direct beam among the detected disks.")
-                }
-                Task { await state.calibrateOriginFromBraggPeaks() }
+                // One call, as the row's button (#511): Detect All Disks when no current detection exists, then the origin.
+                Task { await state.originFromBraggPeaksInOneStep() }
             case .ellipse:
                 let inner = call.arguments["fit_inner_px"].flatMap(Double.init) ?? session.ellipseFitInnerRadius
                 let outer = call.arguments["fit_outer_px"].flatMap(Double.init) ?? session.ellipseFitOuterRadius

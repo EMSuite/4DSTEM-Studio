@@ -12,6 +12,9 @@ Apple silicon.
   <img src="docs/images/strain-map-workspace.png" alt="4DSTEM Studio showing a diffraction pattern with detected Bragg disks and a lattice fit, beside the resulting strain map" width="100%">
 </p>
 
+Documentation: [mac4dstem.com/docs/4dstem-studio](https://mac4dstem.com/docs/4dstem-studio/), with step-by-step
+[tutorials](https://mac4dstem.com/docs/tasks/).
+
 ## Download
 
 Get the signed and notarised DMG:

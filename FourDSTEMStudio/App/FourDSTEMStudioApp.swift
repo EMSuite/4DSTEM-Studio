@@ -329,9 +329,14 @@ private struct DatasetCommands: Commands {
             .keyboardShortcut("l", modifiers: [.command, .control])
             .disabled(appState?.hasDataset != true || appState?.navigation.workspaceArea == .results)
         }
-        // The Help menu: the app ships no help book, so the default "mac4DSTEM Help" item only said help was unavailable. In its
-        // place, the support page and an email to the project (`FeedbackLinks`); the app itself sends nothing.
+        // The Help menu (#487): the app ships no help book, so the system's Help item only said help was unavailable. In its
+        // place, the documentation and tutorials on the website, the support page and an email to the project (`FeedbackLinks`);
+        // the links open in the browser and the app itself sends nothing.
         CommandGroup(replacing: .help) {
+            Button("\(AppName.display) Help") { if let url = FeedbackLinks.help { openURL(url) } }
+                .keyboardShortcut("?", modifiers: .command)
+            Button("Tutorials") { if let url = FeedbackLinks.tutorials { openURL(url) } }
+            Divider()
             Button("\(AppName.display) Support") { if let url = FeedbackLinks.support { openURL(url) } }
             Button("Send Feedback…") { if let url = FeedbackLinks.mail { openURL(url) } }
         }

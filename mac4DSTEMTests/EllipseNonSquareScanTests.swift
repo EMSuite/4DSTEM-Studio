@@ -58,6 +58,8 @@ final class EllipseNonSquareScanTests: XCTestCase {
         // Compared as numbers, not parsed back from printed text (the first version split a printed line and dropped its first
         // integer, which only worked while the model name held no integer).
         XCTAssertEqual(fits.count, expected.count)
+        // The bit patterns of this run, in `expected`'s layout: what to record when a reviewed change moves the fit.
+        print("ellipse non-square bits: \(fits.map { $0.map(\.bitPattern) })")
         for (i, (fit, old)) in zip(fits, expected).enumerated() {
             XCTAssertEqual(fit.count, 6)
             for (new, oldBits) in zip(fit, old) {

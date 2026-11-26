@@ -179,6 +179,21 @@ struct PrepareSettings: View {
                     .labelsHidden()
                     .accessibilityIdentifier("calibration.acceleratingVoltage")
                 }
+                // The convergence semi-angle (#511): with the voltage and the Q scale, the Origin & probe row shows the probe
+                // radius the optics imply and flags a typed radius more than 20 % off it.
+                InspectorRow("Convergence") {
+                    OptionalNumericField(
+                        title: "Convergence semi-angle (mrad)",
+                        value: appState.calibrationSession.convergenceSemiAngleMrad,
+                        format: .number.precision(.fractionLength(0...3)),
+                        unit: "mrad",
+                        onCommit: appState.setConvergenceSemiAngle
+                    )
+                    .labelsHidden()
+                    .accessibilityIdentifier("calibration.convergenceSemiAngle")
+                    .help("The probe's convergence semi-angle α. With the voltage and the Q scale it gives the expected probe radius "
+                          + "(α/λ in reciprocal space), which the Origin & probe row shows and checks a typed radius against.")
+                }
                 // "Not set" alone left open whether anything was wrong (a scan whose file states no voltage, 5.3.0 walk).
                 if !session.hasUsableVoltage {
                     InspectorNote(Self.voltageNotSetNote)

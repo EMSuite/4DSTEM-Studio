@@ -39,6 +39,7 @@ enum AgentDoorCoverage {
         "bottomWorkspace.lineage.rewind": .tool("rewind_lineage"),
         "bottomWorkspace.lineage.rewindUnavailable": .tool("get_lineage"),
         "calibration.acceleratingVoltage": .tool("set_calibration"),
+        "calibration.convergenceSemiAngle": .tool("set_calibration"),   // convergence_mrad (#511)
         "calibration.action.ellipse": .tool("run_calibration"),
         "calibration.action.originProbe": .tool("run_calibration"),
         "calibration.action.qCrystal": .tool("run_calibration"),

@@ -42,7 +42,7 @@ private actor JitteredBeamSource: FourDDataSource {
 @MainActor
 final class CentreOfMassScatterHintTests: XCTestCase {
     /// #459: it names the case it serves; on atomic-resolution data (SrTiO3 Merlin, BFO-BTO EMPAD) there are no Bragg disks.
-    private let hint = "Centre of mass scattered: on a spot pattern, after Detect All Disks use Origin from Bragg Peaks"
+    private let hint = "Centre of mass scattered: on a spot pattern use Origin from Bragg Peaks (it detects the disks first)"
 
     private func row(_ state: AppState) -> String {
         state.calibrationSession.readiness.items.first { $0.kind == .originProbe }?.detail ?? "no Origin & probe row"

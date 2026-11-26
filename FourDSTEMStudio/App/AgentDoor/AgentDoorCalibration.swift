@@ -32,6 +32,9 @@ extension Mac4DSTEMAgentDoor {
                       AgentParameter("r_pixel_size", .number(1e-9...1e9), summary: "Scan step, in r_units."),
                       AgentParameter("r_units", .text, summary: "Å (A), nm or pm. Default: the unit in force, else nm."),
                       AgentParameter("voltage_kv", .number(1...10_000), summary: "Accelerating voltage, kV."),
+                      AgentParameter("convergence_mrad", .number(0.001...1_000), summary: "Convergence semi-angle, mrad. With the "
+                                         + "voltage and the Q scale, get_window's calibration gives expected_probe_radius_px and "
+                                         + "flags a typed probe radius more than 20 % off it."),
                       AgentParameter("origin_x", .number(-100_000...100_000), summary: "Beam centre column, detector pixels (with origin_y). "
                                          + "Not a measurement: quantitative steps still ask for Calibrate Origin."),
                       AgentParameter("origin_y", .number(-100_000...100_000), summary: "Beam centre row, detector pixels (with origin_x)."),
@@ -75,6 +78,7 @@ extension Mac4DSTEMAgentDoor {
             }
             // The voltage first (mrad needs its wavelength), then each unit before its size, as the row's picker and field.
             if let kV = arguments["voltage_kv"].flatMap(Double.init) { state.setManualAcceleratingVoltage(kV) }
+            if let alpha = arguments["convergence_mrad"].flatMap(Double.init) { state.setConvergenceSemiAngle(alpha) }
             if let unit = qUnits?.unit { state.setManualQPixelUnits(unit) }
             if let size = arguments["q_pixel_size"].flatMap(Double.init) { state.setManualQPixelSize(size) }
             if let unit = rUnits?.unit { state.setManualRPixelUnits(unit) }

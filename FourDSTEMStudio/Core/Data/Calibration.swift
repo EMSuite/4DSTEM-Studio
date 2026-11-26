@@ -399,15 +399,34 @@ package struct CalibrationReadinessReport: Equatable, Sendable {
     /// `Calibration.centreOfMassScatterHintPixels` where the run suggested the Bragg-peak origin (a spot pattern, #324, #511).
     /// py4DSTEM's `get_origin` scatters the same way there (it takes the centre of mass about the brightest disk, which on a spot
     /// pattern is often not the beam). Such an origin reads "Flagged", never "Measured", on the row, the overlay key and the door.
-    package nonisolated static func originIsFlagged(calibration: Calibration, provenance: CalibrationProvenance) -> Bool {
+    package static func originIsFlagged(calibration: Calibration, provenance: CalibrationProvenance) -> Bool {
         guard calibration.originProvenance == .fitted, provenance.suggestsOriginFromBraggPeaks,
               calibration.originBeamStopIsAcceptable, let residual = calibration.judgedOriginResidual else { return false }
         return residual > Calibration.centreOfMassScatterHintPixels
     }
 
+    /// The probe radius the optics imply (#511), in detector pixels: the convergence semi-angle α over the wavelength λ is the
+    /// bright-field disk's radius in reciprocal space (α/λ, small angles), divided by the Q pixel size. nil unless α, the voltage
+    /// and a physical Q scale are all known; a Q scale in mrad needs only α (the wavelength cancels).
+    package static func expectedProbeRadiusPixels(
+        convergenceSemiAngleMrad: Double?, voltageKV: Double?, calibration: Calibration
+    ) -> Double? {
+        guard let alpha = convergenceSemiAngleMrad, alpha.isFinite, alpha > 0,
+              let voltageKV, let wavelength = DPC.electronWavelengthAngstrom(voltageKV: voltageKV),
+              let q = calibration.qPixelSize, let qInvA = CalibrationUnitConversion.reciprocalInvAngstromPerPixel(
+                  value: Double(q), units: calibration.qPixelUnits, wavelengthAngstrom: wavelength) else { return nil }
+        let radius = alpha / 1_000 / wavelength / qInvA
+        return radius.isFinite && radius > 0 ? radius : nil
+    }
+
+    /// A typed probe radius departs from the optics' by more than this fraction (#511): a typo or a wrong Q scale, flagged.
+    package static let typedProbeRadiusTolerance = 0.2
+
     package static func make(
         calibration: Calibration,
         provenance: CalibrationProvenance,
+        convergenceSemiAngleMrad: Double? = nil,
+        voltageKV: Double? = nil,
         locale: Locale = .autoupdatingCurrent
     ) -> CalibrationReadinessReport {
         let originSource = calibration.originProvenance.readinessProvenance
@@ -471,9 +490,28 @@ package struct CalibrationReadinessReport: Equatable, Sendable {
             // and the scatter is the signal, so that hint names the case it serves (#459).
             let scattered = (originResidual ?? 0) > Calibration.centreOfMassScatterHintPixels
             originDetail += scattered
-                ? " · Centre of mass scattered: on a spot pattern, after Detect All Disks use Origin from Bragg Peaks (advanced correction)"
-                : " · Spot pattern: after Detect All Disks use Origin from Bragg Peaks (advanced correction)"
+                ? " · Centre of mass scattered: on a spot pattern use Origin from Bragg Peaks (it detects the disks first)"
+                : " · Spot pattern: use Origin from Bragg Peaks (it detects the disks first)"
         }
+        // The radius the optics imply, where α, the voltage and the Q scale are known (#511); a typed radius more than 20 % off
+        // it is flagged (a measured one is the data's own, and says so by its source).
+        var probeFlag: String?
+        if let expected = expectedProbeRadiusPixels(convergenceSemiAngleMrad: convergenceSemiAngleMrad, voltageKV: voltageKV,
+                                                    calibration: calibration) {
+            let expectedText = CalibrationUnitConversion.displayNumber(expected, digits: 3, locale: locale)
+            originDetail += " · Expected\u{00A0}probe ≈\u{00A0}\(expectedText)\u{00A0}px from the convergence angle, voltage and Q scale"
+            if provenance.probe == .manual, validProbe, let typed = calibration.probeRadius {
+                let departure = abs(Double(typed) / expected - 1)
+                if departure > typedProbeRadiusTolerance {
+                    let percent = String(format: "%.0f", departure * 100)
+                    originDetail += " (the typed radius is \(percent)\u{00A0}% off: check it and the Q scale)"
+                    probeFlag = "typed probe radius \(percent) % off the \(expectedText) px the optics imply"
+                }
+            }
+        }
+
+        let flags = [originFlagged ? "centre of mass scattered; use Origin from Bragg Peaks" : nil, probeFlag].compactMap { $0 }
+        let originFlag: String? = flags.isEmpty ? nil : flags.joined(separator: "; ")
 
         let validEllipse = calibration.hasEllipse
         let ellipseDetail: String
@@ -547,7 +585,7 @@ package struct CalibrationReadinessReport: Equatable, Sendable {
                     ? .ready(originProbeSource)
                     : (originSource != nil && validProbe ? .unusable : .missing),
                 detail: originDetail,
-                flag: originFlagged ? "centre of mass scattered; use Origin from Bragg Peaks" : nil,
+                flag: originFlag,
                 mixedSources: originProbeSource == .mixed
                     ? "origin \(originSource?.stateLabel ?? "Not set"), probe \(provenance.probe?.stateLabel ?? "Not set")" : nil
             ),

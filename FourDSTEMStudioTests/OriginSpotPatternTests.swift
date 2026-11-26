@@ -115,4 +115,58 @@ final class OriginSpotPatternTests: XCTestCase {
         XCTAssertEqual(try doorOriginItem(demo)["state"] as? String, "Mixed: origin Measured, probe Manual")
         XCTAssertNil(row.flag, "the demo's single bright disk is not a spot pattern")
     }
+
+    /// The probe radius the optics imply (#511): α / λ / Q pixel size. 200 kV (λ = 0.02508 Å), α = 1 mrad, 0.01 Å⁻¹/px: 3.99 px;
+    /// the same Q scale in nm⁻¹ (0.1 nm⁻¹/px) gives the same; in mrad (0.2508 mrad/px) the wavelength cancels.
+    func testTheExpectedProbeRadiusIsTheConvergenceAngleOverTheWavelengthInQPixels() throws {
+        var calibration = Calibration()
+        calibration.qPixelSize = 0.01
+        calibration.qPixelUnits = "A^-1"
+        let lambda = try XCTUnwrap(DPC.electronWavelengthAngstrom(voltageKV: 200))
+        let expected = 0.001 / lambda / 0.01
+        let radius = try XCTUnwrap(CalibrationReadinessReport.expectedProbeRadiusPixels(
+            convergenceSemiAngleMrad: 1, voltageKV: 200, calibration: calibration))
+        XCTAssertEqual(radius, expected, accuracy: 1e-9)
+        XCTAssertEqual(radius, 3.987, accuracy: 0.002)
+        calibration.qPixelSize = 0.1
+        calibration.qPixelUnits = "nm^-1"
+        XCTAssertEqual(try XCTUnwrap(CalibrationReadinessReport.expectedProbeRadiusPixels(
+            convergenceSemiAngleMrad: 1, voltageKV: 200, calibration: calibration)), expected, accuracy: 1e-9)
+        calibration.qPixelSize = lambda * 0.01 * 1_000
+        calibration.qPixelUnits = "mrad"
+        XCTAssertEqual(try XCTUnwrap(CalibrationReadinessReport.expectedProbeRadiusPixels(
+            convergenceSemiAngleMrad: 1, voltageKV: 200, calibration: calibration)), expected, accuracy: 1e-4)
+        XCTAssertNil(CalibrationReadinessReport.expectedProbeRadiusPixels(
+            convergenceSemiAngleMrad: nil, voltageKV: 200, calibration: calibration), "no α, no expectation")
+        XCTAssertNil(CalibrationReadinessReport.expectedProbeRadiusPixels(
+            convergenceSemiAngleMrad: 1, voltageKV: nil, calibration: calibration), "no voltage, no expectation")
+        calibration.qPixelSize = nil
+        XCTAssertNil(CalibrationReadinessReport.expectedProbeRadiusPixels(
+            convergenceSemiAngleMrad: 1, voltageKV: 200, calibration: calibration), "no Q scale, no expectation")
+    }
+
+    /// A typed radius more than 20 % off the optics' is flagged on the row and in the door; within 20 %, or measured, it is not.
+    /// Mutation: the check compares against the wrong radius, or flags a measured one - red.
+    func testATypedProbeRadiusFarFromTheOpticsIsFlagged() async throws {
+        let demo = AppState()
+        await demo.openDemoFixture(calibrated: false)
+        await demo.calibrateOrigin()
+        let session = demo.calibrationSession
+        session.calibration.qPixelSize = 0.01
+        session.calibration.qPixelUnits = "A^-1"
+        demo.setManualAcceleratingVoltage(200)
+        demo.setConvergenceSemiAngle(1)   // expects 3.99 px
+        XCTAssertTrue(try originRow(demo).detail.contains("Expected\u{00A0}probe ≈\u{00A0}3.99\u{00A0}px"), try originRow(demo).detail)
+        XCTAssertNotEqual(session.provenance.probe, .manual, "fixture: the demo's radius is measured")
+        XCTAssertNil(try originRow(demo).flag, "a measured radius is the data's own: \(try originRow(demo).detail)")
+
+        await demo.useProbeRadius(4.4)   // 10 % off
+        XCTAssertNil(try originRow(demo).flag, try originRow(demo).detail)
+        await demo.useProbeRadius(6)     // 50 % off
+        let flag = try XCTUnwrap(try originRow(demo).flag)
+        XCTAssertTrue(flag.contains("typed probe radius 50 % off"), flag)
+        XCTAssertTrue(try originRow(demo).detail.contains("the typed radius is 50\u{00A0}% off"), try originRow(demo).detail)
+        XCTAssertEqual(try doorOriginItem(demo)["flag"] as? String, flag)
+        XCTAssertEqual(demo.agentCalibration["expected_probe_radius_px"] as? Double ?? 0, 3.987, accuracy: 0.002)
+    }
 }

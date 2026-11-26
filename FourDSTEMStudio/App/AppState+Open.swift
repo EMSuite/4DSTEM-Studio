@@ -551,6 +551,7 @@ extension AppState {
         )
         // One app convention, kV — the rule (the stated unit, else eV above 1000) is Core's, shared with the preprocessing export.
         calibrationSession.acceleratingVoltage = await AcceleratingVoltage.kilovolts(from: reader)
+        calibrationSession.convergenceSemiAngleMrad = nil   // typed per dataset (#511)
         // Strain dies BEFORE the calibration reset: `activate` suspends on reader
         // awaits in between, the export menu is reachable during a suspension, and
         // the strain frame keys come from the LIVE calibration — an uncleared map
@@ -1646,6 +1647,12 @@ extension AppState {
             calibrationSession.provenance.rScale = .manual
         }
         rederiveDisplayedDPCForScaleChange()
+    }
+
+    /// The convergence semi-angle typed in Prepare (#511), in mrad; a value that is not positive clears it. It feeds only the
+    /// Origin & probe row's expected radius and the check of a typed radius, so nothing else is invalidated.
+    func setConvergenceSemiAngle(_ value: Double) {
+        calibrationSession.convergenceSemiAngleMrad = value.isFinite && value > 0 ? value : nil
     }
 
     func setManualAcceleratingVoltage(_ value: Double) {

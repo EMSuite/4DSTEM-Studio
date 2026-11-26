@@ -11,6 +11,12 @@
 # engineering-process plan, process item 3; Electron Microscopy Studio made the same change in its #768). The required
 # check is the job, `unit (XCTest)`.
 #
+# MAC OR GITHUB (as Electron Microscopy Studio's ci.yml, its #1117): GitHub has no "whichever runner is free" across labels and
+# chooses a job's runner when it is queued, so `changes` asks the Actions API first. A pull request's `unit` takes the org's Mac
+# runner unless the Mac already holds MAC_DEPTH jobs (running and waiting) AND no job waits for a GitHub macOS runner; only
+# then does it overflow to macos-26, so a backlog runs on both at once. It counts this repo's jobs and those of EMSuiteUI and
+# Electron Microscopy Studio, which share the Mac. An API error picks the Mac. The job's log says which and why.
+#
 # DOCS ONLY: a pull request that changes only the root's Markdown files (README, CONTRIBUTING, ...), files under docs/
 # or the issue templates runs no macOS job. The Linux job `changes` lists the pull request's files and says whether any
 # needs the Mac; `unit` is then skipped, and GitHub counts a job skipped by its `if` as passing, so the required check
@@ -120,8 +126,13 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read for MAC OR GITHUB (the other runs' jobs); nothing is written.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       macos: ${{ steps.files.outputs.macos }}
+      mac: ${{ steps.mac.outputs.mac }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -149,6 +160,41 @@ jobs:
             fi
           done < <(git diff --name-only --no-renames HEAD^1 HEAD)
           echo "macos=$macos" | tee -a "$GITHUB_OUTPUT"
+      - name: Mac or GitHub (MAC OR GITHUB in the header)
+        id: mac
+        if: github.event_name == 'pull_request' && vars.MACEM_MAC_RUNNER != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The Mac keeps this many jobs (the one it runs and the ones waiting for it) before a pull request overflows to GitHub.
+          MAC_DEPTH: 3
+        run: |
+          set -uo pipefail
+          # Every queued or running job of the other runs (any workflow, any event) of this repo and of the two other public repos
+          # whose jobs share the Mac (EMSuiteUI and Electron Microscopy Studio, Electron-Microscopy-Studio#1117), as "status label-kind". The kit runner's jobs
+          # (macem-kit) are another machine's and not counted.
+          jobs=""
+          for repo in "$GITHUB_REPOSITORY" EMSuite/EMSuiteUI EMSuite/Electron-Microscopy-Studio; do
+          for status in queued in_progress; do
+            runs=$(gh api "repos/$repo/actions/runs?status=$status&per_page=100" \
+                     --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | .id") \
+              || { echo "the API did not answer for $repo: the Mac"; echo "mac=true" >> "$GITHUB_OUTPUT"; exit 0; }
+            for run in $runs; do
+              jobs+=$(gh api "repos/$repo/actions/runs/$run/jobs?per_page=100" --jq '.jobs[]
+                  | select(.status == "queued" or .status == "in_progress")
+                  | "\(.status) \(if (.labels | index("self-hosted")) and ((.labels | index("macem-kit")) | not) then "mac"
+                                  elif ([.labels[] | select(startswith("macos"))] | length) > 0 then "github" else "linux" end)"' \
+                  || true)$'\n'
+            done
+          done
+          done
+          mac=$(grep -c ' mac$' <<< "$jobs" || true)
+          github_waiting=$(grep -c '^queued github$' <<< "$jobs" || true)
+          echo "the Mac holds $mac job(s) (running and waiting); $github_waiting job(s) wait for a GitHub macOS runner"
+          if [ "$mac" -ge "$MAC_DEPTH" ] && [ "$github_waiting" -eq 0 ]; then
+            echo "the Mac has a queue and GitHub has a free runner: this one runs on macos-26"; echo "mac=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "this one runs on the Mac"; echo "mac=true" >> "$GITHUB_OUTPUT"
+          fi
 
   unit:
     # The one macOS job of a pull request: inventory, core, then the XCTest suite (ONE MACOS JOB in the header). Its name
@@ -159,10 +205,10 @@ jobs:
     # pull request (DOCS ONLY in the header). `!cancelled()` runs it although `changes` is skipped (every event but a pull
     # request) or failed (then its answer is empty and the job runs, the safe side).
     if: ${{ !cancelled() && needs.changes.outputs.macos != 'false' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')) }}
-    # A same-repo pull request: the org's Mac runner while the org variable MACEM_MAC_RUNNER is set (GitHub's five macOS
-    # machines for the org were the queue, 24 Nov 2026); a fork PR, tags and the nightly: GitHub's macos-26, the macOS 26
-    # runtime proof. Deleting the variable puts every run back on macos-26 with no PR.
-    runs-on: ${{ github.event_name == 'pull_request' && vars.MACEM_MAC_RUNNER && !github.event.pull_request.head.repo.fork && fromJSON(vars.MACEM_MAC_RUNNER) || 'macos-26' }}
+    # A same-repo pull request: the org's Mac runner while the org variable MACEM_MAC_RUNNER is set and `changes` found it free
+    # (MAC OR GITHUB in the header; an empty answer counts as free); a fork PR, tags and the nightly: GitHub's macos-26, the
+    # macOS 26 runtime proof. Deleting the variable puts every run back on macos-26 with no PR.
+    runs-on: ${{ github.event_name == 'pull_request' && vars.MACEM_MAC_RUNNER && !github.event.pull_request.head.repo.fork && needs.changes.outputs.mac != 'false' && fromJSON(vars.MACEM_MAC_RUNNER) || 'macos-26' }}
     # The three former jobs' timeouts (unit 90, core 30, inventory 10), summed.
     timeout-minutes: 130
     steps:

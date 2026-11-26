@@ -383,7 +383,7 @@ final class SpectroGoldenTests: XCTestCase {
     }
 
     /// COMPARISON: recomputes every scenario and compares each against the committed baseline, byte for byte, reporting the
-    /// first differing line. Mutation: one bit of any fitted net flipped (net * (1 + 1e-15)) - red on that scenario's file.
+    /// differing lines. Mutation: one bit of any fitted net flipped (net * (1 + 1e-15)) - red on that scenario's file.
     func testOutputsAreByteIdenticalToTheBaseline() async throws {
         try XCTSkipIf(recordDir != nil, "recording run")
         // Byte-identical holds on the macOS the baseline was recorded on (27): Accelerate's last bits differ on macOS 26 (the CI runner),
@@ -396,8 +396,12 @@ final class SpectroGoldenTests: XCTestCase {
             let recorded = try String(contentsOf: url, encoding: .utf8)
             if s.text == recorded { continue }
             let a = s.text.split(separator: "\n", omittingEmptySubsequences: false), b = recorded.split(separator: "\n", omittingEmptySubsequences: false)
-            let i = (0..<min(a.count, b.count)).first { a[$0] != b[$0] } ?? min(a.count, b.count)
-            XCTFail("\(s.name) moved at line \(i + 1): now \(i < a.count ? String(a[i]) : "<end>") | baseline \(i < b.count ? String(b[i]) : "<end>")")
+            // Every moved line (the first 40), so one run says all a dependency moved and the baseline can be updated at once.
+            let moved = (0..<max(a.count, b.count)).filter { $0 >= a.count || $0 >= b.count || a[$0] != b[$0] }
+            let lines = moved.prefix(40).map { i in
+                "line \(i + 1): now \(i < a.count ? String(a[i]) : "<end>") | baseline \(i < b.count ? String(b[i]) : "<end>")"
+            }
+            XCTFail("\(s.name) moved at \(moved.count) line(s):\n" + lines.joined(separator: "\n"))
         }
     }
 }

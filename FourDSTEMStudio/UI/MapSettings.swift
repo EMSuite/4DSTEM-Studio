@@ -996,7 +996,7 @@ private struct StrainSection: View {
                 InspectorWarning(
                     "Too few peaks: median \(Num.fixed(Double(medianPeaks), 1)) per pattern, \(emptyPercent)% empty"
                 )
-                InspectorNote("Indexing needs the direct beam plus two more reflections. "
+                InspectorNote("The lattice fit needs at least 5 indexed disks at a position, as py4DSTEM's fit_lattice_vectors. "
                      + "Lower the detection thresholds, not the reference.")
                 InspectorActionRow {
                     InspectorAdaptiveButton("Go to Bragg Disks", systemImage: "circle.grid.cross") {

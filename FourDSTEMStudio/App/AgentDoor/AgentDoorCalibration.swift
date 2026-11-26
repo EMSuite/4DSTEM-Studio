@@ -35,7 +35,7 @@ extension Mac4DSTEMAgentDoor {
                       AgentParameter("origin_x", .number(-100_000...100_000), summary: "Beam centre column, detector pixels (with origin_y). "
                                          + "Not a measurement: quantitative steps still ask for Calibrate Origin."),
                       AgentParameter("origin_y", .number(-100_000...100_000), summary: "Beam centre row, detector pixels (with origin_x)."),
-                      AgentParameter("qr_rotation_deg", .number(-720...720), summary: "R–Q rotation in degrees, py4DSTEM's QR_rotation "
+                      AgentParameter("qr_rotation_deg", .number(-720...720), summary: "R–Q rotation in degrees, py4DSTEM's QR_rotation_degrees "
                                          + "(the sign get_window shows). Replaces a measured one; the transpose in force stays unless "
                                          + "qr_flip is given."),
                       AgentParameter("qr_flip", .boolean, summary: "Detector axes transposed, py4DSTEM's QR_flip. Alone, it changes "

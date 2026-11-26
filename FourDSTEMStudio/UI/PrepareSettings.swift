@@ -404,7 +404,7 @@ struct PrepareSettings: View {
         }
     }
 
-    /// The R–Q rotation typed by hand (#275): py4DSTEM's QR_rotation in degrees and QR_flip, the convention the "R–Q rotation"
+    /// The R–Q rotation typed by hand (#275): py4DSTEM's QR_rotation_degrees and QR_flip, the convention the "R–Q rotation"
     /// row shows, applied only by the button, as the typed ellipse is. For a dataset whose centre-of-mass field cannot decide
     /// the rotation, or a value known from another tool.
     @ViewBuilder
@@ -412,7 +412,7 @@ struct PrepareSettings: View {
         let degrees = rotationDraftDegrees
             ?? calibration.rotationRad.map { RQRotationConvention.displayDegrees(fromApp: $0) } ?? 0
         let transpose = rotationDraftTranspose ?? calibration.transposeQR ?? false
-        let help = "Enter the R–Q rotation by hand in py4DSTEM's convention (QR_rotation, degrees) and whether the detector axes are transposed (QR_flip): the numbers the R–Q rotation row shows. It replaces a measured rotation; DPC, strain and parallax follow it."
+        let help = "Enter the R–Q rotation by hand in py4DSTEM's convention (QR_rotation_degrees; the file's QR_rotation is in radians) and whether the detector axes are transposed (QR_flip): the numbers the R–Q rotation row shows. It replaces a measured rotation; DPC, strain and parallax follow it."
         InspectorRow("Typed θ") {
             NumericField(
                 "R–Q rotation in degrees",

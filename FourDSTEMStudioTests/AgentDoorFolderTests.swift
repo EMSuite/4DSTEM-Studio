@@ -90,9 +90,12 @@ final class AgentDoorFolderTests: XCTestCase {
         let all = try await paths([:])
         XCTAssertTrue((all.answer["absolute_path"] as? String ?? "").hasSuffix("/Agent"), "\(all.answer)")
         XCTAssertEqual(all.answer["total"] as? Int, 3)
-        XCTAssertEqual(try await paths(["pattern": "*.h5"]).paths, ["sub/b.h5"])
-        XCTAssertEqual(try await paths(["pattern": "sub/*"]).paths, ["sub/b.h5"])
-        XCTAssertEqual(try await paths(["path": "sub"]).paths, ["sub/b.h5"])
+        let found0 = try await paths(["pattern": "*.h5"]).paths
+        XCTAssertEqual(found0, ["sub/b.h5"])
+        let found1 = try await paths(["pattern": "sub/*"]).paths
+        XCTAssertEqual(found1, ["sub/b.h5"])
+        let found2 = try await paths(["path": "sub"]).paths
+        XCTAssertEqual(found2, ["sub/b.h5"])
         let page = try await paths(["offset": 1, "limit": 1])
         XCTAssertEqual(page.paths, ["sub/b.h5"])
         XCTAssertEqual(page.answer["more"] as? Bool, true)

@@ -221,7 +221,8 @@ final class MaterialsProjectDocumentTests: XCTestCase {
     private static let refusalMessages: [String: String] = [
         "atoms-too-close": "ERR Materials Project response could not be used: mp-7 failed validation: Two fully-occupied atomic sites are 0.0004 Å apart — closer than any real interatomic distance, so the cell holds more atoms than the structure has.",
         "bad-occupancy": "ERR Materials Project response could not be used: mp-7 failed validation: Atomic occupancies must be finite and in (0, 1].",
-        "centred-coincident-sites": "ERR Materials Project cell could not be safely standardised: mp-7: two sites of Z=13 landed on each other after the conversion; the served sites are not this centring's asymmetric unit. Import a conventional CIF for this phase instead.",
+        // DiffractoKit 0.24 validates the served sites before it converts the cell: the coincident pair is refused there.
+        "centred-coincident-sites": "ERR Materials Project response could not be used: mp-7 failed validation: Two fully-occupied atomic sites are 0.0000 Å apart — closer than any real interatomic distance, so the cell holds more atoms than the structure has.",
         "centred-no-species": "ERR Materials Project response could not be used: Site 0 of mp-7 lists no species.",
         // DEVIATION (DiffractoKit structure(from:)): the former adapter refused this unnamed ("a site has no usable fractional
         // coordinates to standardise."); the kit names the site, as it does for an uncentred cell.

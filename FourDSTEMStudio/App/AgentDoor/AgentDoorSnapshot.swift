@@ -176,6 +176,8 @@ extension AppState {
             "progress": AgentJSON.number(progress),
             "status": statusText,
             "error": AgentJSON.orNull(errorMessage ?? lastComputeFailure),
+            // The last export the door started (#514): writing, written, failed with its error, or cancelled.
+            "last_export": AgentJSON.orNull(agentLastExport?.json),
         ] as [String: Any]
         snapshot["result"] = agentResult
         snapshot["pattern"] = agentPattern

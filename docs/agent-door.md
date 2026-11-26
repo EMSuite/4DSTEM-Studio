@@ -206,3 +206,12 @@ one pane's zoom (`pane` pattern, result or comparison; `zoom` fit, in or out, as
 result's display `orientation` (0, 90, 180, 270) and `mirrored` (display only, not the R–Q rotation), the pattern's
 `fit_overlay`, and the comparison's `same_scale`. Nothing computed changes. `get_window`'s `view.display` says each pane's zoom
 (null when the pane is not on screen) and the rest.
+
+## For scripts (issues #330, #514, #515)
+
+- **Exports answer with their outcome (#514).** `export_result` writes its file before it answers: `saved` with the bytes, or
+  the call is an error that names why (a read-only folder, a full disk). `get_window`'s `operation.last_export` keeps the last
+  export's file, its state (`writing`, `written`, `failed`, `cancelled`) and its error; `preprocess`, which runs on, is read
+  there. A failed export also raises the window's alert, as the Export menu's own failures do. The .h5 is built in this Mac's
+  temporary folder and copied into the Agent folder as a new file, so a drive without exclusive renames or file locks (exFAT)
+  takes it.

@@ -1076,6 +1076,9 @@ final class AppState {
     /// Why the last compute step failed (`presentComputeFailure`), until the next operation begins: the agent door's
     /// `operation.error` for a step that failed after it started (mac4DSTEM#266, #323). The person reads it in the status line.
     var lastComputeFailure: String?
+    /// The last export the agent door started (#514): its file, whether it is still writing, and how it ended. get_window's
+    /// `operation.last_export`, so a write that fails after the call answered is never read as success.
+    var agentLastExport: AgentExportOutcome?
 
     private(set) var openDatasetRequest = 0
     private(set) var preprocessingExportRequest = 0

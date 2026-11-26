@@ -20,7 +20,7 @@ private actor HoppingSpotPatternSource: FourDDataSource {
         var values = [Float]()
         for ry in 0..<8 {
             for rx in 0..<8 {
-                var dp = [Float](repeating: 30, count: 66 * 66)
+                var dp = [Float](repeating: 0, count: 66 * 66)
                 let leftBright = (rx + ry) % 2 == 0
                 ProbeRadiusSeveralDisksTests.drawDisk(into: &dp, width: 66, cx: beam.x, cy: beam.y, radius: 2.5, value: 255)
                 ProbeRadiusSeveralDisksTests.drawDisk(into: &dp, width: 66, cx: beam.x - 16, cy: beam.y, radius: 2.5,

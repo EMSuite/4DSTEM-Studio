@@ -189,19 +189,22 @@ package nonisolated enum BraggVectorEMDWriter {
         }
         try checkCancellation(cancellation)
         do {
-            try HDF5NewFile.write(to: destination, sourcePath: sourcePath) { session in
-                try session.writeEMDFileHeader(EMDFileHeader(authoringProgram: "mac4DSTEM", authoringUser: nil, uuid: nil))
-                try session.createEMDRoot("scientific_bundle_root", attributes: [
-                    "mac4dstem_bundle_schema": .text("1"),
-                    "mac4dstem_bundle_fields": .text(maps.map(\.kind).joined(separator: "\n")),
-                ])
-                try session.writeEMDCalibration(emdCalibration(calibration), inRoot: "/scientific_bundle_root", booleanStorage: .uint8)
-                for map in maps {
+            // Off a Mac volume (exFAT) built in the temporary folder, then placed (#526, `ForeignVolumeWrite`).
+            try ForeignVolumeWrite.write(to: destination) { target in
+                try HDF5NewFile.write(to: target, sourcePath: sourcePath) { session in
+                    try session.writeEMDFileHeader(EMDFileHeader(authoringProgram: "mac4DSTEM", authoringUser: nil, uuid: nil))
+                    try session.createEMDRoot("scientific_bundle_root", attributes: [
+                        "mac4dstem_bundle_schema": .text("1"),
+                        "mac4dstem_bundle_fields": .text(maps.map(\.kind).joined(separator: "\n")),
+                    ])
+                    try session.writeEMDCalibration(emdCalibration(calibration), inRoot: "/scientific_bundle_root", booleanStorage: .uint8)
+                    for map in maps {
+                        try checkCancellation(cancellation)
+                        try session.writeEMDScalarMap(scalarEMDMap(map, nodeName: resultNodeName(forKind: map.kind), calibration: calibration),
+                                                      inRoot: "/scientific_bundle_root")
+                    }
                     try checkCancellation(cancellation)
-                    try session.writeEMDScalarMap(scalarEMDMap(map, nodeName: resultNodeName(forKind: map.kind), calibration: calibration),
-                                                  inRoot: "/scientific_bundle_root")
                 }
-                try checkCancellation(cancellation)
             }
         } catch {
             throw writeFailure("writing the scientific bundle", error)
@@ -487,16 +490,19 @@ package nonisolated enum BraggVectorEMDWriter {
         // The kit builds the file under a scratch name (the item-replacement folder, so the sandbox allows it and the rename stays on the
         // destination's volume) and publishes it atomically over the destination: a cancel or a failure leaves the original as it was.
         do {
-            try HDF5NewFile.write(to: destination) { session in
-                lineageOmission = try writeFile(
-                    into: session, vectors: vectors, map: map, rgbaMap: rgbaMap,
-                    qWidth: qWidth, qHeight: qHeight,
-                    calibration: calibration, preserving: existing, removingKind: removingKind,
-                    loadSpecification: loadSpecification, replayRecord: replayRecord, source: source,
-                    diskCentreLabelsJSON: diskCentreLabelsJSON, supportedSchema: supportedSchema,
-                    vectorsWithoutRecipe: vectorsWithoutRecipe,
-                    cancellation: cancellation, progress: progress
-                )
+            // Off a Mac volume (exFAT) built in the temporary folder, then placed (#526, `ForeignVolumeWrite`).
+            try ForeignVolumeWrite.write(to: destination) { target in
+                try HDF5NewFile.write(to: target) { session in
+                    lineageOmission = try writeFile(
+                        into: session, vectors: vectors, map: map, rgbaMap: rgbaMap,
+                        qWidth: qWidth, qHeight: qHeight,
+                        calibration: calibration, preserving: existing, removingKind: removingKind,
+                        loadSpecification: loadSpecification, replayRecord: replayRecord, source: source,
+                        diskCentreLabelsJSON: diskCentreLabelsJSON, supportedSchema: supportedSchema,
+                        vectorsWithoutRecipe: vectorsWithoutRecipe,
+                        cancellation: cancellation, progress: progress
+                    )
+                }
             }
         } catch {
             throw writeFailure("writing the session file", error)

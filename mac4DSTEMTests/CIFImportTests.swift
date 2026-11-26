@@ -314,10 +314,11 @@ final class CIFImportTests: XCTestCase {
         _atom_site_fract_x
         _atom_site_fract_y
         _atom_site_fract_z
-        X1 Xx 0 0 0
+        X1 Zz 0 0 0
         """
+        // Not "Xx": DiffractoKit 0.24 reads X, Xx, Q, Du, Dum and Lp as dummy atoms and skips them, as pymatgen does.
         assertThrows(cif, fileBaseName: "bogus",
-                     expected: .unknownElementSymbol("Xx", atomSiteLabel: "X1"))
+                     expected: .unknownElementSymbol("Zz", atomSiteLabel: "X1"))
     }
 
     func testNoAtomSiteLoopIsRejected() {
@@ -553,11 +554,13 @@ final class CIFImportTests: XCTestCase {
     O 0.5 0.5 0.5
     """
 
-    func testNonP1DeclarationWithoutOperationsIsRefusedNamingTheGroup() {
-        assertThrows(
-            mgoNoOpsCIF,
-            expected: .missingSymmetryOperations(spaceGroup: "F m -3 m")
-        )
+    /// DiffractoKit 0.21 (its #202) expands an asymmetric unit from the group the file names, as pymatgen does from the
+    /// Hermann–Mauguin symbol; before, the file was refused naming the group. Rock salt: 4 Mg and 4 O.
+    func testNonP1DeclarationWithoutOperationsIsExpandedFromItsGroup() throws {
+        let model = try CIFModelImport.crystalModel(from: mgoNoOpsCIF, fileBaseName: "MgO")
+        XCTAssertEqual(model.structure.sites.count, 8)
+        XCTAssertEqual(model.structure.sites.filter { $0.z == 12 }.count, 4)
+        XCTAssertEqual(model.structure.sites.filter { $0.z == 8 }.count, 4)
     }
 
     func testP1DeclarationWithoutOperationsIsStillAdmitted() throws {

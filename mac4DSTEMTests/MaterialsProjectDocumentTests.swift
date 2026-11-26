@@ -229,7 +229,7 @@ final class MaterialsProjectDocumentTests: XCTestCase {
         "centred-unknown-element": "ERR Materials Project response could not be used: Site 0 of mp-7 has an unrecognized element symbol \"Xx\".",
         "centred-wrong-metric": "ERR Materials Project cell could not be safely standardised: mp-7: converting as F-centred did not give a conventional cubic cell (a=7.508636532492104, b=6.279880713121656, c=5.762073130645699, α=120.41523057580362°, β=107.19536069103795°, γ=87.45750594682568°). Import a conventional CIF for this phase instead.",
         "empty-sites": "ERR Materials Project response could not be used: mp-7's structure lists no atomic sites.",
-        "nan-lattice": "ERR Materials Project response could not be used: mp-7 failed validation: Cell lengths must be finite and positive.; The lattice vectors do not form a finite positive-volume cell.",
+        "nan-lattice": "ERR Materials Project response could not be used: mp-7's lattice holds a number that is not finite.",
         "no-lattice": "ERR Materials Project response could not be used: mp-7's structure has no lattice.",
         "no-sites": "ERR Materials Project response could not be used: mp-7's structure lists no atomic sites.",
         "no-structure": "ERR Materials Project response could not be used: mp-7 has no structure block.",

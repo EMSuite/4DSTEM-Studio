@@ -978,20 +978,21 @@ final class MaterialsProjectImportTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try MaterialsProjectImport.crystalModel(from: doc, fetchedAt: Date())) { error in
-            guard case let MaterialsProjectImport.Failure.nonStandardCell(reason)? =
+            // DiffractoKit 0.24 refuses the doubled site in its structure validation, before the cell standardisation.
+            guard case let MaterialsProjectImport.Failure.malformed(reason)? =
                 error as? MaterialsProjectImport.Failure else {
-                return XCTFail("expected .nonStandardCell, got \(error)")
+                return XCTFail("expected .malformed, got \(error)")
             }
             XCTAssertTrue(reason.contains("mp-999002"), reason)
-            XCTAssertTrue(reason.lowercased().contains("cif"), reason)
+            XCTAssertTrue(reason.contains("apart"), reason)
         }
     }
 
-    // (g) NEGATIVE: inconsistent MP metadata — an F-centred cubic symbol
-    // reported under crystal_system "hexagonal". Guard (a) refuses because
-    // the standardised (cubic) cell cannot pass the hexagonal conventional
-    // test (γ must be 120°, not 90°).
-    func testInconsistentCentringSymbolAndCrystalSystemIsRefused() {
+    // (g) Inconsistent MP metadata — an F-centred cubic symbol reported under
+    // crystal_system "hexagonal". Refused until DiffractoKit 0.24 (guard (a):
+    // the standardised cubic cell cannot pass the hexagonal conventional
+    // test); now the atoms decide, and the answer must be cubic.
+    func testInconsistentCentringSymbolAndCrystalSystemIsReadFromTheAtoms() throws {
         let a = 5.431
         let half = a / 2
         let matrix: [[Double]] = [[0, half, half], [half, 0, half], [half, half, 0]]
@@ -1014,13 +1015,11 @@ final class MaterialsProjectImportTests: XCTestCase {
             symmetry: MaterialsProjectSymmetry(crystalSystem: "hexagonal", symbol: "Fm-3m", number: nil)
         )
 
-        XCTAssertThrowsError(try MaterialsProjectImport.crystalModel(from: doc, fetchedAt: Date())) { error in
-            guard case let MaterialsProjectImport.Failure.nonStandardCell(reason)? =
-                error as? MaterialsProjectImport.Failure else {
-                return XCTFail("expected .nonStandardCell, got \(error)")
-            }
-            XCTAssertTrue(reason.contains("mp-999003"), reason)
-        }
+        // DiffractoKit 0.24: a stated group the served cell does not take is read from the atoms instead (the keyless
+        // route's reading, as spglib), so the diamond atoms import as the cubic cell they are, never as the stated hexagonal.
+        let model = try MaterialsProjectImport.crystalModel(from: doc, fetchedAt: Date())
+        XCTAssertEqual(model.symmetry, .cubic, "read from the atoms, never the stated hexagonal")
+        XCTAssertEqual(model.structure.sites.count, 8, "the conventional diamond cell")
     }
 
     // (h) R-centred trigonal: a synthetic rhombohedral primitive (a=b=c,

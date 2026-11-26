@@ -470,6 +470,12 @@ struct WelcomeWorkspace: View {
         .disabled(appState.isBusy)
         .help("The demo is a small synthetic 4D-STEM dataset — every workspace works, and nothing on disk is touched.")
         .accessibilityIdentifier("welcome.demoButton")
+        // The tutorials on the website, the same page as Help > Tutorials (#487).
+        if let tutorials = FeedbackLinks.tutorials {
+            Link(destination: tutorials) { Label("Tutorials", systemImage: "book") }
+                .help("Step-by-step guides on the website, opened in your browser")
+                .accessibilityIdentifier("welcome.tutorials")
+        }
     }
 
     private var recents: some View {

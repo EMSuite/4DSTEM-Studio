@@ -1,6 +1,8 @@
 //
 //  FeedbackLinks.swift
-//  Role: where Help > Send Feedback and Help > mac4DSTEM Support go. Feedback is an email the person writes and sends from their
+//  Role: where the Help menu goes (#487): the app's documentation on the website (first, ⌘?), the tutorials, the support page
+//        and Send Feedback. Every address is a page EMSuite/website serves (docs/4dstem-studio/index.html, docs/tasks/index.html,
+//        support.html); the welcome window's Tutorials link is the same address. Feedback is an email the person writes and sends from their
 //        own mail app, addressed to the project, with the app and macOS versions prefilled so a report names its build. The app
 //        itself sends nothing (the privacy label stays "Data Not Collected").
 //
@@ -11,6 +13,10 @@ import Foundation
 nonisolated enum FeedbackLinks {
     static let address = "mail@mac4dstem.com"
     static let support = URL(string: "https://mac4dstem.com/support.html")
+    /// The app's documentation, the Help menu's first item (⌘?), in place of the system's Help book item.
+    static let help = URL(string: "https://mac4dstem.com/docs/4dstem-studio/")
+    /// One page per task, each in a few steps: the tutorials index, shared with Electron Microscopy Studio.
+    static let tutorials = URL(string: "https://mac4dstem.com/docs/tasks/")
 
     /// "5.2.1 (41)" from the bundle; "unknown" for a bundle without a version (a test host).
     static var appVersion: String {

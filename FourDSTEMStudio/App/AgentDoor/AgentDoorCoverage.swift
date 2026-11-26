@@ -300,6 +300,7 @@ enum AgentDoorCoverage {
         "welcome.loadingStatus": .seen,
         "welcome.localStorageNotice": .seen,
         "welcome.openWithOptions": .tool("open_file_with_options"),
+        "welcome.tutorials": .personOnly("opens a web page in the person's browser; the door has nothing to run"),
         "workspace.guidance": .seen,
         "workspace.guidance.improve": .seen,
         "workspace.nextStepHint": .seen,

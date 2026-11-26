@@ -227,7 +227,6 @@ final class MaterialsProjectDocumentTests: XCTestCase {
         // coordinates to standardise."); the kit names the site, as it does for an uncentred cell.
         "centred-site-no-abc": "ERR Materials Project response could not be used: Site 1 of mp-7 has no usable fractional coordinates.",
         "centred-unknown-element": "ERR Materials Project response could not be used: Site 0 of mp-7 has an unrecognized element symbol \"Xx\".",
-        "centred-wrong-metric": "ERR Materials Project cell could not be safely standardised: mp-7: converting as F-centred did not give a conventional cubic cell (a=7.508636532492104, b=6.279880713121656, c=5.762073130645699, α=120.41523057580362°, β=107.19536069103795°, γ=87.45750594682568°). Import a conventional CIF for this phase instead.",
         "empty-sites": "ERR Materials Project response could not be used: mp-7's structure lists no atomic sites.",
         "nan-lattice": "ERR Materials Project response could not be used: mp-7's lattice holds a number that is not finite.",
         "no-lattice": "ERR Materials Project response could not be used: mp-7's structure has no lattice.",
@@ -263,9 +262,17 @@ final class MaterialsProjectDocumentTests: XCTestCase {
     }
 
     func testRefusalsKeepTheirMessages() throws {
-        for (key, doc) in refusals {
+        for (key, doc) in refusals where key != "centred-wrong-metric" {
             XCTAssertEqual(outcome(doc), Self.refusalMessages[key], key)
         }
+    }
+
+    /// A triclinic cell served under a stated Fm-3m was refused until DiffractoKit 0.24 ("converting as F-centred did not
+    /// give a conventional cubic cell"). The kit now reads a cell its centring matrix cannot convert from the atoms (its
+    /// #216, spglib's reading), so the one Al atom imports in the cell it was served in. Recorded on the Mac runner.
+    func testACentredSymbolOnACellThatIsNotCentredIsReadFromTheAtoms() throws {
+        let doc = try XCTUnwrap(refusals.first { $0.0 == "centred-wrong-metric" }).1
+        XCTAssertEqual(outcome(doc), "6dcdda7fd251bbbf")
     }
 
     func testRequestAndDecodeAndFirstDocument() throws {

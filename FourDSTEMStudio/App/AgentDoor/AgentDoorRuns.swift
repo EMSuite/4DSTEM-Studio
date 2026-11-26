@@ -35,7 +35,8 @@ extension Mac4DSTEMAgentDoor {
     static let runTools: [AgentTool] = [
         AgentTool(name: "select_scan_position", title: "Select scan position",
                   summary: "Shows the diffraction pattern at scan position (x, y), as a click on the scan map does. In the Disks task "
-                      + "the detected disks of that pattern are drawn on get_pattern_image.",
+                      + "the detected disks of that pattern are drawn on get_pattern_image. The pattern loads and its disks are detected "
+                      + "after the answer: get_detected_disks' ready (and get_window's pattern.ready) turns true when both are in.",
                   input: .window,
                   parameters: [AgentParameter("x", .integer(0...100_000), summary: "Scan column, from 0.", required: true),
                                AgentParameter("y", .integer(0...100_000), summary: "Scan row, from 0.", required: true)],
@@ -52,7 +53,8 @@ extension Mac4DSTEMAgentDoor {
             }
             state.selectScan(x: x, y: y)
             state.statusText = "An agent selected scan position (\(x), \(y))."
-            return .json(["scan_position": ["x": x, "y": y]])
+            return .json(["scan_position": ["x": x, "y": y], "ready": state.agentPatternReady,
+                          "note": "Read get_detected_disks once its ready is true; until then it may show the last position's disks."])
         },
         AgentTool(name: "set_disk_detection", title: "Tune disk detection",
                   summary: "Changes the Disks task's detection settings, as its sliders do; only the ones given. The detection on the "
@@ -78,8 +80,8 @@ extension Mac4DSTEMAgentDoor {
         },
         AgentTool(name: "run_task", title: "Run",
                   summary: "Presses the window's Run for its current task (Compute Image, Detect Disks on the whole scan, Map Strain, ...), "
-                      + "as the toolbar button does. It starts the run and answers at once; get_window says busy until it finishes, "
-                      + "and get_log says how it ended.",
+                      + "as the toolbar button does. It starts the run and answers at once with its run_id; get_window's "
+                      + "operation.finished_run_id reaches that id when it ends, and operation.last_run says how.",
                   input: .window, acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
             guard !state.agentBusy else { return busyRefusal }
@@ -91,8 +93,8 @@ extension Mac4DSTEMAgentDoor {
                 guard !state.edx.isBusy else { return busyRefusal }
                 if let blocker = state.edx.quantifyBlocker { return .refusal(status: 409, message: blocker) }
                 state.statusText = "An agent started Run (Quantify)."
-                Task { await state.runPrimaryWorkspaceTask() }
-                return .json(["started": "Quantify"])
+                let id = state.agentRun("Quantify") { await state.runPrimaryWorkspaceTask() }
+                return .json(["started": "Quantify", "run_id": id])
             }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             guard state.hasPrimaryWorkspaceTask else {
@@ -100,8 +102,8 @@ extension Mac4DSTEMAgentDoor {
             }
             let task = state.navigation.analysisMode.rawValue
             state.statusText = "An agent started Run (\(task))."
-            Task { await state.runPrimaryWorkspaceTask() }
-            return .json(["started": task])
+            let id = state.agentRun(task) { await state.runPrimaryWorkspaceTask() }
+            return .json(["started": task, "run_id": id])
         },
         AgentTool(name: "stop_run", title: "Stop",
                   summary: "Cancels the run in progress, as the window's Stop button does.",

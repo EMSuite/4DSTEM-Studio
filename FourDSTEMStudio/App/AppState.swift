@@ -545,6 +545,10 @@ final class AppState {
     // from `App/AppState+DiskDetection.swift`, a different file.
     var probeKernel: ProbeKernel?
     var currentPeaks: [BraggPeak] = []
+    /// The scan position `currentPattern` was read at, and the one the live detection last finished on (#330): the agent door's
+    /// `pattern_ready`, so a script reads disks only once they belong to the position it selected.
+    @ObservationIgnored var currentPatternScan: ScanPos?
+    @ObservationIgnored var detectedPatternScan: ScanPos?
     var currentDiskDiagnostics: DiskDetectionPatternDiagnostics?
     var completedDiskSummary: DiskDetectionScanSummary?
     @ObservationIgnored var liveDetectionRequest: UInt64 = 0
@@ -1079,6 +1083,11 @@ final class AppState {
     /// The last export the agent door started (#514): its file, whether it is still writing, and how it ended. get_window's
     /// `operation.last_export`, so a write that fails after the call answered is never read as success.
     var agentLastExport: AgentExportOutcome?
+    /// The runs the agent door started (#330): each answer names its `run_id`; get_window's `operation.last_run` says when that
+    /// run finished and how, so a script never guesses from `busy` alone.
+    @ObservationIgnored var agentRunSerial = 0
+    @ObservationIgnored var agentFinishedRunID: Int?
+    var agentLastRun: AgentRunRecord?
 
     private(set) var openDatasetRequest = 0
     private(set) var preprocessingExportRequest = 0

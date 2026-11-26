@@ -218,8 +218,10 @@ extension Mac4DSTEMAgentDoor {
                 loads.append((result, slot))
             }
             state.statusText = agentChangeLine("the comparison", call.arguments)
-            Task { for (result, slot) in loads { await state.loadSavedSessionResult(result, into: slot) } }
-            return .json(["loading": loads.map { ["slot": $0.1 == .a ? "a" : "b", "id": $0.0.id] },
+            let id = state.agentRun("compare_saved_results") {
+                for (result, slot) in loads { await state.loadSavedSessionResult(result, into: slot) }
+            }
+            return .json(["loading": loads.map { ["slot": $0.1 == .a ? "a" : "b", "id": $0.0.id] }, "run_id": id,
                           "saved_results": savedResults(of: state)])
         },
         AgentTool(name: "show_quality_field", title: "Inspect quality field",
@@ -261,8 +263,9 @@ extension Mac4DSTEMAgentDoor {
             if case .failure(let refusal) = state.replay.lineage.rewindPlan(to: step) {
                 return .refusal(status: 404, message: refusal.description)
             }
-            Task { await state.rewindLineage(to: step) }
-            return .json(["rewinding_to": step, "note": "get_window's status says when it is done, or why it was refused."])
+            let id = state.agentRun("rewind_lineage") { await state.rewindLineage(to: step) }
+            return .json(["rewinding_to": step, "run_id": id,
+                          "note": "get_window's operation.last_run says when it is done; its status_line says why if refused."])
         },
         AgentTool(name: "reopen_full_extent", title: "Reopen at Full Extent",
                   summary: "Reopens a cropped or binned dataset at its full extent and replays the recorded recipe on it, as Reopen at "
@@ -272,8 +275,8 @@ extension Mac4DSTEMAgentDoor {
             guard !state.agentBusy else { return busyRefusal }
             guard state.hasDataset else { return .refusal(status: 404, message: "This window has no dataset open.") }
             state.statusText = "An agent pressed Reopen at Full Extent."
-            Task { await state.promoteAndReplayRecipe() }
-            return .json(["started": true])
+            let id = state.agentRun("reopen_full_extent") { await state.promoteAndReplayRecipe() }
+            return .json(["started": true, "run_id": id])
         },
     ]
 

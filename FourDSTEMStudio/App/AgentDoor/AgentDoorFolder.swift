@@ -47,10 +47,14 @@ extension Mac4DSTEMAgentDoor {
                       + "there, one window holds one kind: a spectrum image opened in a window with a 4D scan, or a 4D file in a "
                       + "window with only a spectrum image, opens in a NEW window: list_windows then names it. It "
                       + "starts the open and answers at once; get_window says busy until the dataset is in, and get_log says if it failed. "
-                      + "Refused while an analysis runs, since opening would stop it.",
+                      + "Refused while an analysis runs, since opening would stop it. The answer's run_id reaches get_window's "
+                      + "operation.finished_run_id when the open ends. without_session true opens the file with its saved session "
+                      + "left aside, as Reopen Without Session does: the session file is neither read nor changed.",
                   input: .window,
                   parameters: [AgentParameter("path", .text, summary: "The file, relative to the Agent folder, as list_agent_folder "
-                                                  + "names it.", required: true)],
+                                                  + "names it.", required: true),
+                               AgentParameter("without_session", .boolean, summary: "Leave the saved session aside for this open "
+                                                  + "(default false): a fresh start on the same file.")],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
             if let refusal = openRefusal(state) { return refusal }
@@ -67,8 +71,10 @@ extension Mac4DSTEMAgentDoor {
             // window's open is claimed now (`claimOpen`, the one-load guard of #303, which every open shares).
             guard state.claimOpen() else { return busyRefusal }
             state.statusText = "An agent opened \(quotedAgentText(file.lastPathComponent))."
-            Task { await state.openFileAsync(url: file, claimed: true) }
-            return .json(["opening": folder.relativePath(of: file)])
+            let fresh = call.arguments["without_session"] == "true"
+            if fresh { state.ignoreSessionForDatasetID = file.standardizedFileURL.path }
+            let id = state.agentRun("open_file") { await state.openFileAsync(url: file, claimed: true) }
+            return .json(["opening": folder.relativePath(of: file), "without_session": fresh, "run_id": id])
         },
         AgentTool(name: "save_result_image", title: "Save result picture",
                   summary: "Saves the displayed result into the Agent folder as File > Export > Result Image does: a PNG with the "

@@ -106,6 +106,24 @@ final class AgentDoorFolderTests: XCTestCase {
         withExtendedLifetime(state) {}
     }
 
+    /// #330: without_session leaves the saved session aside for that open (Reopen Without Session's one-shot skip), and the
+    /// answer names its run. Mutation: the argument ignored - red.
+    func testOpeningWithoutTheSessionSetsTheOneShotSkip() async throws {
+        let state = AppState()
+        door.enroll(state) { [weak state] in state?.agentSummary() ?? [:] }
+        Mac4DSTEMAgentDoor.folder.use(folder: root)
+        door.runsAllowed = true
+        let skips = state.agentRunSerial
+        let opened = try await call("open_file", ["path": "a.dm4", "without_session": true])
+        XCTAssertFalse(opened.refused, opened.text)
+        let answer = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(opened.text.utf8)) as? [String: Any])
+        XCTAssertEqual(answer["without_session"] as? Bool, true)
+        XCTAssertEqual(answer["run_id"] as? Int, skips + 1)
+        // The file is not a real dm4, so the open fails before any session is read: the skip still names this file.
+        for _ in 0..<500 where (state.agentFinishedRunID ?? 0) < skips + 1 { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(state.ignoreSessionForDatasetID?.hasSuffix("/a.dm4") == true, "\(state.ignoreSessionForDatasetID ?? "nil")")
+    }
+
     /// #313: during an analysis, open_file is refused with a sentence that names the run, and the run goes on; the window's own
     /// question (`RunInterruptionDialog`) is for the person, never raised by an agent. Mutation: the door's open using the plain
     /// busy refusal ("The window is busy") - red.

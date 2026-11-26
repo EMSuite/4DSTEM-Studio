@@ -42,9 +42,11 @@ extension Mac4DSTEMAgentDoor {
                 return .refusal(status: 400, message: "The radius is a positive number of pixels that fits the detector\(limit).")
             }
             state.statusText = "An agent set the probe radius: \(numberText(Double(radius))) px."
-            Task { await noteDiskSettingChanges(of: state, by: "The probe radius") { await state.useProbeRadius(radius) } }
+            let id = state.agentRun("set_probe_radius") {
+                await noteDiskSettingChanges(of: state, by: "The probe radius") { await state.useProbeRadius(radius) }
+            }
             return .json(["probe_radius_px": Double(radius),
-                          "rebuilds_kernel": state.probeKernel?.source == .synthetic])
+                          "rebuilds_kernel": state.probeKernel?.source == .synthetic, "run_id": id])
         },
         AgentTool(name: "build_probe_kernel", title: "Build kernel",
                   summary: "Builds the probe kernel, as Build Kernel does: synthetic (a disk at the probe radius), current_pattern (the "
@@ -71,7 +73,7 @@ extension Mac4DSTEMAgentDoor {
                 return .refusal(status: 404, message: "No pattern is on screen to build the kernel from.")
             }
             state.statusText = "An agent pressed Build Kernel (\(source.rawValue))."
-            Task {
+            let id = state.agentRun("build_probe_kernel") {
                 await noteDiskSettingChanges(of: state, by: "Build Kernel") {
                     switch source {
                     case .synthetic: await state.generateProbeKernel()
@@ -81,7 +83,8 @@ extension Mac4DSTEMAgentDoor {
                 }
             }
             var answer: [String: Any] = ["building": source.rawValue,
-                                         "mode": source == .synthetic ? "sigmoid_trench" : ModeChoice(mode).rawValue]
+                                         "mode": source == .synthetic ? "sigmoid_trench" : ModeChoice(mode).rawValue,
+                                         "run_id": id]
             if source == .synthetic, call.arguments["mode"] != nil {   // said, not ignored silently (#266)
                 answer["note"] = "mode applies to current_pattern and file_probe only; a synthetic kernel is always sigmoid_trench."
             }

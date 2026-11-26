@@ -215,3 +215,19 @@ result's display `orientation` (0, 90, 180, 270) and `mirrored` (display only, n
   there. A failed export also raises the window's alert, as the Export menu's own failures do. The .h5 is built in this Mac's
   temporary folder and copied into the Agent folder as a new file, so a drive without exclusive renames or file locks (exFAT)
   takes it.
+- **Runs say when they end (#330).** Every tool that starts a run (`run_task`, `run_calibration`, `build_probe_kernel`,
+  `set_probe_radius`, `run_reconstruction_step`, `find_matrix_zone_axis`, `open_file`, `open_demo`, `rewind_lineage`,
+  `reopen_full_extent`, loading saved results to compare) answers a `run_id`. `get_window`'s `operation.finished_run_id`
+  reaches that id when the run ends, and `operation.last_run` holds its state (`running`, `finished`, `failed`), its error, the
+  status line it ended on (a cancel or a refusal says so there), its length in seconds and `changed_disk_settings`, each disk
+  setting it moved with `from` and `to`. A script waits on the id, never on `busy` alone.
+- **The pattern says when it belongs to the position (#330).** `select_scan_position` answers before the pattern loads.
+  `get_detected_disks` and `get_window`'s `pattern` carry `ready`: true once the pattern on screen is the selected position's
+  and, in the Disks task with a kernel, its live detection has finished on it; `pattern_scan_position` names the position the
+  disks were found on.
+- **Origin and result numbers (#330).** `get_window`'s calibration gives `origin_fit_rms_px` (the status line's fit RMS) and
+  `origin_method`: `centre_of_mass`, `friedel`, `bragg_peaks` or `manual` from the run in force, else `file`, `session` or null
+  for the detector's middle. The displayed result carries `statistics` over its valid finite pixels: `count_finite`, `mean`,
+  `std` (population, numpy's default ddof 0), `min` and `max`; null for a colour result.
+- **A fresh start on a file (#330).** `open_file` with `without_session` true opens the file with its saved session left aside,
+  as Reopen Without Session does: the session file is neither read nor changed.

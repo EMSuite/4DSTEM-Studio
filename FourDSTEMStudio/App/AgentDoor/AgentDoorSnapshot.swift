@@ -178,6 +178,9 @@ extension AppState {
             "error": AgentJSON.orNull(errorMessage ?? lastComputeFailure),
             // The last export the door started (#514): writing, written, failed with its error, or cancelled.
             "last_export": AgentJSON.orNull(agentLastExport?.json),
+            // The last run the door started (#330): a script waits for finished_run_id to reach the run_id its call answered.
+            "last_run": AgentJSON.orNull(agentLastRun?.json),
+            "finished_run_id": AgentJSON.orNull(agentFinishedRunID),
         ] as [String: Any]
         snapshot["result"] = agentResult
         snapshot["pattern"] = agentPattern
@@ -262,7 +265,29 @@ extension AppState {
             out["mean_origin_px"] = NSNull()
         }
         out["spot_distortion_fit"] = AgentJSON.orNull(spotDistortion.pending?.summary(locale: Mac4DSTEMAgentDoor.textLocale))
+        // How the origin in force was measured and how well its per-position fit holds (#330): the status line's "fit RMS"
+        // as a number, so a script reads it without parsing text.
+        out["origin_fit_rms_px"] = AgentJSON.number(calibration.origin?.rmsResidual)
+        out["origin_method"] = agentOriginMethod
         return out
+    }
+
+    /// centre_of_mass, friedel, bragg_peaks or manual from the active origin run; the file's or session's origin otherwise.
+    var agentOriginMethod: Any {
+        let run = replay.lineage.activeNodes().last { $0.kind == "calibration_origin" }?.parameters["method"]
+        switch run {
+        case OriginMethod.centreOfMass.rawValue?: return "centre_of_mass"
+        case OriginMethod.friedel.rawValue?: return "friedel"
+        case "bragg_peaks"?, "manual"?, "restored"?: return run!
+        default:
+            switch calibrationSession.calibration.originProvenance {
+            case .geometricDefault: return NSNull()
+            case .fileMean, .fileMaps: return "file"
+            case .sessionMean, .sessionMaps: return "session"
+            case .manual: return "manual"
+            case .fitted: return "fitted"
+            }
+        }
     }
 
     private var agentResult: Any {
@@ -285,7 +310,41 @@ extension AppState {
         if let range = resultDisplayedValueRange {
             out["display_range"] = ["low": AgentJSON.number(range.low), "high": AgentJSON.number(range.high)]
         }
+        out["statistics"] = Self.agentStatistics(of: product)
         return out
+    }
+
+    /// The displayed result's numbers over its valid finite pixels (#330): count, mean, standard deviation (population, as
+    /// numpy's default ddof 0), min and max, so a script checks a map without fetching it. Null for a colour (rgba) result.
+    nonisolated static func agentStatistics(of product: DisplayedProduct) -> Any {
+        guard case .scalar(let image) = product.payload else { return NSNull() }
+        var count = 0, sum = 0.0, low = Double.infinity, high = -Double.infinity
+        for (index, value) in image.pixels.enumerated() where value.isFinite
+            && (index >= product.validityMask.count || product.validityMask[index]) {
+            let v = Double(value)
+            count += 1; sum += v; low = min(low, v); high = max(high, v)
+        }
+        guard count > 0 else {
+            return ["count_finite": 0, "mean": NSNull(), "std": NSNull(), "min": NSNull(), "max": NSNull()] as [String: Any]
+        }
+        let mean = sum / Double(count)
+        var squares = 0.0
+        for (index, value) in image.pixels.enumerated() where value.isFinite
+            && (index >= product.validityMask.count || product.validityMask[index]) {
+            let d = Double(value) - mean
+            squares += d * d
+        }
+        return ["count_finite": count, "mean": mean, "std": (squares / Double(count)).squareRoot(),
+                "min": low, "max": high] as [String: Any]
+    }
+
+    /// Whether the pattern on screen, and in the Disks task its detected disks, belong to the scan position selected (#330):
+    /// select_scan_position answers before the pattern loads and the live detection runs.
+    var agentPatternReady: Bool {
+        let patternIn = patternDisplayMode != .current || currentPatternScan == selectedScan
+        let detecting = diskDetection.liveDetectionInFlight || diskDetection.liveDetectionPending
+        let disksIn = navigation.analysisMode != .disks || probeKernel == nil || detectedPatternScan == currentPatternScan
+        return patternIn && !detecting && disksIn
     }
 
     private var agentPattern: Any {
@@ -293,6 +352,7 @@ extension AppState {
         return [
             "width": pattern.qx,
             "height": pattern.qy,
+            "ready": agentPatternReady,
             "shown": patternDisplayMode.rawValue,
             "log_scale": logScale,
             "image": "get_pattern_image",
@@ -372,6 +432,9 @@ extension AppState {
     var agentPeaks: [String: Any] {
         [
             "scan_position": ["x": selectedScan.x, "y": selectedScan.y],
+            // The position the disks below were detected on, and whether that is the one selected with the detection done (#330).
+            "pattern_scan_position": AgentJSON.orNull(detectedPatternScan.map { ["x": $0.x, "y": $0.y] }),
+            "ready": agentPatternReady,
             "coordinates": "detector pixels of the pattern as shown: x to the right, y down, (0, 0) the centre of the top-left pixel",
             "probe_radius_px": AgentJSON.number(probeKernel?.probeRadius),
             "disks": currentPeaks.map { peak in

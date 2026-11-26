@@ -144,8 +144,8 @@ extension Mac4DSTEMAgentDoor {
                     + "are lost.")
             }
             state.statusText = "An agent opened the demo data."
-            Task { await state.openDemoFixture() }
-            return .json(["opening": "demo"])
+            let id = state.agentRun("open_demo") { await state.openDemoFixture() }
+            return .json(["opening": "demo", "run_id": id])
         },
     ]
 

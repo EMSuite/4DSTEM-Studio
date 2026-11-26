@@ -256,11 +256,15 @@ extension AppState {
             return
         }
         diskDetection.liveDetectionInFlight = true
+        let scan = currentPatternScan
         await performLiveDetection()
         diskDetection.liveDetectionInFlight = false
         if diskDetection.liveDetectionPending {
             diskDetection.liveDetectionPending = false
+            detectedPatternScan = nil   // not ready until the re-run lands (#330)
             Task { await detectCurrentPattern() }
+        } else {
+            detectedPatternScan = scan
         }
     }
 

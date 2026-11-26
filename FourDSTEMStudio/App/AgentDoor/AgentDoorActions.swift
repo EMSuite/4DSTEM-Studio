@@ -46,8 +46,8 @@ extension Mac4DSTEMAgentDoor {
             guard !state.agentBusy else { return busyRefusal }
             if let refusal = state.matrixZoneAxisRefusal { return .refusal(status: 409, message: refusal) }
             state.statusText = "An agent pressed Find Matrix Zone Axis."
-            Task { _ = await state.findMatrixZoneAxis() }
-            return .json(["started": true])
+            let id = state.agentRun("find_matrix_zone_axis") { _ = await state.findMatrixZoneAxis() }
+            return .json(["started": true, "run_id": id])
         },
     ]
 }

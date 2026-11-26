@@ -78,6 +78,44 @@ final class AgentDoorFolderTests: XCTestCase {
         let files = try XCTUnwrap((try JSONSerialization.jsonObject(with: Data(listed.text.utf8)) as? [String: Any])?["files"] as? [[String: Any]])
         XCTAssertEqual(files.compactMap { $0["path"] as? String }, ["a.dm4", "sub/b.h5", "taken.png"])
         XCTAssertEqual(files.first?["bytes"] as? Int, 1)
+
+        // #515: a subfolder, a glob, pages, and the absolute path.
+        func paths(_ arguments: [String: Any]) async throws -> (paths: [String], answer: [String: Any]) {
+            let listed = try await call("list_agent_folder", arguments)
+            XCTAssertFalse(listed.refused, listed.text)
+            let answer = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(listed.text.utf8)) as? [String: Any])
+            let files = try XCTUnwrap(answer["files"] as? [[String: Any]])
+            return (files.compactMap { $0["path"] as? String }, answer)
+        }
+        let all = try await paths([:])
+        XCTAssertTrue((all.answer["absolute_path"] as? String ?? "").hasSuffix("/Agent"), "\(all.answer)")
+        XCTAssertEqual(all.answer["total"] as? Int, 3)
+        XCTAssertEqual(try await paths(["pattern": "*.h5"]).paths, ["sub/b.h5"])
+        XCTAssertEqual(try await paths(["pattern": "sub/*"]).paths, ["sub/b.h5"])
+        XCTAssertEqual(try await paths(["path": "sub"]).paths, ["sub/b.h5"])
+        let page = try await paths(["offset": 1, "limit": 1])
+        XCTAssertEqual(page.paths, ["sub/b.h5"])
+        XCTAssertEqual(page.answer["more"] as? Bool, true)
+        let out = try await call("list_agent_folder", ["path": "../Elsewhere"])
+        XCTAssertTrue(out.refused, out.text)
+    }
+
+    /// #515: a save may name sub-folders inside the Agent folder; they are made, and one that leads out by a link is refused.
+    /// Mutation: the target's folder not checked after it is made - red at the link.
+    func testSavesMayNameSubFoldersInsideTheFolder() throws {
+        Mac4DSTEMAgentDoor.folder.use(folder: root)
+        Mac4DSTEMAgentDoor.savesAllowed = true
+        let saved = Mac4DSTEMAgentDoor.saveNewFile(Data("x".utf8), named: "maps/run 1/table", default: "x", extension: "csv")
+        XCTAssertEqual(try? saved.get(), "maps/run 1/table.csv")
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("maps/run 1/table.csv")), Data("x".utf8))
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("away"), withDestinationURL: outside)
+        let leaked = Mac4DSTEMAgentDoor.saveNewFile(Data("x".utf8), named: "away/table", default: "x", extension: "csv")
+        guard case .failure(let refusal) = leaked else { return XCTFail("a save followed a link out of the folder") }
+        XCTAssertTrue(refusal.message.contains("outside the Agent folder"), refusal.message)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.appendingPathComponent("table.csv").path))
+        let deeper = Mac4DSTEMAgentDoor.saveNewFile(Data("x".utf8), named: "away/new/table", default: "x", extension: "csv")
+        guard case .failure = deeper else { return XCTFail("a save made folders through a link out of the folder") }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.appendingPathComponent("new").path))
     }
 
     /// Opening acts: refused until runs are allowed, and refused for anything outside the folder or missing.
@@ -186,7 +224,14 @@ final class AgentDoorFolderTests: XCTestCase {
         XCTAssertEqual(try? Mac4DSTEMAgentDoor.fileName(nil, default: "scan (2)/a_result").get(), "scan _2__a_result.png")
         XCTAssertEqual(try? Mac4DSTEMAgentDoor.fileName("", default: ".hidden").get(), "_hidden.png")
         XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("../x", default: "x").get())
-        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a/b", default: "x").get())
+        // #515: sub-folders, each part by the same rule.
+        XCTAssertEqual(try? Mac4DSTEMAgentDoor.fileName("a/b", default: "x").get(), "a/b.png")
+        XCTAssertEqual(try? Mac4DSTEMAgentDoor.fileName("maps/run 1/strain.png", default: "x").get(), "maps/run 1/strain.png")
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a/../b", default: "x").get())
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("/abs/b", default: "x").get())
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a//b", default: "x").get())
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a/.hidden/b", default: "x").get())
+        XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName("a/", default: "x").get())
         XCTAssertNil(try? Mac4DSTEMAgentDoor.fileName(".x", default: "x").get())
     }
 }

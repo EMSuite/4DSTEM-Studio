@@ -26,12 +26,7 @@ extension Mac4DSTEMAgentDoor {
         guard let root = folder.url else { return .failure(ToolRefusal(status: 404, message: folder.missingMessage)) }
         switch fileName(given, default: fallback, extension: ext) {
         case .failure(let refusal): return .failure(ToolRefusal(status: 400, message: refusal.message))
-        case .success(let name):
-            let target = root.appendingPathComponent(name)
-            guard (try? FileManager.default.attributesOfItem(atPath: target.path)) == nil else {
-                return .failure(ToolRefusal(status: 409, message: "\(name) exists in the Agent folder and is never replaced: choose another name."))
-            }
-            return .success(target)
+        case .success(let name): return newFileTarget(name, in: root)
         }
     }
 
@@ -107,7 +102,7 @@ extension Mac4DSTEMAgentDoor {
                   input: .window,
                   parameters: [
                       AgentParameter("what", .choice(["data", "bundle", "figure"]), summary: "What to write.", required: true),
-                      AgentParameter("name", .text, summary: "The file name, without folders; the extension is added."),
+                      AgentParameter("name", .text, summary: "The file name, sub-folders with /; the extension is added."),
                       AgentParameter("figure_panels", .text, summary: "Figure only: the panels, comma-separated ids (result, pattern, "
                                          + "map.eds); leave out for every panel there is."),
                       AgentParameter("figure_detector", .boolean, summary: "Figure only: outline the virtual detector on the pattern."),
@@ -189,7 +184,7 @@ extension Mac4DSTEMAgentDoor {
                                   fileName: target.lastPathComponent, productKind: maps.first?.kind)
             state.agentLastExport = AgentExportOutcome(file: target.lastPathComponent, state: .written)
             state.statusText = "An agent exported \(maps.count) field(s) → \(target.lastPathComponent) in the Agent folder."
-            return .json(["saved": target.lastPathComponent, "fields": maps.map(\.kind),
+            return .json(["saved": folder.relativePath(of: target), "fields": maps.map(\.kind),
                           "bytes": (try? FileManager.default.attributesOfItem(atPath: target.path)[.size] as? Int) ?? NSNull()])
         },
         AgentTool(name: "compare_results", title: "Compare saved results",

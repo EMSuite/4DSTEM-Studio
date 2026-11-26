@@ -130,7 +130,7 @@ extension Mac4DSTEMAgentDoor {
                       + "does, with the settings and provenance in its header. Needs \"Let agents save results there\"; never "
                       + "replaces a file.",
                   input: .window,
-                  parameters: [AgentParameter("name", .text, summary: "The file name, without folders; .csv is added. Leave out for "
+                  parameters: [AgentParameter("name", .text, summary: "The file name, sub-folders with /; .csv is added. Leave out for "
                                                   + "the dataset's name followed by _objects.")],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }

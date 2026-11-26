@@ -178,11 +178,10 @@ extension Mac4DSTEMAgentDoor {
                 switch fileName(a["name"], default: suggested, extension: "h5") {
                 case .failure(let refusal): return .refusal(status: 400, message: refusal.message)
                 case .success(let name):
-                    let target = root.appendingPathComponent(name)
-                    guard (try? FileManager.default.attributesOfItem(atPath: target.path)) == nil else {
-                        return .refusal(status: 409, message: "\(name) exists in the Agent folder and is never replaced: choose another name.")
+                    switch newFileTarget(name, in: root) {
+                    case .success(let target): destination = target
+                    case .failure(let refusal): return .refusal(status: refusal.status, message: refusal.message)
                     }
-                    destination = target
                 }
             }
             let openAfter = a["open_after"] == "true"

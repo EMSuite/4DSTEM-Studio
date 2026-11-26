@@ -231,3 +231,15 @@ result's display `orientation` (0, 90, 180, 270) and `mirrored` (display only, n
   `std` (population, numpy's default ddof 0), `min` and `max`; null for a colour result.
 - **A fresh start on a file (#330).** `open_file` with `without_session` true opens the file with its saved session left aside,
   as Reopen Without Session does: the session file is neither read nor changed.
+- **Numbers as numbers (#515).** `get_result_values` gives the displayed result's fields (those `export_result` data writes,
+  then its quality fields) as Float32: `format` npy saves numpy's .npy into the Agent folder, base64 answers the raw
+  little-endian bytes inline up to 4 MB; rows are scan rows. `export_bragg_vectors` writes every position's disks in one file:
+  h5 (py4DSTEM's BraggVectors in EMD 1.0, as the session file keeps them) or csv (`scan_x, scan_y, x_px, y_px, intensity`).
+  `get_detected_disks` with `x0`, `y0`, `x1`, `y1` reads a rectangle of up to 10 000 positions from the whole-scan detection.
+- **Side effects in the answer (#515).** `set_probe_radius` answers `changed_disk_settings` (each setting the radius moved, with
+  `from` and `to`), and a synthetic kernel's rebuild is a run with its own `run_id`; `build_probe_kernel`'s changes are in
+  `operation.last_run`, as every run's are.
+- **A deeper Agent folder (#515).** `list_agent_folder` names the folder's `absolute_path` and takes `path` (one subfolder),
+  `pattern` (a shell glob on the file name, or on the whole path when it holds a `/`), `offset` and `limit`; `total` counts
+  every match and `more` says a next page exists. Every save name may hold sub-folders (`maps/run 1/strain`): each part follows
+  the file-name rule, the folders are made, and one that leads out of the Agent folder by a link is refused.

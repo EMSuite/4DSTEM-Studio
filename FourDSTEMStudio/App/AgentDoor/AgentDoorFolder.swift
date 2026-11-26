@@ -37,10 +37,29 @@ extension Mac4DSTEMAgentDoor {
     static let folderTools: [AgentTool] = [
         AgentTool(name: "list_agent_folder", title: "Agent folder files",
                   summary: "The files in the Agent folder the person chose in Settings > Agents (and its subfolders): path relative to "
-                      + "the folder, size in bytes, modification date. open_file opens one; save_result_image saves into the folder.",
-                  input: .noWindow) { _ in
-            guard let listed = folder.listing() else { return .refusal(status: 404, message: folder.missingMessage) }
-            return .json(["folder": folder.url?.lastPathComponent ?? "", "files": listed.files, "truncated": listed.truncated])
+                      + "the folder, size in bytes, modification date, sorted by path, and the folder's absolute path. path keeps one "
+                      + "subfolder, pattern a shell glob (*.h5; with a / it matches the whole path), offset and limit page through "
+                      + "the list: total counts every match. open_file opens one; the save tools save into the folder.",
+                  input: .noWindow,
+                  parameters: [
+                      AgentParameter("path", .text, summary: "A subfolder, relative to the Agent folder; leave out for all of it."),
+                      AgentParameter("pattern", .text, summary: "A shell glob, as *.dm4 or maps/*_strain.*."),
+                      AgentParameter("offset", .integer(0...10_000_000), summary: "Files to skip in the sorted list (default 0)."),
+                      AgentParameter("limit", .integer(1...10_000), summary: "Most files in this page (default 2000)."),
+                  ]) { call in
+            let offset = call.arguments["offset"].flatMap(Int.init) ?? 0
+            let limit = call.arguments["limit"].flatMap(Int.init) ?? 2000
+            guard let listed = folder.listing(under: call.arguments["path"], pattern: call.arguments["pattern"],
+                                              offset: offset, limit: limit) else {
+                return .refusal(status: 404, message: folder.missingMessage)
+            }
+            switch listed {
+            case .failure(let refusal): return .refusal(status: 404, message: refusal.message)
+            case .success(let page):
+                return .json(["folder": folder.url?.lastPathComponent ?? "", "absolute_path": folder.url?.path ?? "",
+                              "files": page.files, "total": page.total, "offset": offset,
+                              "more": offset + page.files.count < page.total, "truncated": page.truncated])
+            }
         },
         AgentTool(name: "open_file", title: "Open file",
                   summary: "Opens a file of the Agent folder in the window, as File > Open does, replacing the dataset it shows. As "
@@ -81,7 +100,7 @@ extension Mac4DSTEMAgentDoor {
                       + "colour scale, scale bar and caption drawn in and the full provenance record in its metadata. Never replaces "
                       + "a file: a name that exists is refused.",
                   input: .window,
-                  parameters: [AgentParameter("name", .text, summary: "The file name, without folders; .png is added. Leave out for "
+                  parameters: [AgentParameter("name", .text, summary: "The file name, sub-folders with /; .png is added. Leave out for "
                                                   + "the dataset's name followed by _result.")],
                   acts: true) { call in
             guard let state = call.window?.state as? AppState else { return notAWindow }
@@ -96,11 +115,10 @@ extension Mac4DSTEMAgentDoor {
             case .success(let made): name = made
             case .failure(let refusal): return .refusal(status: 400, message: refusal.message)
             }
-            let target = root.appendingPathComponent(name)
-            // Any entry of that name, a link that leads nowhere included: `fileExists` follows links, so a dangling one would
-            // read as free and the write would follow it out of the folder.
-            guard (try? FileManager.default.attributesOfItem(atPath: target.path)) == nil else {
-                return .refusal(status: 409, message: "\(name) exists in the Agent folder and is never replaced: choose another name.")
+            let target: URL
+            switch newFileTarget(name, in: root) {
+            case .success(let made): target = made
+            case .failure(let refusal): return .refusal(status: refusal.status, message: refusal.message)
             }
             let scale = state.preferences.exportScale.pixelScale
             let made: (image: CGImage, product: DisplayedProduct)
@@ -138,9 +156,27 @@ extension Mac4DSTEMAgentDoor {
     /// The longest file name a save takes, in UTF-8 bytes before the extension.
     static let fileNameByteLimit = 200
 
-    /// A save's file name: letters, digits, spaces, `-`, `_` and `.`, no folders, ending in .png.
+    /// A save's file name: letters, digits, spaces, `-`, `_` and `.`, ending in .png; sub-folders of the Agent folder are named
+    /// with `/` (#515), each part by the same rule, so none is `..` or hidden.
     static func fileName(_ given: String?, default fallback: String, extension ext: String = "png") -> Result<String, AgentFolderRefusal> {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_."))
+        var folders: [String] = []
+        var given = given
+        if let typed = given?.trimmingCharacters(in: .whitespacesAndNewlines), typed.contains("/") {
+            var parts = typed.split(separator: "/", omittingEmptySubsequences: false).map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
+            let leaf = parts.removeLast()
+            guard parts.count <= 8, parts.allSatisfy({ part in
+                !part.isEmpty && !part.hasPrefix(".") && part.utf8.count <= fileNameByteLimit
+                    && part.unicodeScalars.allSatisfy(allowed.contains)
+            }), !leaf.isEmpty else {
+                return .failure(AgentFolderRefusal("A sub-folder is named like a file: letters, digits, spaces, - _ and . only, "
+                    + "not starting with a dot, as in maps/run 1/strain (at most 8 deep)."))
+            }
+            folders = parts
+            given = leaf
+        }
         var name = (given ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if name.isEmpty {   // the dataset's own name may hold any character: those outside the rule become _
             var kept = String.UnicodeScalarView()
@@ -156,10 +192,37 @@ extension Mac4DSTEMAgentDoor {
             return .failure(AgentFolderRefusal("A file name is at most \(fileNameByteLimit) bytes before its extension."))
         }
         guard !name.isEmpty, !name.hasPrefix("."), name.unicodeScalars.allSatisfy(allowed.contains) else {
-            return .failure(AgentFolderRefusal("A file name is letters, digits, spaces, - _ and . only, without folders, and does "
-                + "not start with a dot."))
+            return .failure(AgentFolderRefusal("A file name is letters, digits, spaces, - _ and . only (sub-folders with /), and "
+                + "does not start with a dot."))
         }
-        return .success(name + "." + ext)
+        return .success((folders + [name + "." + ext]).joined(separator: "/"))
+    }
+
+    /// The place of a new file `name` (made by `fileName`) in the Agent folder `root`: refused when anything of that name exists,
+    /// and its sub-folders made when missing (#515), each checked to stay inside the folder (a link that leads out is refused).
+    static func newFileTarget(_ name: String, in root: URL) -> Result<URL, ToolRefusal> {
+        let target = root.appendingPathComponent(name)
+        // Any entry of that name, a link that leads nowhere included: `fileExists` follows links, so a dangling one would
+        // read as free and the write would follow it out of the folder.
+        guard (try? FileManager.default.attributesOfItem(atPath: target.path)) == nil else {
+            return .failure(ToolRefusal(status: 409, message: "\(name) exists in the Agent folder and is never replaced: choose another name."))
+        }
+        let parent = target.deletingLastPathComponent()
+        guard name.contains("/") else { return .success(target) }
+        let outside = ToolRefusal(status: 400, message: "\(name) would be outside the Agent folder; only folders inside it can be used.")
+        // The deepest folder that exists already, links resolved, must be inside: a link part-way down the name never leads the
+        // new folders out.
+        var existing = parent
+        while !FileManager.default.fileExists(atPath: existing.path), existing.path.count > root.path.count {
+            existing = existing.deletingLastPathComponent()
+        }
+        guard folder.contains(AgentFolder.canonical(existing)) else { return .failure(outside) }
+        do { try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true) } catch {
+            return .failure(ToolRefusal(status: 409, message: "The folder for \(name) could not be made in the Agent folder: "
+                + error.localizedDescription))
+        }
+        guard folder.contains(AgentFolder.canonical(parent)) else { return .failure(outside) }
+        return .success(AgentFolder.canonical(parent).appendingPathComponent(target.lastPathComponent))
     }
 
     /// Writes `data` as a NEW file of the Agent folder (O_EXCL: a name, or a link, that exists is never replaced or followed), behind
@@ -176,9 +239,10 @@ extension Mac4DSTEMAgentDoor {
         case .success(let made): name = made
         case .failure(let refusal): return .failure(ToolRefusal(status: 400, message: refusal.message))
         }
-        let target = root.appendingPathComponent(name)
-        guard (try? FileManager.default.attributesOfItem(atPath: target.path)) == nil else {
-            return .failure(ToolRefusal(status: 409, message: "\(name) exists in the Agent folder and is never replaced: choose another name."))
+        let target: URL
+        switch newFileTarget(name, in: root) {
+        case .success(let made): target = made
+        case .failure(let refusal): return .failure(refusal)
         }
         do { try data.write(to: target, options: .withoutOverwriting) } catch {
             return .failure(ToolRefusal(status: 409, message: "\(name) could not be written as a new file in the Agent folder: "

@@ -59,11 +59,7 @@ extension AppState {
             let newError = self.errorMessage != errorBefore ? self.errorMessage : nil
             record.error = self.lastComputeFailure ?? newError
             record.statusLine = self.statusText
-            let after = self.diskDetection.diskParams
-            for setting in Mac4DSTEMAgentDoor.DiskSetting.all {
-                let old = setting.read(before), new = setting.read(after)
-                if old != new { record.diskChanges[setting.parameter.name] = ["from": old, "to": new] }
-            }
+            record.diskChanges = Mac4DSTEMAgentDoor.diskChanges(from: before, to: self.diskDetection.diskParams)
             self.agentLastRun = record
         }
         return id

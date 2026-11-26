@@ -139,6 +139,10 @@ final class AgentDoorKernelTests: XCTestCase {
 
         let radius = try await call("set_probe_radius", ["radius": 2])
         XCTAssertFalse(radius.refused, radius.text)
+        // #515: the answer names the setting it moved, not only the log.
+        let answered = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(radius.text.utf8)) as? [String: Any])
+        let changed = try XCTUnwrap(answered["changed_disk_settings"] as? [String: [String: Double]], radius.text)
+        XCTAssertEqual(changed["min_peak_spacing"]?["to"], Double(expected), radius.text)
         for _ in 0..<250 where state.diskDetection.diskParams.minPeakSpacing != expected { try await Task.sleep(for: .milliseconds(20)) }
         XCTAssertEqual(state.diskDetection.diskParams.minPeakSpacing, expected)
         let moved = "The probe radius also changed disk detection: min_peak_spacing "

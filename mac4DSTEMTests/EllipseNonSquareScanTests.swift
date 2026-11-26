@@ -59,7 +59,7 @@ final class EllipseNonSquareScanTests: XCTestCase {
         // integer, which only worked while the model name held no integer).
         XCTAssertEqual(fits.count, expected.count)
         // The bit patterns of this run, in `expected`'s layout: what to record when a reviewed change moves the fit.
-        print("ellipse non-square bits: \(fits.map { $0.map(\.bitPattern) })")
+        let bits = fits.map { $0.map(\.bitPattern) }
         for (i, (fit, old)) in zip(fits, expected).enumerated() {
             XCTAssertEqual(fit.count, 6)
             for (new, oldBits) in zip(fit, old) {
@@ -67,7 +67,7 @@ final class EllipseNonSquareScanTests: XCTestCase {
                 // Measured: up to 911 ulp (a, case 1: 1.7e-13 relative) between the Xcode test host and the standalone build, and
                 // 1.9e-11 relative (centerQX, case 2) after DiffractoKit 0.24's fit. The rule (D12) is the float64 assert_allclose
                 // default, rtol 1e-7; the row/column truth above is what this test guards.
-                XCTAssertEqual(new, b, accuracy: 1e-7 * abs(b), "case \(i)")
+                XCTAssertEqual(new, b, accuracy: 1e-7 * abs(b), "case \(i); this run's bits: \(bits)")
             }
         }
     }

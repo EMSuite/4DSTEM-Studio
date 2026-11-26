@@ -396,12 +396,16 @@ final class SpectroGoldenTests: XCTestCase {
             let recorded = try String(contentsOf: url, encoding: .utf8)
             if s.text == recorded { continue }
             let a = s.text.split(separator: "\n", omittingEmptySubsequences: false), b = recorded.split(separator: "\n", omittingEmptySubsequences: false)
-            // Every moved line (the first 40), so one run says all a dependency moved and the baseline can be updated at once.
-            let moved = (0..<max(a.count, b.count)).filter { $0 >= a.count || $0 >= b.count || a[$0] != b[$0] }
-            let lines = moved.prefix(40).map { i in
-                "line \(i + 1): now \(i < a.count ? String(a[i]) : "<end>") | baseline \(i < b.count ? String(b[i]) : "<end>")"
+            // The change as a line diff from the baseline (removals at baseline line numbers, insertions at new ones, the first
+            // 300), so one run says all a dependency moved and the baseline can be updated at once.
+            var changes: [String] = []
+            for change in a.difference(from: b) {
+                switch change {
+                case let .remove(offset, line, _): changes.append("- \(offset + 1) \(line)")
+                case let .insert(offset, line, _): changes.append("+ \(offset + 1) \(line)")
+                }
             }
-            XCTFail("\(s.name) moved at \(moved.count) line(s):\n" + lines.joined(separator: "\n"))
+            XCTFail("\(s.name) moved, \(changes.count) line change(s):\n" + changes.prefix(300).joined(separator: "\n"))
         }
     }
 }

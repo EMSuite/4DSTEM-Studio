@@ -106,25 +106,18 @@ final class AppState {
 
     init(
         sessionSidecar: SessionSidecarLocator = SessionSidecarLocator(),
-        materialsProject: MaterialsProjectSettings? = nil,
         preferences: AppPreferences? = nil,
         recents: RecentDatasets? = nil
     ) {
         self.sessionSidecar = sessionSidecar
         self.recents = recents ?? RecentDatasets()
-        // Not a default *parameter* value: `MaterialsProjectSettings` is
-        // `@MainActor`, and a default argument expression is always checked
-        // as nonisolated, regardless of the initializer's own isolation — so
-        // constructing the fallback here, inside the (MainActor) init body,
-        // is what actually compiles.
-        self.materialsProject = materialsProject ?? MaterialsProjectSettings()
         // Local `let`, not `self.preferences`, so the closures handed to
         // `OperationCenter` below capture a plain value instead of `self`
         // before every other stored property has one (two-phase init).
         //
         // Finding C (adversarial review, 2026-09-21): the fallback must not
         // be `AppPreferences()`, whose default store is the real
-        // `UserDefaults.standard` — `sessionSidecar`/`materialsProject` keep
+        // `UserDefaults.standard` — `sessionSidecar` keeps
         // that same real store out of a bare `AppState()` by staying LAZY
         // (nothing touches the store until a caller asks a specific
         // question), but `AppPreferences.init` cannot be made lazy the same
@@ -335,15 +328,6 @@ final class AppState {
             precipitateObjectReport.map(PrecipitateGlyphSet.make)
         }
     }
-    /// Session S5: whether a Materials Project API key is stored, and the
-    /// save/remove actions the Settings scene drives — composition only, no
-    /// forwarding properties (`Session/MaterialsProjectSettings.swift`). This
-    /// is the one piece of state the owner's product decision (Materials
-    /// Project as the default phase source) needs on every window, so no
-    /// other existing owner is the honest home for it. Injectable in `init`
-    /// for the same reason `sessionSidecar` is: the default reads and writes
-    /// the REAL Keychain item, which a test must never touch.
-    let materialsProject: MaterialsProjectSettings
     /// The Settings window's state (session S21, `ROADMAP.md` "Settings
     /// window, Xcode-style sidebar"). Reached from here only for the few
     /// places `AppState` itself must consult a default — seeding a fresh
@@ -352,10 +336,10 @@ final class AppState {
     /// keep-awake closure handed to `operationCenter`. Every VIEW reads
     /// `AppPreferences` from `.environment(preferences)` instead
     /// (`App/FourDSTEMStudioApp.swift`), never through this property. Injectable
-    /// for the same reason `materialsProject` is — a test that wants to
+    /// for the same reason `sessionSidecar` is — a test that wants to
     /// assert on a CHOSEN preference must supply its own suite-private
     /// `AppPreferences(defaults:)` (`AppPreferencesTests.scratchDefaults()`'s
-    /// shape) — but unlike `materialsProject`/`sessionSidecar`, the omitted
+    /// shape) — but unlike `sessionSidecar`, the omitted
     /// case is ALSO safe: `init`'s fallback is a private scratch suite, never
     /// `.standard` (Finding C, adversarial review 2026-09-21; see `init`'s
     /// `scratchPreferencesDefaults()`), so a bare `AppState()` cannot read or

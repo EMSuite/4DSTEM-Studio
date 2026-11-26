@@ -76,38 +76,6 @@ final class ImportAndNetworkMessageTests: XCTestCase {
         XCTAssertEqual(state.phaseMapping.phases.map(\.model.id), ["imported_Al"])
     }
 
-    // MARK: - e3: an offline Materials Project fetch is one plain line
-
-    private struct ThrowingTransport: MaterialsProjectTransport {
-        let error: Error
-        func data(for request: URLRequest) async throws -> (Data, URLResponse) { throw error }
-    }
-
-    /// Mutation: restore `String(describing: error)` in describeFetchError -> the NSURLErrorDomain dump.
-    func testAnOfflineFetchIsAPlainSentence() async {
-        let state = AppState(materialsProject: MaterialsProjectSettings(store: InMemoryAPIKeyStore(initial: "k")))
-        let outcome = await state.fetchMaterialsProject(
-            materialID: "mp-134", expectation: PhaseExpectation(formula: "Al", spaceGroupNumber: 225),
-            transport: ThrowingTransport(error: URLError(.notConnectedToInternet)))
-        guard case .failure(let message) = outcome else { return XCTFail("expected .failure, got \(outcome)") }
-        XCTAssertFalse(message.contains("NSURLErrorDomain"), message)
-        XCTAssertFalse(message.contains("UserInfo"), message)
-        XCTAssertTrue(message.contains("materialsproject.org"), message)
-    }
-
-    /// The other network codes share the line; an unmapped URLError uses its localized text, not a dump.
-    /// Mutations: drop `.timedOut` from the case list -> no "materialsproject.org" (red); `String(describing:)` as the URLError fallback -> the dump (red).
-    func testOtherNetworkCodesAndTheLocalizedFallback() {
-        for code in [URLError.Code.timedOut, .cannotFindHost, .cannotConnectToHost, .networkConnectionLost] {
-            XCTAssertTrue(AppState.describeFetchError(URLError(code)).contains("materialsproject.org"), "\(code)")
-        }
-        // A system URLError carries NSLocalizedDescription; a bare synthetic one only the generic
-        // "(NSURLErrorDomain error -1011.)" text, which is not the production shape.
-        let sentence = "The server returned a bad response."
-        let other = AppState.describeFetchError(URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: sentence]))
-        XCTAssertEqual(other, sentence)
-    }
-
     // MARK: - e6: ⌘R follows readiness; a refused run says why
 
     /// Phase mapping with no phase: the menu predicate is false (the toolbar's Map Phases is disabled for the same reason).

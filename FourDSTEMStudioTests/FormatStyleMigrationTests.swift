@@ -25,20 +25,6 @@ final class FormatStyleMigrationTests: XCTestCase {
         }
     }
 
-    /// The Materials Project provenance line's fetch time: medium date, short time (U+202F before AM/PM in English).
-    func testMaterialsProjectFetchTimeIsUnchanged() {
-        let nnbsp = "\u{202F}"
-        let enStrings = ["Oct 8, 2026 at 12:00\(nnbsp)AM", "Oct 8, 2026 at 12:00\(nnbsp)PM", "Oct 8, 2026 at 2:03\(nnbsp)PM",
-                         "Oct 8, 2026 at 11:59\(nnbsp)PM", "Jan 5, 2026 at 9:07\(nnbsp)AM"]
-        let deStrings = ["08.10.2026, 00:00", "08.10.2026, 12:00", "08.10.2026, 14:03", "08.10.2026, 23:59", "05.01.2026, 09:07"]
-        let instants = ["2026-10-08T00:00:00Z", "2026-10-08T12:00:05Z", "2026-10-08T14:03:22Z",
-                        "2026-10-08T23:59:59Z", "2026-01-05T09:07:03Z"]
-        for (i, iso) in instants.enumerated() {
-            XCTAssertEqual(MaterialsProjectImportSheet.displayDate(instant(iso), locale: en, timeZone: utc), enStrings[i], "en_US \(iso)")
-            XCTAssertEqual(MaterialsProjectImportSheet.displayDate(instant(iso), locale: de, timeZone: utc), deStrings[i], "de_DE \(iso)")
-        }
-    }
-
     // MARK: - Numbers (C2)
 
     private let nnbsp = "\u{202F}"

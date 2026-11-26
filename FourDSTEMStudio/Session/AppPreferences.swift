@@ -7,8 +7,7 @@
 //        where the export is chosen; every other reader reaches it through
 //        `.environment(preferences)`.
 //
-//  Injectable store, same shape as `MaterialsProjectSettings`'s injectable
-//  `APIKeyStore` and `SessionSidecarLocator`'s injectable bookmark store: a
+//  Injectable store, same shape as `SessionSidecarLocator`'s injectable bookmark store: a
 //  test must never touch the real `UserDefaults.standard` domain — construct
 //  with `UserDefaults(suiteName:)` and remove the suite afterward.
 //

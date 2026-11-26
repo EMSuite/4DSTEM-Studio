@@ -482,7 +482,8 @@ extension AppState {
             }
             return
         }
-        switch record.restored(held: acomSession.importedCrystalModels) {
+        // A phase from My Phases (#513) resolves from the library when the window does not hold it.
+        switch record.restored(held: heldAndLibraryCrystalModels) {
         case .failure(let refusal):
             activityLog.record(refusal.description)
         case .success(let setup):
@@ -494,6 +495,7 @@ extension AppState {
                 }
                 acomSession.importedCIFSources[entry.model.id] = entry.cif
             }
+            for model in setup.phases.map(\.model) { holdLibraryPhase(id: model.id) }
             phaseMapping.phases = setup.phases
             phaseMapping.reference = setup.reference
             phaseMapping.matching = setup.matching
@@ -524,7 +526,8 @@ extension AppState {
                 compositionJoin: precipitateJoins.composition, strainJoin: precipitateJoins.strain,
                 variantJoin: precipitateJoins.variants, variantSettings: precipitateVariantSettings,
                 endOnDirection: precipitateJoins.variantEndOnDirection, variantDirections: precipitateJoins.variantDirections,
-                variantDefaultToleranceDegrees: precipitateJoins.variantDefaultToleranceDegrees)
+                variantDefaultToleranceDegrees: precipitateJoins.variantDefaultToleranceDegrees,
+                variantFamilyNames: precipitateJoins.variantFamilyNames, variantWarning: precipitateJoins.variantWarning)
         } catch {
             // Nil: the objects cannot be measured. Said once in the Output, in the classification's words (mac4DSTEM#300).
             sayPrecipitateReportRefusal(error)

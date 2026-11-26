@@ -32,6 +32,8 @@
 		300000000000000000000402 /* ShellMetal in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000401 /* ShellMetal */; };
 		300000000000000000000404 /* ShellControls in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000403 /* ShellControls */; };
 		300000000000000000000406 /* ShellInspector in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000405 /* ShellInspector */; };
+		300000000000000000000418 /* ShellPhaseLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000417 /* ShellPhaseLibrary */; };
+		300000000000000000000420 /* ShellPhaseViews in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000419 /* ShellPhaseViews */; };
 		300000000000000000000408 /* ShellLayout in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000407 /* ShellLayout */; };
 		300000000000000000000414 /* ShellAgentDoor in Frameworks */ = {isa = PBXBuildFile; productRef = 300000000000000000000413 /* ShellAgentDoor */; };
 		300000000000000000000410 /* ShellSpectroscopy in Frameworks */ = {isa = PBXBuildFile; productRef = 30000000000000000000040F /* ShellSpectroscopy */; };
@@ -363,6 +365,8 @@
 				300000000000000000000402 /* ShellMetal in Frameworks */,
 				300000000000000000000404 /* ShellControls in Frameworks */,
 				300000000000000000000406 /* ShellInspector in Frameworks */,
+				300000000000000000000418 /* ShellPhaseLibrary in Frameworks */,
+				300000000000000000000420 /* ShellPhaseViews in Frameworks */,
 				300000000000000000000408 /* ShellLayout in Frameworks */,
 				300000000000000000000410 /* ShellSpectroscopy in Frameworks */,
 				300000000000000000000412 /* ShellEDXModel in Frameworks */,
@@ -490,6 +494,8 @@
 				300000000000000000000401 /* ShellMetal */,
 				300000000000000000000403 /* ShellControls */,
 				300000000000000000000405 /* ShellInspector */,
+				300000000000000000000417 /* ShellPhaseLibrary */,
+				300000000000000000000419 /* ShellPhaseViews */,
 				300000000000000000000407 /* ShellLayout */,
 				30000000000000000000040F /* ShellSpectroscopy */,
 				300000000000000000000411 /* ShellEDXModel */,
@@ -1808,6 +1814,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
 			productName = ShellInspector;
+		};
+		300000000000000000000417 /* ShellPhaseLibrary */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellPhaseLibrary;
+		};
+		300000000000000000000419 /* ShellPhaseViews */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */;
+			productName = ShellPhaseViews;
 		};
 		300000000000000000000407 /* ShellLayout */ = {
 			isa = XCSwiftPackageProductDependency;

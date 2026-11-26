@@ -53,7 +53,7 @@ final class DemoV3VariantsTests: XCTestCase {
         let objects = try PrecipitateSegmentation.classObjects(labels: labeled.labels, width: map.width, height: map.height, roles: labeled.roles,
                                                            pixelSize: nil, pixelUnit: nil)
         let outcome = ObjectVariantJoin.run(objects: objects, map: map, library: state.phaseMapping.lastLibrary,
-                                            matrixEntryIndex: state.phaseMapping.lastRun?.matrixEntryIndex, settings: VariantSettings())
+                                            matrixEntryIndex: state.phaseMapping.lastRun?.matrixEntryIndex, settings: VariantSettings(example: .betaDoublePrimeInAl))
         XCTAssertNil(outcome.result.unavailable)
 
         // Each planted precipitate: the object that holds most of its pixels, and that object's assignment.
@@ -121,7 +121,7 @@ final class DemoV3VariantsTests: XCTestCase {
             run: run, crystals: state.phaseMapping.phases.map(\.model.structure), candidateIndex: [nil, 0],
             reachInvAngstrom: try XCTUnwrap(state.phaseMapping.lastRun?.libraryKMaxInvAngstrom), pairRadiusInvAngstrom: state.phaseMapping.matching.pairRadiusInvAngstrom,
             excitationSlabs: [0, PhaseMappingProduct.structuresExcitationSlabDefault])
-        let outcome = ObjectVariantJoin.run(objects: objects, map: map, library: nil, matrixEntryIndex: nil, settings: VariantSettings(),
+        let outcome = ObjectVariantJoin.run(objects: objects, map: map, library: nil, matrixEntryIndex: nil, settings: VariantSettings(example: .betaDoublePrimeInAl),
                                             structureRun: structureRun)
         XCTAssertNil(outcome.result.unavailable)
 
@@ -164,7 +164,7 @@ final class DemoV3VariantsTests: XCTestCase {
         // What the legend, the object table and the CSV say (seen on screen in the PR 253 check, pinned here).
         let report = try PrecipitateObjectReport.make(
             objects: objects, phaseNames: map.phaseNames, matrixPhaseIndex: map.matrixPhaseIndex, pixelSize: nil, pixelUnit: nil, minimumAreaPx: 1,
-            variantJoin: outcome.result, variantSettings: VariantSettings(), endOnDirection: outcome.endOnDirection,
+            variantJoin: outcome.result, variantSettings: VariantSettings(example: .betaDoublePrimeInAl), endOnDirection: outcome.endOnDirection,
             variantDirections: outcome.habitFamilies, variantDefaultToleranceDegrees: outcome.defaultToleranceDegrees)
         let variantRows = (report.variantGroups ?? []).filter { $0.kind == .variant }
         let titles = variantRows.map(\.title)

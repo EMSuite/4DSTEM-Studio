@@ -89,7 +89,8 @@ silently feeding strain or ACOM.
 robust local lattice fits, component-median reference, εxx/εyy/εxy/θ with
 unfittable positions as explicit no-data.
 **ACOM orientation mapping.** Polar-correlation template matching against a
-`CrystalModel` from the Materials Project (by mp-id) or an imported CIF; the
+`CrystalModel` from the shared phase library (EMSuiteUI `ShellPhaseLibrary`:
+the Materials Project, the person's CIFs, My Phases) or an imported CIF; the
 built-in library (cubic presets, HCP magnesium, 2H-WS₂, custom cubic) remains
 as a replay resolver only. CPU and Metal backends with parity gating,
 reliability, IPF-Z maps, Euler output in py4DSTEM's frame and convention
@@ -173,7 +174,7 @@ Placement is wiring.
 | App-side reader adapters over FormatoKit, calibration model, EMD writer, product model | `FourDSTEMStudio/Core/Data/` |
 | Cancellation (the Metal engine is EMSuiteUI's `ShellMetal`, the FFTs ImagoKit's) | `FourDSTEMStudio/Core/Compute/` |
 | Analysis algorithms (virtual detector, solvers, disks, strain, DPC, parallax, ptycho) | `FourDSTEMStudio/Core/Analysis/` |
-| Crystal model, CIF and Materials Project import, the ACOM orientation plan and backend choice (cells, presets, scattering factors and the CPU and Metal matcher are DiffractoKit's) | `FourDSTEMStudio/Core/Crystal/` |
+| Crystal model, CIF import, the ACOM orientation plan and backend choice (cells, presets, scattering factors and the CPU and Metal matcher are DiffractoKit's) | `FourDSTEMStudio/Core/Crystal/` |
 | Learned stages: the Core ML inference class and its scan orchestration (C7) | `FourDSTEMStudio/Core/ML/`; the pinned asset and its record JSON in `FourDSTEMStudio/Resources/DiskDetector/` (a folder resource, compiled at load); its session owner `Session/LearnedDetection.swift` |
 | EDS spectrum images: opening, line windows, maps, quantification inputs, exports (the science is SpectroKit's) | `FourDSTEMStudio/Core/EDS/`; the room in `FourDSTEMStudio/UI/EDS/` |
 | 4D × EDS registration | `FourDSTEMStudio/Core/Spectroscopy/Registration/` |
@@ -215,7 +216,7 @@ it. Current owners (`FourDSTEMStudio/Session/`): `ACOMSession`, `ACOMWorkflow`,
 `CalibrationSession`, `DatasetResidency`, `DatasetSession`,
 `DiffractionGroupsProduct`, `DiskCentreLabels`, `DiskDetectionProduct`,
 `DPCProduct`, `FitOverlayPresentation`, `LearnedDetection`, `LoadedView`,
-`MaterialsProjectKeyStore`, `MaterialsProjectSettings`, `OperationCenter`,
+`OperationCenter`,
 `PhaseContrastProduct`, `PhaseMapObjectsBridge`, `PhaseMappingProduct`,
 `PrecipitateClassificationProduct`, `PromotionRun`, `QCalibrationRun`,
 `RecentDatasets`, `ReplayPlan`, `ReplayRun`, `ResultPresentation`,
@@ -224,7 +225,7 @@ it. Current owners (`FourDSTEMStudio/Session/`): `ACOMSession`, `ACOMWorkflow`,
 `WorkspaceRecovery`; each with its own `App/AppState+<Feature>.swift`
 orchestration file where cross-owner logic needs one (`+ACOM`,
 `+Calibration`, `+DatasetSession`, `+DiffractionGroups`, `+DiskDetection`,
-`+DPC`, `+MaterialsProject`, `+Open`, `+PhaseContrast`, `+PhaseMapping`,
+`+DPC`, `+Open`, `+PhaseContrast`, `+PhaseMapping`,
 `+Promote`, `+Replay`, `+ResultPresentation`).
 The target the seams plan cited goes further
 than what shipped: one immutable `ScientificProduct` value type (pixels,

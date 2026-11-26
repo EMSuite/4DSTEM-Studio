@@ -63,7 +63,7 @@ extension Mac4DSTEMAgentDoor {
         // MARK: ACOM (#226)
         AgentTool(name: "set_acom", title: "ACOM settings",
                   summary: "Sets ACOM's panel, only what is given: the phase model from a CIF in the Agent folder (as Import CIF "
-                      + "does), the area (preview, selectedRegion around the selected scan position with region_radius, or "
+                      + "does) or from My Phases by phase_id (as Add Phase… does), the area (preview, selectedRegion around the selected scan position with region_radius, or "
                       + "fullScan), quality, engine, in-plane refinement, the map shown and the IPF map's confidence gate "
                       + "(reliability_threshold 0 to 1; clear_reliability_threshold goes back to automatic). Answers the settings "
                       + "and, after a run, how many positions matched and how many pass the gate. The Q calibration is Prepare's "
@@ -71,6 +71,7 @@ extension Mac4DSTEMAgentDoor {
                   input: .window,
                   parameters: [
                       AgentParameter("phase_cif", .text, summary: "A CIF in the Agent folder, as list_agent_folder names it."),
+                      AgentParameter("phase_id", .text, summary: "A phase of My Phases by its id (list_phases), instead of a CIF."),
                       AgentParameter("scope", .choice(caseNames(ACOMRunScope.self)), summary: "preview, selectedRegion or fullScan."),
                       AgentParameter("region_radius", .integer(4...4096), summary: "selectedRegion: half-size in scan pixels."),
                       AgentParameter("quality", .choice(caseNames(ACOMQualityPreset.self)), summary: "fast, balanced or best."),
@@ -88,6 +89,11 @@ extension Mac4DSTEMAgentDoor {
             if let path = call.arguments["phase_cif"] {
                 switch importCIF(path, into: state) {
                 case .success: break
+                case .failure(let refusal): return .refusal(status: refusal.status, message: refusal.message)
+                }
+            } else if let id = call.arguments["phase_id"] {
+                switch libraryPhase(id: id) {
+                case .success(let phase): state.useLibraryPhase(phase, as: .acom)
                 case .failure(let refusal): return .refusal(status: refusal.status, message: refusal.message)
                 }
             }

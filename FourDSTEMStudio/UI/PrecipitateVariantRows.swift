@@ -26,11 +26,14 @@ struct PrecipitateVariantRows: View {
         Toggle("Count variants", isOn: Binding(
             get: { appState.precipitateVariantSettings != nil },
             set: { appState.setPrecipitateVariantSettings($0 ? VariantSettings() : nil) }))
-            .help("Name each object's orientation-relationship variant from the phase map's winning orientation per position (twelve for beta'' in Al), "
-                  + "and count the needles per direction and per variant.")
+            .help("Name each object's orientation-relationship variant from the phase map's winning orientation per position, "
+                  + "and count the precipitates per habit direction and per variant. The relationship is the one you type or pick.")
             .accessibilityIdentifier("precipitates.variants.section")
         if let settings {
             controls(settings)
+            if let warning = report.variantWarning {
+                InspectorWarning(warning).accessibilityIdentifier("precipitates.variants.warning")
+            }
             if let why = report.variantUnavailable {
                 InspectorNote(why).accessibilityIdentifier("precipitates.variants.unavailable")
             } else if let groups = report.variantGroups {
@@ -54,13 +57,8 @@ struct PrecipitateVariantRows: View {
                 .accessibilityIdentifier("precipitates.variants.phase")
             }
         }
-        InspectorRow("Orientation relationship") {
-            Picker("Orientation relationship", selection: Binding(get: { settings.orientationRelationship },
-                                                                  set: { update({ s, v in s.orientationRelationship = v }, with: $0) })) {
-                ForEach(OrientationRelationshipPreset.allCases) { Text($0.title).tag($0) }
-            }
-            .labelsHidden()
-            .accessibilityIdentifier("precipitates.variants.orPicker")
+        VariantRelationshipFields(relationship: settings.relationship) { relationship in
+            update({ s, v in s.relationship = v }, with: relationship)
         }
         InspectorRow("Angle tolerance") {
             OptionalNumericField(title: "Angle tolerance", value: settings.toleranceDegrees, format: .number, unit: "°",
@@ -149,5 +147,91 @@ nonisolated enum VariantGroupText {
         let assigned = groups.filter { $0.kind == .direction }.reduce(0) { $0 + $1.countedObjects }
         let unassigned = groups.first { $0.kind == .unassigned }?.countedObjects ?? 0
         return "\(assigned) assigned + \(unassigned) unassigned = \(assigned + unassigned) counted."
+    }
+}
+
+/// The relationship as a paper states it (#512): two parallel pairs in one field, the habit and its axis, committed on Return once
+/// all three are there. Empty until the person types one: no built-in relationship is offered, for any material (a session saved
+/// with one of the three Al relationships of 5.4 replays it, and its note names the paper). A field that does not read is named
+/// and the standing relationship stays.
+private struct VariantRelationshipFields: View {
+    let relationship: VariantRelationship?
+    let commit: (VariantRelationship?) -> Void
+    @State private var pairs = ""
+    @State private var habit: OrientationRelationshipPreset.Habit?
+    @State private var axis = ""
+    @State private var refusal: String?
+
+    var body: some View {
+        InspectorRow("Relationship") {
+            TextField("Relationship", text: $pairs, prompt: Text("(h k l) ∥ (h k l), [u v w] ∥ [u v w]"))
+                .labelsHidden()
+                .onSubmit(apply)
+                .accessibilityIdentifier("precipitates.variants.orPairs")
+        }
+        .onChange(of: relationship, initial: true) { _, new in
+            pairs = new?.pairs ?? ""
+            habit = new?.habit
+            axis = new?.habitAxisText ?? ""
+            refusal = nil
+        }
+        .help("Two parallel pairs, the precipitate's first, as a paper states them: planes in ( ), directions in [ ]. The first pair is "
+              + "kept exact, the second fixes the rotation about it (orix from_align_vectors). Return applies.")
+        InspectorRow("Habit") {
+            Picker("Habit", selection: Binding(get: { habit }, set: { habit = $0; apply() })) {
+                Text("Choose").tag(OrientationRelationshipPreset.Habit?.none)
+                Text("Needle").tag(OrientationRelationshipPreset.Habit?.some(.needle))
+                Text("Plate").tag(OrientationRelationshipPreset.Habit?.some(.plate))
+            }
+            .labelsHidden().fixedSize()
+            .accessibilityIdentifier("precipitates.variants.habit")
+        }
+        .help("A needle lies along its habit axis; a plate stands on it (the axis is its normal).")
+        InspectorRow("Habit axis") {
+            TextField("Habit axis", text: $axis, prompt: Text("[u v w]"))
+                .labelsHidden()
+                .onSubmit(apply)
+                .accessibilityIdentifier("precipitates.variants.habitAxis")
+        }
+        .help("The needle axis or the plate normal, a direction of the precipitate.")
+        if let example = relationship?.example {
+            InspectorNote("\(example.precipitateName) in \(example.matrixName) as \(example.citation) state it.")
+                .accessibilityIdentifier("precipitates.variants.exampleNote")
+        }
+        if let refusal {
+            InspectorNote(refusal).accessibilityIdentifier("precipitates.variants.orRefusal")
+        }
+        if relationship != nil {
+            InspectorActionRow {
+                Button("Clear Relationship") { commit(nil) }
+                    .accessibilityIdentifier("precipitates.variants.clearRelationship")
+            }
+        }
+    }
+
+    private func apply() {
+        let typed = pairs.trimmingCharacters(in: .whitespacesAndNewlines), axisText = axis.trimmingCharacters(in: .whitespaces)
+        if typed.isEmpty && axisText.isEmpty && habit == nil {
+            refusal = nil
+            commit(nil)
+            return
+        }
+        guard !typed.isEmpty, let habit, !axisText.isEmpty else {
+            refusal = "Type the two pairs, choose the habit and type its axis; the relationship applies once all three are there."
+            return
+        }
+        guard let parsed = PhaseMappingSlot.parseOrientationRelationships(typed), parsed.count == 2 else {
+            refusal = VariantError.pairsDoNotRead(typed).localizedDescription
+            return
+        }
+        guard let uvw = PhaseMappingSlot.parseZoneAxis(axisText), uvw != .zero else {
+            refusal = "\(axisText) is not a direction [u v w]."
+            return
+        }
+        refusal = nil
+        let next = VariantRelationship(pairs: typed, habit: habit, habitAxis: uvw)
+        // Return on a replayed example's own fields keeps it.
+        if let current = relationship, current.pairs == next.pairs, current.habit == habit, current.habitAxis == uvw { return }
+        commit(next)
     }
 }

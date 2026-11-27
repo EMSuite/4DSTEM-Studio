@@ -308,12 +308,12 @@ whole.quantification.axisLocked = false
 whole.quantification.refinement.fileOffset = 0000000000000000 0
 whole.quantification.refinement.fileScale = 3f847ae147ae147b 0.01
 whole.quantification.refinement.fileResolutionMnKaEV = 4060400000000000 130
-whole.quantification.refinement.offset = bfb2ac23532f9062 -0.072939117249519764
-whole.quantification.refinement.scale = 3f85810624da2061 0.0104999999996524
-whole.quantification.refinement.resolutionMnKaEV = 40619952d76ff636 140.79136249415905
-whole.quantification.refinement.rssFile = 40e6506c66e31e45 45699.387559470291
-whole.quantification.refinement.rssRefined = 40daadecacd6b24a 27319.698049234496
-whole.quantification.refinement.iterations = 319
+whole.quantification.refinement.offset = bfb2add580e0e41d -0.07296499630400928
+whole.quantification.refinement.scale = 3f85810624da00c8 0.010499999999638368
+whole.quantification.refinement.resolutionMnKaEV = 40619908779ab2c6 140.78228359426993
+whole.quantification.refinement.rssFile = 40e61a656c3b1a82 45267.169461776517
+whole.quantification.refinement.rssRefined = 40daae01b5ac25af 27320.026713406372
+whole.quantification.refinement.iterations = 180
 whole.quantification.refinement.converged = false
 whole.quantification.refinement.parametersAtBound: array 1
 whole.quantification.refinement.parametersAtBound[0] = "gain"
@@ -346,7 +346,7 @@ whole.quantification.qualityLabel = "χ²ᵣ (Pearson)"
 whole.quantification.quality = 3fe3ab46c640c6c8 0.61465777131362476
 whole.quantification.footerLines: array 10
 whole.quantification.footerLines[0] = "least squares, unweighted · continuum: Kramers×Bernstein(9,5), split at 1.5596 keV (step broadened by the detector resolution); orders chosen on synthetic data · escape peaks: none (no line above the Si K edge, 1.839 keV)"
-whole.quantification.footerLines[1] = "energy axis: file 0.000 keV + 0.0100 keV/ch → refined -72.9 eV, gain +5.000 %, FWHM(Mn Kα) 141 eV; NOT used (stopped at its bound: gain +5.000 % (bound ±5 %))"
+whole.quantification.footerLines[1] = "energy axis: file 0.000 keV + 0.0100 keV/ch → refined -73.0 eV, gain +5.000 %, FWHM(Mn Kα) 141 eV; NOT used (stopped at its bound: gain +5.000 % (bound ±5 %))"
 whole.quantification.footerLines[2] = "beam 200 kV · typed"
 whole.quantification.footerLines[3] = "fit range 0.2–10.23 keV (default; the axis end) · 1024 px pooled (Whole map)"
 whole.quantification.footerLines[4] = "sum peaks tested, not kept: Al_Ka + Al_Ka alone is c / σ_c = 0.0 (needs 3); the default fit (one Gaussian per line, no sum peaks)"
@@ -389,7 +389,7 @@ whole.quantification.unlistedCheckPending = false
 whole.quantification.abundanceCaveat = nil
 whole.quantification.appliedSumEscape = nil
 whole.quantification.continuumDeadLayerMicrons = nil
-whole.csv-fnv = 6a388a7237708681
+whole.csv-fnv = b9af1a4dadcb0b6c
 whole.rangeSensitivity = nil
 whole.unlistedProposal.candidates: array 16
 whole.unlistedProposal.candidates[0].element = "Tm"
@@ -718,4 +718,4 @@ whole.withholding[1][0] = 40ada72c41be340c 3795.5864390791448
 whole.withholding[1][1] = 0000000000000000 0
 whole.withholding[1][2] = 0000000000000000 0
 whole.withholding.caveat = nil
-whole.csv-withholding-fnv = a47f2abbc85727ac
+whole.csv-withholding-fnv = 43e2f9ceb261dec1

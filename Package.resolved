@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/EMSuite/CuboKit",
       "state" : {
-        "revision" : "bfb70ea97db87196351f4cc29c7738221c39f9b0",
-        "version" : "0.12.1"
+        "revision" : "29eb4b29a0d23064c48faecb45d40c36ffff18e7",
+        "version" : "0.13.0"
       }
     },
     {
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/EMSuite/FormatoKit",
       "state" : {
-        "revision" : "346385f7a5812b6d0b388db804fa771ecc70e0e9",
-        "version" : "0.21.0"
+        "revision" : "347b88382f544cd9bd7e7ceb431d8784eb32a980",
+        "version" : "0.22.0"
       }
     },
     {
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/EMSuite/ImagoKit",
       "state" : {
-        "revision" : "4af4d49816d6d0fa55975faba48c403a2ac9240f",
-        "version" : "0.11.0"
+        "revision" : "ef3a9ca67ff0f851c7a7eec44d68ec9d3f93368e",
+        "version" : "0.12.0"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/EMSuite/SpectroKit",
       "state" : {
-        "revision" : "025c564450cd3ce00ebcc06e81b7d73af8b6f1a9",
-        "version" : "0.17.1"
+        "revision" : "bfebaecc0ab5c83fb6d66ea120a8fbdbdb54511f",
+        "version" : "0.17.2"
       }
     }
   ],

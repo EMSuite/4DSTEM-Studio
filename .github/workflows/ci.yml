@@ -59,6 +59,7 @@
 # passing, as in DOCS ONLY) and `scientific` does not run; the Linux jobs run. What a light run gives up, a break between
 # two pull requests that each passed alone, the tag's own `unit` run still catches before anything is notarized. Any other
 # file, a base without that proof, or a branch that is not release-please's: the full by-hand run, as before.
+# A light run also reports the required `pr` check (job `pr-light`), which checks.yml cannot on a PR the bot opened.
 #
 # XCODE: every job uses Xcode 26.6 (DEVELOPER_DIR below), never the image's
 # default, so an image update cannot change the toolchain on an unchanged tree.
@@ -380,6 +381,33 @@ jobs:
         run: docker run --rm -v "$PWD:/work" -w /work --entrypoint swiftlint ghcr.io/realm/swiftlint:0.65.1 lint --strict --quiet
       - name: SwiftFormat
         run: docker run --rm -v "$PWD:/work" -w /work --entrypoint swiftformat ghcr.io/nicklockwood/swiftformat:0.64.4 --lint .
+
+  # The required `pr` check (the suite's checks.yml: a conventional-commit title, an issue named) on a light run. The Release
+  # PR is opened with GITHUB_TOKEN, so its pull_request runs wait for approval and checks.yml's `pr` never reports on it; the
+  # ruleset then blocks the merge although every check that ran passed. Here the same script reads the Release PR's own
+  # title, body and branch (the bot's title is a conventional commit; its branch is exempt from naming an issue), so the
+  # check is the real one, not a stand-in. Only a light dispatch is named `pr`: on every other run this job is skipped under
+  # another name, so it never stands beside checks.yml's `pr` on a pull request.
+  pr-light:
+    name: ${{ inputs.light && 'pr' || 'pr (light Release PR runs only)' }}
+    if: github.event_name == 'workflow_dispatch' && inputs.light
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - name: title and issue (the Release PR's)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --state open --json title,body,headRefName --jq '.[0] // empty')"
+          [[ -n "$pr" ]] || { echo "::error::No open pull request has the head $GITHUB_REF_NAME."; exit 1; }
+          PR_TITLE="$(jq -r .title <<<"$pr")" PR_BODY="$(jq -r .body <<<"$pr")" PR_HEAD="$(jq -r .headRefName <<<"$pr")" \
+            python3 .github/scripts/pr_check.py
 
   private-refs:
     name: No private references

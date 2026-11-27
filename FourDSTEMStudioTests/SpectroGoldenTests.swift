@@ -399,7 +399,8 @@ final class SpectroGoldenTests: XCTestCase {
             if s.text == recorded { continue }
             let a = s.text.split(separator: "\n", omittingEmptySubsequences: false), b = recorded.split(separator: "\n", omittingEmptySubsequences: false)
             // The change as a line diff from the baseline (removals at baseline line numbers, insertions at new ones, the first
-            // 300), so one run says all a dependency moved and the baseline can be updated at once.
+            // 5000), so one run says all a dependency moved and the baseline can be rebuilt from the CI log alone (a cloud session
+            // has no Mac to record on).
             var changes: [String] = []
             for change in a.difference(from: b) {
                 switch change {
@@ -407,7 +408,7 @@ final class SpectroGoldenTests: XCTestCase {
                 case let .insert(offset, line, _): changes.append("+ \(offset + 1) \(line)")
                 }
             }
-            moved.append("\(s.name) moved, \(changes.count) line change(s):\n" + changes.prefix(300).joined(separator: "\n"))
+            moved.append("\(s.name) moved, \(changes.count) line change(s):\n" + changes.prefix(5000).joined(separator: "\n"))
         }
         if !moved.isEmpty { XCTFail(moved.joined(separator: "\n")) }
     }

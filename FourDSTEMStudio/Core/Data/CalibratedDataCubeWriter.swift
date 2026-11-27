@@ -320,10 +320,18 @@ nonisolated extension BraggVectorEMDWriter {
         let layout = EMDDatacubeLayout(
             shape: outputShape, header: header, calibration: emdCalibration(calibration), booleanStorage: .uint8,
             rootAttributes: rootAttributes)
+        // Off a Mac volume (exFAT) built in the temporary folder, then placed (#526, `ForeignVolumeWrite`).
+        let plan: ForeignVolumeWrite.Plan
+        do {
+            plan = try ForeignVolumeWrite.plan(for: destination)
+        } catch {
+            throw writeFailure("creating the calibrated datacube", error)
+        }
         let writer: EMDDatacubeWriter
         do {
-            writer = try EMDDatacubeWriter(destination: destination, layout: layout, sourcePath: sourcePath)
+            writer = try EMDDatacubeWriter(destination: plan.target, layout: layout, sourcePath: sourcePath)
         } catch {
+            plan.discard()
             throw writeFailure("creating the calibrated datacube", error)
         }
         do {
@@ -351,8 +359,10 @@ nonisolated extension BraggVectorEMDWriter {
             }
             try checkCancellation(cancellation)
             try writer.publish()
+            try plan.finish()
         } catch {
             writer.cancel()
+            plan.discard()
             throw writeFailure("writing the calibrated datacube", error)
         }
         progress?(1)

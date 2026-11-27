@@ -440,6 +440,7 @@ mac4dstem_sources() {
           "$core/Data/FormatoArrayFloat32.swift"
           "$core/Data/H5Reader.swift"
           "$core/Data/BraggVectorEMDTypes.swift"
+          "$core/Data/ForeignVolumeWrite.swift"
           "$core/Data/BraggVectorEMDWriter.swift"
           "$core/Data/SessionSidecarReading.swift"
           "$core/Data/SessionSidecarWriting.swift"

@@ -655,7 +655,7 @@
 				30000000000000000000002E /* XCRemoteSwiftPackageReference "FormatoKit" */,
 				30000000000000000000002F /* XCRemoteSwiftPackageReference "ImagoKit" */,
 				300000000000000000000040 /* XCRemoteSwiftPackageReference "EMSuiteUI" */,
-				300000000000000000000502 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				300000000000000000000502 /* XCLocalSwiftPackageReference "Vendor/Sparkle" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
@@ -1642,6 +1642,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = .;
 		};
+		300000000000000000000502 /* XCLocalSwiftPackageReference "Vendor/Sparkle" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/Sparkle;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1691,14 +1695,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.20.0;
-			};
-		};
-		300000000000000000000502 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sparkle-project/Sparkle";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.10.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -1877,7 +1873,7 @@
 		};
 		300000000000000000000500 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 300000000000000000000502 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			package = 300000000000000000000502 /* XCLocalSwiftPackageReference "Vendor/Sparkle" */;
 			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */

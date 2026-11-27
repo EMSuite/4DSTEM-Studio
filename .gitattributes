@@ -7,3 +7,6 @@
 # reports as majority Python, which misdescribes a native Swift/Metal
 # application — and out of diffs by default.
 References/** linguist-vendored
+
+# Sparkle as tools/release/build-sparkle.sh built it (#497): build-info.txt hashes every file, so git never rewrites one.
+Vendor/Sparkle/Sparkle.xcframework/** -text

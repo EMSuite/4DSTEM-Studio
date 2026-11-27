@@ -10,6 +10,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). App
 - **Runs on macOS 26** (was macOS 27) on Apple Silicon. Figure export writes through SwiftUI's `FileDocument`; the toolbar's Save
   button takes its low priority on macOS 26.1 and newer. MacEMUI 0.3.2. CI builds and runs the unit tests again, on Xcode 26.6.
 
+## [5.5.0](https://github.com/EMSuite/4DSTEM-Studio/compare/v5.4.3...v5.5.0) (2026-11-27)
+
+
+### Features
+
+* an agent door a script can rely on: outcomes, readiness, numbers and a deeper Agent folder ([#524](https://github.com/EMSuite/4DSTEM-Studio/issues/524)) ([25178cc](https://github.com/EMSuite/4DSTEM-Studio/commit/25178cceecd014e57f5093cd2e911974a3874afb))
+* an update renames an installed mac4DSTEM.app to 4DSTEM Studio.app ([#529](https://github.com/EMSuite/4DSTEM-Studio/issues/529)) ([6bd1761](https://github.com/EMSuite/4DSTEM-Studio/commit/6bd17611046ca107f68fee6d0a8afd6af04436a2))
+* honest origin, probe and help texts, and the spot pattern's origin in one step ([#521](https://github.com/EMSuite/4DSTEM-Studio/issues/521)) ([da469b9](https://github.com/EMSuite/4DSTEM-Studio/commit/da469b9ddb4e8a88552954d7b978c5b1498110da))
+* precipitate variants for any material, and phases from the shared phase library ([#523](https://github.com/EMSuite/4DSTEM-Studio/issues/523)) ([d59b821](https://github.com/EMSuite/4DSTEM-Studio/commit/d59b821c965147b41e2a03c208b7bd2e1d4dbaf4))
+
+
+### Bug Fixes
+
+* exports from the File menu land on an exFAT drive ([#528](https://github.com/EMSuite/4DSTEM-Studio/issues/528)) ([4cea6a8](https://github.com/EMSuite/4DSTEM-Studio/commit/4cea6a8c9d353a4f059889b73d9eab0575c78e39))
+* the EDX energy-axis refinement reads from 0.6 keV (SpectroKit 0.17.2, FormatoKit 0.22.0, ImagoKit 0.12.0, CuboKit 0.13.0) ([#534](https://github.com/EMSuite/4DSTEM-Studio/issues/534)) ([0341209](https://github.com/EMSuite/4DSTEM-Studio/commit/034120989fa59d03484bc13189a9f87abf0e4e25))
+
 ## [5.4.3](https://github.com/EMSuite/4DSTEM-Studio/compare/v5.4.2...v5.4.3) (2026-11-18)
 
 

@@ -71,16 +71,34 @@ final class SoftwareUpdateTests: XCTestCase {
         XCTAssertEqual(count(#"PRODUCT_BUNDLE_IDENTIFIER = "$(MACEM_APP_ID).QuickLookThumbnail";"#), 3)
     }
 
+    /// The download links Sparkle built with the app-name rename (Vendor/Sparkle), never sparkle-project's package, which ships
+    /// the same framework with the setting off, so an updated mac4DSTEM.app would keep its name (#497). Mutation: the project
+    /// back on the remote package, or the build-info's override dropped - red.
+    func testTheDownloadLinksSparkleBuiltWithTheRename() throws {
+        let project = try text("FourDSTEMStudio.xcodeproj/project.pbxproj")
+        XCTAssertTrue(project.contains("relativePath = Vendor/Sparkle;"))
+        XCTAssertFalse(project.localizedCaseInsensitiveContains("sparkle-project/Sparkle"))
+        let resolved = try text("FourDSTEMStudio.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved")
+        XCTAssertFalse(resolved.localizedCaseInsensitiveContains("sparkle-project/Sparkle"))
+        let info = try text("Vendor/Sparkle/build-info.txt")
+        XCTAssertTrue(info.contains("\noverride SPARKLE_NORMALIZE_INSTALLED_APPLICATION_NAME=1\n"))
+        let pin = try text("tools/lib/sparkle-pin.sh")
+        let tag = try XCTUnwrap(pin.split(separator: "\n").first { $0.hasPrefix("SPARKLE_TAG=") }).dropFirst("SPARKLE_TAG=".count)
+        XCTAssertTrue(info.contains("\ntag \(tag)\n"), "build-info.txt is the pinned tag")
+        XCTAssertTrue(try text("Vendor/Sparkle/Package.swift").contains(#".binaryTarget(name: "Sparkle", path: "Sparkle.xcframework")"#))
+    }
+
     /// Mutation: drop the helper signing, the key check or the feed step from the download; or a store check - red.
     func testTheReleaseScriptsSignTheDownloadsUpdaterAndRefuseItInTheStore() throws {
         let download = try text("tools/release/build-developer-id.sh")
         for check in ["Installer.xpc", "Autoupdate", "Updater.app", "Downloader.xpc", "SUPublicEDKey", "SET-BEFORE-RELEASE",
-                      "-clonedSourcePackagesDirPath", "CURRENT_PROJECT_VERSION=\"$VERSION_SET\"", "mach-lookup"] {
+                      "-clonedSourcePackagesDirPath", "CURRENT_PROJECT_VERSION=\"$VERSION_SET\"", "mach-lookup",
+                      "Vendor/Sparkle/Sparkle.xcframework", "dwarfdump --uuid"] {
             XCTAssertTrue(download.contains(check), "build-developer-id.sh no longer handles \(check)")
         }
         XCTAssertTrue(try text("tools/release.sh").contains("tools/release/appcast.sh"))
         let appcast = try text("tools/release/appcast.sh")
-        for part in ["sign_update", "tools/release/feed.py"] {
+        for part in ["sign_update", "tools/release/feed.py", "SPARKLE_SPM_ZIP_SHA256"] {
             XCTAssertTrue(appcast.contains(part), "appcast.sh no longer runs \(part)")
         }
         let feed = try text("tools/release/feed.py")

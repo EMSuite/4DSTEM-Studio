@@ -411,9 +411,12 @@ package struct CalibrationReadinessReport: Equatable, Sendable {
     package static func expectedProbeRadiusPixels(
         convergenceSemiAngleMrad: Double?, voltageKV: Double?, calibration: Calibration
     ) -> Double? {
+        // The kit's relativistic wavelength (DPC's own), named here so the Data layer needs nothing from Analysis: the
+        // standalone harnesses compile this file without DPC.swift.
         guard let alpha = convergenceSemiAngleMrad, alpha.isFinite, alpha > 0,
-              let voltageKV, let wavelength = DPC.electronWavelengthAngstrom(voltageKV: voltageKV),
-              let q = calibration.qPixelSize, let qInvA = CalibrationUnitConversion.reciprocalInvAngstromPerPixel(
+              let voltageKV, voltageKV.isFinite, voltageKV > 0 else { return nil }
+        let wavelength = ElectronWavelength.angstroms(volts: voltageKV * 1_000)
+        guard let q = calibration.qPixelSize, let qInvA = CalibrationUnitConversion.reciprocalInvAngstromPerPixel(
                   value: Double(q), units: calibration.qPixelUnits, wavelengthAngstrom: wavelength) else { return nil }
         let radius = alpha / 1_000 / wavelength / qInvA
         return radius.isFinite && radius > 0 ? radius : nil

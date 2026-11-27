@@ -55,10 +55,11 @@
 # `light`): the Release PR changes only the version files (CHANGELOG.md, .release-please-manifest.json,
 # Config/Version.xcconfig) on top of a main commit whose code already passed `unit (XCTest)`. A push to main runs no `unit`
 # here (MAIN above), so the proof is the pull request that made that commit: its last CI run passed `unit`, or a run on the
-# commit itself did (the nightly, by hand). `changes` checks both; then `unit` is skipped (GitHub counts a skipped job as
-# passing, as in DOCS ONLY) and `scientific` does not run; the Linux jobs run. What a light run gives up, a break between
-# two pull requests that each passed alone, the tag's own `unit` run still catches before anything is notarized. Any other
+# commit itself did (the nightly, by hand). `changes` checks both; then `unit` reports success from ubuntu-latest with its
+# steps skipped (a skipped required check does not satisfy the ruleset, #530) and `scientific` does not run; the Linux
+# jobs run. What a light run gives up, a break between two pull requests that each passed alone, the tag's own `unit` run still catches before anything is notarized. Any other
 # file, a base without that proof, or a branch that is not release-please's: the full by-hand run, as before.
+# A light run also reports the required `pr` check (job `pr-light`), which checks.yml cannot on a PR the bot opened.
 #
 # XCODE: every job uses Xcode 26.6 (DEVELOPER_DIR below), never the image's
 # default, so an image update cannot change the toolchain on an unchanged tree.
@@ -261,40 +262,53 @@ jobs:
     # Not on a push to main: the PR run tested the change; nightly and tags run it (MAIN in the header). Not on a docs-only
     # pull request (DOCS ONLY in the header). `!cancelled()` runs it although `changes` is skipped (every event but a pull
     # request) or failed (then its answer is empty and the job runs, the safe side).
-    if: ${{ !cancelled() && needs.changes.outputs.macos != 'false' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')) }}
+    # A light Release-PR run (LIGHT in the header): GitHub does not accept a skipped required check (#530, as Electron
+    # Microscopy Studio's #1160), so the job runs on ubuntu-latest with every step but the first skipped, and reports success
+    # only because `changes` found the base commit's own `unit (XCTest)` green.
+    if: ${{ !cancelled() && (needs.changes.outputs.macos != 'false' || needs.changes.outputs.light == 'true') && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')) }}
     # A same-repo pull request: the org's Mac runner while the org variable MACEM_MAC_RUNNER is set and `changes` found it free
     # (MAC OR GITHUB in the header; an empty answer counts as free); a fork PR, tags and the nightly: GitHub's macos-26, the
     # macOS 26 runtime proof. Deleting the variable puts every run back on macos-26 with no PR.
-    runs-on: ${{ github.event_name == 'pull_request' && vars.MACEM_MAC_RUNNER && !github.event.pull_request.head.repo.fork && needs.changes.outputs.mac != 'false' && fromJSON(vars.MACEM_MAC_RUNNER) || 'macos-26' }}
+    runs-on: ${{ needs.changes.outputs.light == 'true' && 'ubuntu-latest' || github.event_name == 'pull_request' && vars.MACEM_MAC_RUNNER && !github.event.pull_request.head.repo.fork && needs.changes.outputs.mac != 'false' && fromJSON(vars.MACEM_MAC_RUNNER) || 'macos-26' }}
     # The three former jobs' timeouts (unit 90, core 30, inventory 10), summed.
     timeout-minutes: 130
     steps:
+      - name: Light run - the base commit's unit run passed (LIGHT in the header)
+        if: needs.changes.outputs.light == 'true'
+        run: echo "Only the version files changed, and changes found the base commit's unit (XCTest) green; nothing to build."
       - uses: actions/checkout@v7
+        if: needs.changes.outputs.light != 'true'
         with:
           # The C5 growth rule reads HEAD^ on a clean tree. The default depth
           # of 1 does not have it, and the read used to fall through to zero,
           # so the inventory could never pass (found 2026-09-09).
           fetch-depth: 2
       - name: Toolchain on record
+        if: needs.changes.outputs.light != 'true'
         run: |
           sw_vers
           xcode-select -p
           xcodebuild -version
           swift --version
       - name: Ensure the Metal toolchain component
+        if: needs.changes.outputs.light != 'true'
         run: |
           if ! xcrun -sdk macosx metal --version >/dev/null 2>&1; then
             sudo xcodebuild -downloadComponent MetalToolchain
           fi
           xcrun -sdk macosx metal --version
       - name: Resolve the kit pins
+        if: needs.changes.outputs.light != 'true'
         # The redistributed-binaries check reads FormatoKit's libhdf5 from the pinned checkout.
         run: swift package resolve
       - name: Run the inventory (cheapest first)
+        if: needs.changes.outputs.light != 'true'
         run: tools/run-tests.sh inventory
       - name: Build the package layers standalone (core)
+        if: needs.changes.outputs.light != 'true'
         run: tools/run-tests.sh core
       - name: Run the unit gate
+        if: needs.changes.outputs.light != 'true'
         run: tools/run-tests.sh unit
 
   scientific:
@@ -380,6 +394,33 @@ jobs:
         run: docker run --rm -v "$PWD:/work" -w /work --entrypoint swiftlint ghcr.io/realm/swiftlint:0.65.1 lint --strict --quiet
       - name: SwiftFormat
         run: docker run --rm -v "$PWD:/work" -w /work --entrypoint swiftformat ghcr.io/nicklockwood/swiftformat:0.64.4 --lint .
+
+  # The required `pr` check (the suite's checks.yml: a conventional-commit title, an issue named) on a light run. The Release
+  # PR is opened with GITHUB_TOKEN, so its pull_request runs wait for approval and checks.yml's `pr` never reports on it; the
+  # ruleset then blocks the merge although every check that ran passed. Here the same script reads the Release PR's own
+  # title, body and branch (the bot's title is a conventional commit; its branch is exempt from naming an issue), so the
+  # check is the real one, not a stand-in. Only a light dispatch is named `pr`: on every other run this job is skipped under
+  # another name, so it never stands beside checks.yml's `pr` on a pull request.
+  pr-light:
+    name: ${{ inputs.light && 'pr' || 'pr (light Release PR runs only)' }}
+    if: github.event_name == 'workflow_dispatch' && inputs.light
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - name: title and issue (the Release PR's)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --state open --json title,body,headRefName --jq '.[0] // empty')"
+          [[ -n "$pr" ]] || { echo "::error::No open pull request has the head $GITHUB_REF_NAME."; exit 1; }
+          PR_TITLE="$(jq -r .title <<<"$pr")" PR_BODY="$(jq -r .body <<<"$pr")" PR_HEAD="$(jq -r .headRefName <<<"$pr")" \
+            python3 .github/scripts/pr_check.py
 
   private-refs:
     name: No private references

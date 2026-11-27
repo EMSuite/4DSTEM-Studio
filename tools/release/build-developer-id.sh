@@ -13,7 +13,7 @@ rm -rf "$ARCHIVE"
 mkdir -p "$OUT"
 # The download's build number is its version (#122): Sparkle compares the feed's sparkle:version with CFBundleVersion, and
 # the project's CURRENT_PROJECT_VERSION does not move between releases (it is the App Store build's). The packages are
-# cloned to build/SourcePackages so tools/release/appcast.sh finds Sparkle's sign_update at one path.
+# cloned to build/SourcePackages, one place per checkout.
 VERSION_SET="$(sed -n 's/^MARKETING_VERSION = \([0-9.]*\).*/\1/p' "$ROOT/Config/Version.xcconfig")"
 
 xcodebuild archive \
@@ -38,14 +38,26 @@ assert_mac4dstem_bundle_arm64_only "$APP"
 # signed a second time here, so a nested piece the archive signed wrongly fails below instead of being papered over.
 # Each signed piece is checked: Developer ID, hardened runtime, secure timestamp; the helper sandboxed, without
 # get-task-allow, arm64 only.
-# Sparkle (#122), the download's updater. The package ships its helpers (the installer and downloader services, Autoupdate,
-# Updater.app) signed by the Sparkle project; the archive copies the framework without signing inside it. Each helper is
-# signed here with the Developer ID, the hardened runtime and a timestamp, inside out, as Sparkle's documentation says for a
+# Sparkle (#122), the download's updater: Vendor/Sparkle's build, which renames an updated mac4DSTEM.app (#497). Its helpers
+# (the installer and downloader services, Autoupdate, Updater.app) come signed ad hoc; the archive copies the framework without
+# signing inside it. First, the helpers must be that build: each one's Mach-O UUIDs as in Vendor/Sparkle (signing and Xcode's
+# copy change the bytes, never the UUIDs), so a project that went back to the stock package cannot ship unnoticed. Each helper
+# is signed here with the Developer ID, the hardened runtime and a timestamp, inside out, as Sparkle's documentation says for a
 # build that is not exported by Xcode; the downloader keeps its own entitlements. Then the app again, keeping its
 # entitlements, because its seal covers the framework. The feed key must be the real one: the placeholder would leave the
 # updater off in every copy.
 SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
 [[ -d "$SPARKLE" ]] || { echo "FAIL: the download has no Sparkle.framework (the updater, #122)" >&2; exit 1; }
+VENDOR=("$ROOT"/Vendor/Sparkle/Sparkle.xcframework/macos-*/Sparkle.framework(N))
+(( ${#VENDOR} == 1 )) || { echo "FAIL: Vendor/Sparkle holds no one macOS Sparkle.framework (tools/release/build-sparkle.sh, #497)" >&2; exit 1; }
+for helper in Versions/B/Autoupdate Versions/B/Updater.app/Contents/MacOS/Updater \
+    Versions/B/XPCServices/Installer.xpc/Contents/MacOS/Installer Versions/B/XPCServices/Downloader.xpc/Contents/MacOS/Downloader; do
+  # The arm64 slice's UUID: the download is arm64, whether or not the copy kept the framework's other slice.
+  shipped="$(xcrun dwarfdump --uuid --arch arm64 "$SPARKLE/$helper" 2>/dev/null | awk '{ print $2 }')"
+  vendored="$(xcrun dwarfdump --uuid --arch arm64 "${VENDOR[1]}/$helper" 2>/dev/null | awk '{ print $2 }')"
+  [[ -n "$vendored" && "$shipped" == "$vendored" ]] \
+    || { echo "FAIL: the download's Sparkle $helper is not Vendor/Sparkle's build (the app-name rename, #497)" >&2; exit 1; }
+done
 KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist" 2>/dev/null || true)"
 [[ -n "$KEY" && "$KEY" != SET-BEFORE-RELEASE ]] \
   || { echo "FAIL: Info-Direct.plist has no public EdDSA key (SUPublicEDKey); tools/release/README.md says how to make it" >&2; exit 1; }

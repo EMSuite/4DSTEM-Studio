@@ -3,8 +3,9 @@
 # Merging the Release PR writes the CHANGELOG entry and the manifest version; the next run tags the merge commit and
 # creates the GitHub release. Tags are v-prefixed (v1.2.3), never moved.
 #
-# A PR opened with GITHUB_TOKEN starts no workflows, so this job dispatches CI on the Release PR's branch: the required
-# `test` check then reports on its head commit. Step env is evaluated even when `if` skips the step, so the PR JSON is
+# A PR opened with GITHUB_TOKEN starts no workflows (its pull_request runs wait for approval), so this job dispatches CI on
+# the Release PR's branch with `light`: the required checks, `unit (XCTest)` (skipped when the light rule holds) and `pr`
+# (ci.yml's `pr-light`), then report on its head commit. Step env is evaluated even when `if` skips the step, so the PR JSON is
 # read with jq rather than fromJSON (empty on a run with no Release PR). Needs "Allow GitHub Actions to create and approve pull requests".
 name: release-please
 

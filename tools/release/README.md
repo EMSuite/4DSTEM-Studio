@@ -64,8 +64,10 @@ build has no updater, because the store updates it and refuses an app that updat
 
 - **One name.** Both builds are **4DSTEM Studio** (`4DSTEM Studio.app`, its executable, CFBundleName and
   CFBundleDisplayName): App Review refuses "Mac" in an App Store app's name (guideline 5.2.5, 5.2.0 rejected
-  2026-11-16), and the website DMG followed in 5.4.3 (#496). An installed `mac4DSTEM.app` updates in place and keeps its
-  file name; Info-Direct.plist's `SUBundleName` is the name a normalizing Sparkle installs to (#497). `Config/Version.xcconfig` sets both (`MACEM_APP_NAME_YES`/`_NO`), the module
+  2026-11-16), and the website DMG followed in 5.4.3 (#496). The download links Sparkle built with
+  `SPARKLE_NORMALIZE_INSTALLED_APPLICATION_NAME=1` (`Vendor/Sparkle`, #497), whose installer moves an updated app to
+  Info-Direct.plist's `SUBundleName`.app; the installer is the installed app's own, so `mac4DSTEM.app` becomes
+  `4DSTEM Studio.app` on the first update after a release that carries it. `Config/Version.xcconfig` sets both (`MACEM_APP_NAME_YES`/`_NO`), the module
   is `FourDSTEMStudio` since 5.5.0 (#510), the bundle identifier is unchanged, and `AppName.display` puts the build's name in the app's
   sentences. `build-app-store.sh` checks the product carries the name, without "mac", under the same identifier.
 - **One switch.** `MACEM_STORE_BUILD` (NO unless the store script sets YES) picks `Info.plist` or `Info-Direct.plist`,
@@ -90,8 +92,8 @@ build has no updater, because the store updates it and refuses an app that updat
   Updater.app) and the framework with the Developer ID, inside out, then the app again keeping its entitlements, and
   checks each one before notarization.
 
-**The key.** `build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys` (there after one `tools/release.sh` or any
-build that resolves the packages into `build/SourcePackages`) makes the EdDSA pair, keeps the private half in the login
+**The key.** `build/sparkle-tools/2.10.1/bin/generate_keys` (`tools/release/appcast.sh` unpacks the pinned tag's official
+Swift Package Manager zip there, checksum in `tools/lib/sparkle-pin.sh`) makes the EdDSA pair, keeps the private half in the login
 keychain and prints the public half, which goes under `SUPublicEDKey` in `FourDSTEMStudio/Info-Direct.plist` (it is public; it
 may be committed and pasted). Back the private half up at once (Keys and backups, below). A lost key is not the end of
 updates: Sparkle accepts an update with a new key when the new app meets the old app's designated requirement
@@ -144,12 +146,12 @@ by `codesign` or `sign_update` asks for the login password once: choose Always A
 ```sh
 security find-identity -v -p codesigning     # lists "Developer ID Application: Paul Lobpreis (3B8SMSSAX4)"
 xcrun notarytool history --keychain-profile macem-notary    # lists past submissions: the profile works
-build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -p   # equals SUPublicEDKey in Info-Direct.plist
+build/sparkle-tools/2.10.1/bin/generate_keys -p   # equals SUPublicEDKey in Info-Direct.plist
 cp /usr/bin/true "$TMPDIR/signtest"
 codesign --force --sign "Developer ID Application: Paul Lobpreis (3B8SMSSAX4)" --options runtime --timestamp "$TMPDIR/signtest"
 codesign -dvv "$TMPDIR/signtest"            # Authority=Developer ID Application …, a Timestamp line
-build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update "$TMPDIR/signtest"   # prints sparkle:edSignature="…"
-build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update --verify "$TMPDIR/signtest" <the signature>
+build/sparkle-tools/2.10.1/bin/sign_update "$TMPDIR/signtest"   # prints sparkle:edSignature="…"
+build/sparkle-tools/2.10.1/bin/sign_update --verify "$TMPDIR/signtest" <the signature>
 codesign -d -r- "/Applications/4DSTEM Studio.app"   # a website install: the requirement names the team, not a certificate
 ```
 

@@ -183,6 +183,7 @@
 				Core/Data/FormatoArrayFloat32.swift,
 				Core/Data/FourDArray.swift,
 				Core/Data/FourDDataSource.swift,
+				Core/Data/ForeignVolumeWrite.swift,
 				Core/Data/GMSFourDRegistration.swift,
 				Core/Data/H5Reader.swift,
 				Core/Data/HDF5HelperClient.swift,
